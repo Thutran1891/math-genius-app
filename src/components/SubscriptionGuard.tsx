@@ -1,8 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, createContext, useContext } from 'react';
 import { auth, db } from '../firebase';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { UserSubscription } from '../types';
 import { Lock, CheckCircle } from 'lucide-react';
+
+// 1. TẠO CONTEXT ĐỂ CHIA SẺ DỮ LIỆU BẢN QUYỀN
+interface SubContextType {
+  isPremium: boolean;
+  daysLeft: number;
+}
+const SubscriptionContext = createContext<SubContextType>({ isPremium: false, daysLeft: 0 });
+
+// Hook để các component con (như QuizInput) gọi lấy dữ liệu
+export const useSubscription = () => useContext(SubscriptionContext);
 
 interface Props {
   children: React.ReactNode;
@@ -24,10 +34,8 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
       let userData: UserSubscription;
 
       if (userSnap.exists()) {
-        // Đã có dữ liệu -> Lấy về
         userData = userSnap.data() as UserSubscription;
       } else {
-        // Người dùng mới -> Tạo dữ liệu dùng thử 30 ngày
         userData = {
           uid: user.uid,
           email: user.email || "",
@@ -35,26 +43,21 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
           startDate: serverTimestamp(),
           isPremium: false
         };
-        // Lưu vào Firestore
         await setDoc(userRef, userData);
       }
 
       setSubStatus(userData);
 
-      // Tính toán thời gian còn lại
-      // Lưu ý: serverTimestamp ban đầu có thể null nếu chưa sync xong, nên cần check
       const start = userData.startDate?.toDate ? userData.startDate.toDate() : new Date();
       const now = new Date();
       
-      // Nếu đã mua Premium -> Tính theo expiryDate
       if (userData.isPremium && userData.expiryDate) {
           const expiry = userData.expiryDate.toDate();
           const diffTime = expiry.getTime() - now.getTime();
           setDaysLeft(Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
       } else {
-          // Nếu đang dùng thử -> Tính 30 ngày từ ngày bắt đầu
           const trialEnd = new Date(start);
-          trialEnd.setDate(trialEnd.getDate() + 30); // Cộng 30 ngày
+          trialEnd.setDate(trialEnd.getDate() + 30);
           const diffTime = trialEnd.getTime() - now.getTime();
           setDaysLeft(Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
       }
@@ -65,10 +68,8 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
     checkSubscription();
   }, []);
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center">Đang kiểm tra bản quyền...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Đang kiểm tra bản quyền...</div>;
 
-  // LOGIC CHẶN CỬA:
-  // Nếu chưa mua (isPremium = false) VÀ số ngày còn lại <= 0 -> CHẶN
   const isExpired = !subStatus?.isPremium && daysLeft <= 0;
 
   if (isExpired) {
@@ -82,7 +83,7 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Hết hạn dùng thử</h2>
           <p className="text-gray-600 mb-6">
-            Bạn đã sử dụng hết 30 ngày miễn phí. Để tiếp tục sử dụng MathGenius AI và lưu trữ lịch sử, vui lòng gia hạn.
+            Bạn đã hết 30 ngày miễn phí. Vui lòng gia hạn để tiếp tục sử dụng.
           </p>
 
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-6 text-left">
@@ -91,7 +92,6 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
                 <li>Tạo đề thi không giới hạn</li>
                 <li>Giải chi tiết + Vẽ hình 3D</li>
                 <li>Lưu lịch sử làm bài</li>
-                <li>Hỗ trợ 24/7</li>
             </ul>
             <div className="mt-3 text-center text-2xl font-black text-blue-600">
                 20.000đ <span className="text-sm font-normal text-gray-500">/ năm</span>
@@ -103,14 +103,14 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
                 Chuyển khoản với nội dung: <br/>
                 <span className="font-mono font-bold text-black bg-gray-200 px-2 py-1 rounded select-all">MG {auth.currentUser?.email?.split('@')[0]}</span>
             </div>
-            {/* Thay ảnh QR của bạn vào đây */}
+            {/* THAY THÔNG TIN TÀI KHOẢN CỦA BẠN VÀO ĐÂY */}
             <img 
-                src={`https://img.vietqr.io/image/KienLongBank-36480233-compact2.jpg?amount=20000&addInfo=MG ${auth.currentUser?.email?.split('@')[0]}&accountName=TRẦN THỊ KIM THU`} 
+                src={`https://img.vietqr.io/image/MB-0912345678-compact2.jpg?amount=20000&addInfo=MG ${auth.currentUser?.email?.split('@')[0]}&accountName=NGUYEN VAN A`} 
                 alt="QR Payment" 
                 className="mx-auto w-48 rounded-lg border"
             />
             <p className="text-xs text-gray-400 mt-2">
-                Sau khi chuyển khoản, vui lòng liên hệ Admin (Zalo: 0397584358) để kích hoạt ngay lập tức.
+                Liên hệ Admin để kích hoạt sau khi chuyển khoản.
             </p>
           </div>
           
@@ -122,15 +122,10 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
     );
   }
 
-  // Nếu còn hạn hoặc đã mua -> Cho vào App, nhưng hiện thông báo nhỏ nếu sắp hết hạn
+  // 2. CUNG CẤP DỮ LIỆU CHO CON (QUIZ INPUT)
   return (
-    <>
-      {!subStatus?.isPremium && daysLeft <= 5 && daysLeft > 0 && (
-          <div className="bg-yellow-100 text-yellow-800 px-4 py-1 text-xs text-center font-medium">
-             ⚠️ Bạn còn {daysLeft} ngày dùng thử. Gia hạn ngay để không gián đoạn!
-          </div>
-      )}
+    <SubscriptionContext.Provider value={{ isPremium: !!subStatus?.isPremium, daysLeft }}>
       {children}
-    </>
+    </SubscriptionContext.Provider>
   );
 };

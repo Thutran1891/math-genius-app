@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { QuizConfig } from '../types';
-import { Sparkles, KeyRound, LogOut } from 'lucide-react';
+import { Sparkles, KeyRound, LogOut, Clock } from 'lucide-react';
 import { auth } from '../firebase'; // Import auth
+import { useSubscription } from './SubscriptionGuard'; // Import Hook lấy ngày
 
 interface Props {
-  // SỬA: Hàm callback nhận thêm apiKey
+  // Hàm callback nhận thêm apiKey
   onGenerate: (config: QuizConfig, apiKey: string) => void;
   isLoading: boolean;
 }
@@ -13,16 +14,18 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
   const [topic, setTopic] = useState('');
   const [prompt, setPrompt] = useState('');
   
-  // --- THÊM STATE CHO API KEY ---
+  // --- STATE CHO API KEY ---
   const [apiKey, setApiKey] = useState('');
   const [saveKey, setSaveKey] = useState(true);
+
+  // Lấy thông tin ngày còn lại từ SubscriptionGuard (MỚI THÊM)
+  const { daysLeft, isPremium } = useSubscription();
 
   // Load Key từ LocalStorage khi mở app
   useEffect(() => {
     const saved = localStorage.getItem('user_gemini_key');
     if (saved) setApiKey(saved);
   }, []);
-  // -----------------------------
 
   const [matrix, setMatrix] = useState({
     TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
@@ -71,6 +74,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
 
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">MathGenius AI</h1>
+        {/* GIỮ NGUYÊN LỜI CHÀO CỦA BẠN */}
         <p className="text-gray-500">Cô Thu chào, {auth.currentUser?.displayName}!</p>
       </div>
 
@@ -169,6 +173,21 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
           <><Sparkles /> TẠO ĐỀ NGAY ({totalQuestions} CÂU)</>
         )}
       </button>
+
+      {/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (MỚI THÊM) --- */}
+      <div className="mt-6 text-center border-t pt-4">
+        {isPremium ? (
+            <div className="text-sm font-bold text-green-600 flex items-center justify-center gap-1">
+                <Sparkles size={16} /> Tài khoản VIP (Không giới hạn)
+            </div>
+        ) : (
+            <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                <Clock size={14} /> 
+                Bạn còn <b className="text-blue-600">{daysLeft} ngày</b> dùng thử miễn phí.
+            </div>
+        )}
+      </div>
+      {/* --------------------------------------- */}
     </div>
   );
 };
