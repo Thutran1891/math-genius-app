@@ -75,7 +75,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">MathGenius AI</h1>
         {/* GIỮ NGUYÊN LỜI CHÀO CỦA BẠN */}
-        <p className="text-gray-500">Cô Thu chào, {auth.currentUser?.displayName}!</p>
+        <p className="text-gray-500">Cô Thu mến chào, {auth.currentUser?.displayName}!</p>
       </div>
 
       {/* --- KHU VỰC NHẬP API KEY --- */}
