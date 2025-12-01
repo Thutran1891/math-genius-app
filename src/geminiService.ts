@@ -65,7 +65,7 @@ const questionSchema: any = {
     questionText: { type: SchemaType.STRING, description: "Nội dung câu hỏi (LaTeX $). KHÔNG HTML. Trừ bảng thống kê." },
     options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     correctAnswer: { type: SchemaType.STRING },
-    explanation: { type: SchemaType.STRING },
+    explanation: { type: SchemaType.STRING, description: "Lời giải chi tiết. Dùng ký tự '\\n' để xuống dòng giữa các bước giải. Trình bày thoáng, dễ đọc." },
 
     // Cấu trúc bắt buộc cho câu Đúng/Sai
     statements: {
@@ -164,7 +164,8 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       - 'questionText': Nội dung câu hỏi (LaTeX $).
       - Đồ thị hàm số: Dùng 'graphFunction'.
       - Bảng biến thiên: Dùng 'variationTableData'.
-      - Trong lời giải cần ngắt dòng (\n) và có câu chốt cuối cùng: Vậy đáp án đúng là ...
+      - 'explanation': Lời giải chi tiết. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
+      - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
 
       Trả về JSON mảng ${totalQuestions} câu.
     `;

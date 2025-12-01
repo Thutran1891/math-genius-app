@@ -28,7 +28,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         setUserAnswer(question.userAnswer);
         setIsChecked(true); // Khóa lại
         setIsCorrect(!!question.isCorrect);
-        setShowExplanation(true); // Hiện luôn lời giải
+        setShowExplanation(false); // Hiện luôn lời giải
     } else {
         // Reset nếu là bài làm mới
         setUserAnswer(question.type === 'DS' ? {} : '');
