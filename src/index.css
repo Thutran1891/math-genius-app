@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Import CSS của KaTeX để hiển thị công thức Toán (căn bậc 2, phân số...) */
+@import "katex/dist/katex.min.css"; 
+
+/* Thiết lập màu nền chung cho toàn bộ ứng dụng */
+body {
+  background-color: #f8fafc; /* Màu xám rất nhạt, dịu mắt */
+}
