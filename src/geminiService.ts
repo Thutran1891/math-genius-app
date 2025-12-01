@@ -64,7 +64,7 @@ const questionSchema: any = {
     type: { type: SchemaType.STRING, enum: ['TN', 'TLN', 'DS'] },
     questionText: { type: SchemaType.STRING, description: "Nội dung câu hỏi (LaTeX $). KHÔNG HTML. Trừ bảng thống kê." },
     options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-    correctAnswer: { type: SchemaType.STRING },
+    correctAnswer: { type: SchemaType.STRING, description: "TN: Chỉ trả về 'A', 'B', 'C' hoặc 'D'. TLN: Số." },
     explanation: { type: SchemaType.STRING, description: "Lời giải chi tiết. Dùng ký tự '\\n' để xuống dòng giữa các bước giải. Trình bày thoáng, dễ đọc." },
 
     // Cấu trúc bắt buộc cho câu Đúng/Sai
@@ -117,10 +117,14 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     });
 
     const prompt = `
-      Bạn là giáo viên Toán chuyên nghiệp. Tạo ${totalQuestions} câu hỏi:
+      Bạn là Chuyên Gia Giáo Dục. Tạo ${totalQuestions} câu hỏi:
       1. CHỦ ĐỀ: "${config.topic}"
       2. BỔ SUNG: "${config.additionalPrompt || "Không có"}"
       3. SỐ LƯỢNG: ${tnCount} TN, ${tlnCount} TLN, ${dsCount} DS.
+
+      QUY TẮC CHẤM ĐIỂM (CỰC KỲ QUAN TRỌNG):
+      - Câu TRẮC NGHIỆM (TN): Trường 'correctAnswer' CHỈ ĐƯỢC chứa đúng 1 ký tự in hoa: "A", "B", "C", hoặc "D". TUYỆT ĐỐI KHÔNG viết thêm nội dung (Ví dụ SAI: "A. 5", "Đáp án A").
+      - Câu TỰ LUẬN (TLN): Trường 'correctAnswer' chứa đáp số (Ví dụ: "5.5" hoặc "-2").
 
       QUY TẮC QUAN TRỌNG:
       - Tên trường nội dung là 'questionText'.
