@@ -71,7 +71,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
 
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">MathGenius AI</h1>
-        <p className="text-gray-500">Xin chào, {auth.currentUser?.displayName}!</p>
+        <p className="text-gray-500">Cô Thu chào, {auth.currentUser?.displayName}!</p>
       </div>
 
       {/* --- KHU VỰC NHẬP API KEY --- */}
@@ -105,7 +105,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       {/* --------------------------- */}
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Chủ đề toán học</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Chủ đề môn học</label>
         <input 
           value={topic}
           onChange={(e) => setTopic(e.target.value)}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
-import { History } from './components/History'; // Import History
+import { History } from './components/History';
 import { generateQuiz } from './geminiService';
 import { QuizConfig, Question } from './types';
 import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save } from 'lucide-react';
@@ -17,8 +17,8 @@ function App() {
   const [config, setConfig] = useState<QuizConfig | null>(null);
   const [score, setScore] = useState(0);
   const [currentApiKey, setCurrentApiKey] = useState<string>("");
-  const [viewHistory, setViewHistory] = useState(false); // State chuyển view Lịch sử
-  const [isSaved, setIsSaved] = useState(false); // Trạng thái đã lưu điểm chưa
+  const [viewHistory, setViewHistory] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -52,26 +52,28 @@ function App() {
     if (isCorrect) setScore(prev => prev + 1);
   };
 
-  // HÀM LƯU KẾT QUẢ (Đã nâng cấp để lưu full đề)
+  // --- THÊM HÀM QUAN TRỌNG NÀY ---
+  // Hàm này giúp lưu đáp án người dùng chọn vào bộ nhớ, để khi bấm "Lưu điểm", nó sẽ lưu cả đáp án này lên Server
+  const handleQuestionUpdate = (updatedQ: Question) => {
+    setQuestions(prev => prev.map(q => q.id === updatedQ.id ? updatedQ : q));
+  };
+  // ------------------------------
+
   const handleSaveResult = async () => {
     if (!user || !config || isSaved) return;
     try {
-      // Chuẩn bị dữ liệu để lưu
-      const dataToSave = {
+      await addDoc(collection(db, "results"), {
         userId: user.uid,
         topic: config.topic,
         score: score,
         total: questions.length,
         date: serverTimestamp(),
-        // THÊM DÒNG NÀY: Lưu toàn bộ nội dung câu hỏi
-        // Chuyển sang chuỗi JSON để tiết kiệm dung lượng và dễ lưu trữ
+        // Lưu toàn bộ câu hỏi KÈM đáp án người dùng (nhờ hàm handleQuestionUpdate ở trên)
         fullData: JSON.stringify(questions) 
-      };
-
-      await addDoc(collection(db, "results"), dataToSave);
+      });
       
       setIsSaved(true);
-      alert("Đã lưu kết quả và nội dung đề thi thành công!");
+      alert("Đã lưu kết quả thành công!");
     } catch (e) {
       console.error("Lỗi lưu:", e);
       alert("Không thể lưu kết quả.");
@@ -80,7 +82,6 @@ function App() {
 
   if (!user) return <Login />;
 
-  // View Lịch sử
   if (viewHistory) {
     return <History onBack={() => setViewHistory(false)} />;
   }
@@ -89,12 +90,8 @@ function App() {
     <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
       {questions.length === 0 ? (
         <>
-          {/* Nút xem lịch sử ở màn hình chính */}
           <div className="max-w-2xl mx-auto mb-4 flex justify-end">
-             <button 
-                onClick={() => setViewHistory(true)}
-                className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors"
-             >
+             <button onClick={() => setViewHistory(true)} className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors">
                 <HistoryIcon size={20}/> Xem Lịch sử
              </button>
           </div>
@@ -102,14 +99,12 @@ function App() {
         </>
       ) : (
         <div className="max-w-3xl mx-auto animate-fade-in">
-          {/* Header kết quả */}
           <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 mb-6 flex flex-col sm:flex-row justify-between items-center sticky top-2 z-10 gap-3">
             <div className="flex-1">
               <h2 className="font-bold text-lg text-gray-800 line-clamp-1">{config?.topic}</h2>
               <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                 <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
                 
-                {/* Nút Lưu điểm */}
                 {!isSaved ? (
                     <button onClick={handleSaveResult} className="flex items-center gap-1 text-green-600 hover:underline font-medium text-xs bg-green-50 px-2 py-1 rounded border border-green-200">
                         <Save size={14}/> Lưu điểm
@@ -138,6 +133,8 @@ function App() {
                 index={idx} 
                 question={q} 
                 onUpdateScore={handleUpdateScore} 
+                // THÊM: Truyền hàm cập nhật xuống để QuestionCard báo cáo đáp án
+                onDataChange={handleQuestionUpdate}
               />
             ))}
           </div>
@@ -148,10 +145,3 @@ function App() {
 }
 
 export default App;
-
-// CÁCH ĐẨY LÊN GITHUB
-// git add .
-// git commit -m "Mô tả bạn vừa sửa gì"
-// git push
-
-// TEST: npm run dev
