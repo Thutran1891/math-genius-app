@@ -10,6 +10,7 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
+import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -87,6 +88,7 @@ function App() {
   }
 
   return (
+    <SubscriptionGuard>
     <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
       {questions.length === 0 ? (
         <>
@@ -141,6 +143,7 @@ function App() {
         </div>
       )}
     </div>
+    </SubscriptionGuard>
   );
 }
 

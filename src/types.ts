@@ -59,3 +59,13 @@ export interface Question {
   isCorrect?: boolean;
   showSolution?: boolean;
 }
+
+// THÊM: Thông tin gói cước người dùng
+export interface UserSubscription {
+  uid: string;
+  email: string;
+  displayName: string;
+  startDate: any; // Ngày bắt đầu dùng thử (Timestamp)
+  expiryDate?: any; // Ngày hết hạn (nếu đã mua)
+  isPremium: boolean; // Trạng thái đã trả phí chưa
+}
