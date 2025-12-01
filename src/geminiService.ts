@@ -112,7 +112,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
         temperature: 0.3,
         // TĂNG LÊN MỨC CAO ĐỂ TRÁNH BỊ CẮT CỤT JSON
-        maxOutputTokens: 10000,
+        maxOutputTokens: 15000,
       }
     });
 

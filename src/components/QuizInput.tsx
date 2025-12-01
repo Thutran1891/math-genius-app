@@ -73,7 +73,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       </button>
 
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-2">MathGenius AI</h1>
+        <h1 className="text-3xl font-bold text-primary mb-2">AI TẠO ĐỀ CỦNG CỐ KIẾN THỨC</h1>
         {/* GIỮ NGUYÊN LỜI CHÀO CỦA BẠN */}
         <p className="text-gray-500">Cô Thu mến chào, {auth.currentUser?.displayName}!</p>
       </div>
@@ -113,7 +113,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
         <input 
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          placeholder="Ví dụ: Hàm số bậc 3, Hình học không gian..." 
+          placeholder="Ví dụ: Hàm số bậc 3, Tính từ trong Tiếng Anh..." 
           className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
         />
       </div>
@@ -159,7 +159,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
         <textarea 
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Ví dụ: Tập trung vào bài toán thực tế..." 
+          placeholder="Ví dụ: Câu mức vận dụng nên tạo bài toán thực tế..." 
           className="w-full p-3 border rounded-lg h-24 resize-none focus:ring-2 focus:ring-primary outline-none"
         />
       </div>

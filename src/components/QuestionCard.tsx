@@ -15,11 +15,18 @@ interface Props {
 }
 
 export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, onDataChange }) => {
+  const difficultyMap: Record<string, string> = {
+    'BIET': 'Biết',
+    'HIEU': 'Hiểu',
+    'VANDUNG': 'Vận dụng'
+  };
   const [showExplanation, setShowExplanation] = useState(false);
   const [userAnswer, setUserAnswer] = useState<any>(null);
   const [isChecked, setIsChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const graphRef = useRef<HTMLDivElement>(null);
+
+
 
   useEffect(() => {
     if (question.userAnswer) {
@@ -114,10 +121,13 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
       <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-2">
-            <span className="bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded text-sm">Câu {index + 1}</span>
-            <span className="text-gray-400 text-xs border px-2 py-1 rounded">{question.type}</span>
-        </div>
+      <div className="flex items-center gap-2">
+    <span className="bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded text-sm">Câu {index + 1}</span>
+    {/* ĐOẠN MỚI: Hiển thị cả Loại và Cấp độ */}
+    <span className="text-gray-500 text-xs border border-gray-300 px-2 py-1 rounded font-medium">
+        {question.type} - {difficultyMap[question.difficulty] || question.difficulty}
+    </span>
+    </div>        
         {isChecked && (
              <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold animate-pulse ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 {isCorrect ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
