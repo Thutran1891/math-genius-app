@@ -52,19 +52,26 @@ function App() {
     if (isCorrect) setScore(prev => prev + 1);
   };
 
-  // HÀM LƯU KẾT QUẢ VÀO FIRESTORE
+  // HÀM LƯU KẾT QUẢ (Đã nâng cấp để lưu full đề)
   const handleSaveResult = async () => {
     if (!user || !config || isSaved) return;
     try {
-      await addDoc(collection(db, "results"), {
+      // Chuẩn bị dữ liệu để lưu
+      const dataToSave = {
         userId: user.uid,
         topic: config.topic,
         score: score,
         total: questions.length,
-        date: serverTimestamp()
-      });
+        date: serverTimestamp(),
+        // THÊM DÒNG NÀY: Lưu toàn bộ nội dung câu hỏi
+        // Chuyển sang chuỗi JSON để tiết kiệm dung lượng và dễ lưu trữ
+        fullData: JSON.stringify(questions) 
+      };
+
+      await addDoc(collection(db, "results"), dataToSave);
+      
       setIsSaved(true);
-      alert("Đã lưu kết quả thành công!");
+      alert("Đã lưu kết quả và nội dung đề thi thành công!");
     } catch (e) {
       console.error("Lỗi lưu:", e);
       alert("Không thể lưu kết quả.");
@@ -141,3 +148,10 @@ function App() {
 }
 
 export default App;
+
+// CÁCH ĐẨY LÊN GITHUB
+// git add .
+// git commit -m "Mô tả bạn vừa sửa gì"
+// git push
+
+// TEST: npm run dev
