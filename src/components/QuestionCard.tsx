@@ -123,8 +123,8 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
       <div className="flex justify-between items-start mb-4">
       <div className="flex items-center gap-2">
     <span className="bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded text-sm">Câu {index + 1}</span>
-    {/* ĐOẠN MỚI: Hiển thị cả Loại và Cấp độ */}
-    <span className="text-gray-500 text-xs border border-gray-300 px-2 py-1 rounded font-medium">
+    {/* Thêm whitespace-nowrap để chữ luôn nằm trên 1 dòng, ô tự giãn rộng */}
+    <span className="text-gray-500 text-xs border border-gray-300 px-2 py-1 rounded font-medium whitespace-nowrap min-w-fit">
         {question.type} - {difficultyMap[question.difficulty] || question.difficulty}
     </span>
     </div>        

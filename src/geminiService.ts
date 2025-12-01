@@ -62,6 +62,9 @@ const questionSchema: any = {
   properties: {
     id: { type: SchemaType.STRING },
     type: { type: SchemaType.STRING, enum: ['TN', 'TLN', 'DS'] },
+    // --- THÊM DÒNG NÀY VÀO ---
+    difficulty: { type: SchemaType.STRING, enum: ["BIET", "HIEU", "VANDUNG"], description: "Mức độ câu hỏi" },
+    // -------------------------
     questionText: { type: SchemaType.STRING, description: "Nội dung câu hỏi (LaTeX $). KHÔNG HTML. Trừ bảng thống kê." },
     options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     correctAnswer: { type: SchemaType.STRING, description: "TN: Chỉ trả về 'A', 'B', 'C' hoặc 'D'. TLN: Số." },
@@ -140,6 +143,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       QUY TẮC:
       - 'questionText': Nội dung câu hỏi (LaTeX $).    
       - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
+      - PHÂN SỐ: Bắt buộc dùng LaTeX '\dfrac{a}{b}' (Ví dụ: $\dfrac{1}{2}$) thay vì viết '1/2'.
       
       QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
