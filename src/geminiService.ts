@@ -118,16 +118,28 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
     const prompt = `
       Bạn là Chuyên Gia Giáo Dục. Tạo ${totalQuestions} câu hỏi:
-      1. CHỦ ĐỀ: "${config.topic}"
+ 1. CHỦ ĐỀ: "${config.topic}"
       2. BỔ SUNG: "${config.additionalPrompt || "Không có"}"
-      3. SỐ LƯỢNG: ${tnCount} TN, ${tlnCount} TLN, ${dsCount} DS.
+      
+      3. PHÂN PHỐI CHI TIẾT (BẮT BUỘC TUÂN THỦ CẤP ĐỘ):
+         - Trắc nghiệm (${tnCount} câu):
+            + Mức Biết: ${config.distribution.TN.BIET || 0} câu
+            + Mức Hiểu: ${config.distribution.TN.HIEU || 0} câu
+            + Mức Vận dụng: ${config.distribution.TN.VANDUNG || 0} câu
+         
+         - Điền số (${tlnCount} câu):
+            + Mức Biết: ${config.distribution.TLN.BIET || 0} câu
+            + Mức Hiểu: ${config.distribution.TLN.HIEU || 0} câu
+            + Mức Vận dụng: ${config.distribution.TLN.VANDUNG || 0} câu
+            
+         - Đúng/Sai (${dsCount} câu):
+            + Mức Biết: ${config.distribution.DS.BIET || 0} câu
+            + Mức Hiểu: ${config.distribution.DS.HIEU || 0} câu
+            + Mức Vận dụng: ${config.distribution.DS.VANDUNG || 0} câu
 
-      QUY TẮC CHẤM ĐIỂM (CỰC KỲ QUAN TRỌNG):
-      - Câu TRẮC NGHIỆM (TN): Trường 'correctAnswer' CHỈ ĐƯỢC chứa đúng 1 ký tự in hoa: "A", "B", "C", hoặc "D". TUYỆT ĐỐI KHÔNG viết thêm nội dung (Ví dụ SAI: "A. 5", "Đáp án A").
-      - Câu TỰ LUẬN (TLN): Trường 'correctAnswer' chứa đáp số (Ví dụ: "5.5" hoặc "-2").
-
-      QUY TẮC QUAN TRỌNG:
-      - Tên trường nội dung là 'questionText'.
+      QUY TẮC:
+      - 'questionText': Nội dung câu hỏi (LaTeX $).    
+      - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
       
       QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).

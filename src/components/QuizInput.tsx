@@ -121,6 +121,8 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       <div className="mb-6">
         <div className="flex justify-between items-end mb-2">
           <label className="block text-sm font-medium text-gray-700">Cấu trúc đề thi</label>
+          {/* Thêm dòng chú thích nhỏ */}
+          <span className="text-xs text-red-500 italic mr-2">(Khuyên dùng: &lt; 10 câu để AI chạy tốt nhất)</span>
           <span className="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">
             Tổng cộng: {totalQuestions} câu
           </span>
