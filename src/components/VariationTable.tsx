@@ -7,12 +7,14 @@ interface Props {
 }
 
 export const VariationTable: React.FC<Props> = ({ data }) => {
+    // 1. CẤU HÌNH KÍCH THƯỚC (Kế thừa width=800 của bạn cho thoáng)
     const width = 600;
-    const paddingRight = 40;
-    const rowHeight = 45;
-    const yRowHeight = 90;
+    const paddingRight = 60;
+    const rowHeight = 60;
+    const yRowHeight = 120;
     const totalHeight = rowHeight * 2 + yRowHeight;
-    const startX = 60;
+    
+    const startX = 80; 
     
     const usableWidth = width - startX - paddingRight; 
     const colWidth = usableWidth / Math.max(1, data.xNodes.length - 1); 
@@ -20,7 +22,6 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
     const cleanMath = (val: string): string => {
         if (!val) return "";
         let s = val.trim();
-        // Xử lý vô cực
         if (!s.includes('\\infty') && !s.includes('\u221e')) {
             if (s.toLowerCase().includes('-inf')) s = '-\\infty';
             else if (s.toLowerCase().includes('inf') || s.toLowerCase().includes('+inf')) s = '+\\infty';
@@ -30,22 +31,23 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
     };
 
     const getYPos = (val: string) => {
-        const yTop = rowHeight * 2 + 20;
-        const yBot = totalHeight - 20;
+        const yTop = rowHeight * 2 + 30;
+        const yBot = totalHeight - 30;
         const yMid = rowHeight * 2 + yRowHeight / 2;
 
         const v = val.toLowerCase();
         if (v.includes('-\\infty') || v.includes('-inf')) return yBot;
         if (v.includes('+\\infty') || v.includes('+inf') || (v.includes('inf') && !v.includes('-'))) return yTop;
+        
         return yMid; 
     };
 
     return (
-        <div className="w-full max-w-full overflow-x-auto border border-gray-300 rounded p-3 bg-white shadow-sm mb-4 flex justify-start">
+        <div className="w-full max-w-full overflow-x-auto border border-gray-300 rounded p-4 bg-white shadow-sm mb-6 flex justify-start">
             <svg width={width} height={totalHeight} className="select-none" style={{minWidth: width}}>
                 <defs>
-                    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                        <polygon points="0 0, 8 3, 0 6" fill="black" />
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="black" />
                     </marker>
                 </defs>
 
@@ -55,31 +57,30 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                 <line x1={startX} y1="0" x2={startX} y2={totalHeight} stroke="black" strokeWidth="1" />
 
                 {/* Tiêu đề */}
-                <text x={startX/2} y={rowHeight/2 + 4} textAnchor="middle" className="font-bold italic text-base font-serif">x</text>
-                <text x={startX/2} y={rowHeight + rowHeight/2 + 4} textAnchor="middle" className="font-bold italic text-base font-serif">y'</text>
-                <text x={startX/2} y={rowHeight*2 + yRowHeight/2} textAnchor="middle" className="font-bold italic text-base font-serif">y</text>
+                <text x={startX/2} y={rowHeight/2 + 5} textAnchor="middle" className="font-bold italic text-lg font-serif">x</text>
+                <text x={startX/2} y={rowHeight + rowHeight/2 + 5} textAnchor="middle" className="font-bold italic text-lg font-serif">y'</text>
+                <text x={startX/2} y={rowHeight*2 + yRowHeight/2} textAnchor="middle" className="font-bold italic text-lg font-serif">y</text>
 
                 {/* Nội dung */}
                 {data.xNodes.map((x, i) => {
-                    const cx = startX + 30 + i * colWidth;
+                    const cx = startX + 40 + i * colWidth;
                     
-                    // Kiểm tra xem có phải là tiệm cận đứng (||) không
-                    // Logic: Nếu yPrimeVals là '||' HOẶC yNodes chứa '||'
+                    // Kiểm tra tiệm cận đứng
                     const isAsymptote = data.yPrimeVals?.[i] === '||' || data.yNodes[i].includes('||');
 
                     // 1. Hàng X
                     const xDisplay = (
-                        <foreignObject x={cx - 30} y={12} width={60} height={rowHeight - 12}>
+                        <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                              <div className="flex justify-center w-full h-full font-bold text-sm">
                                 <LatexText text={cleanMath(x)} />
                              </div>
                         </foreignObject>
                     );
 
-                    // 2. Hàng Y' (Giá trị hoặc 2 gạch)
+                    // 2. Hàng Y' (Giá trị hoặc Kẻ sọc ||)
                     let yPrimeDisplay = null;
                     if (isAsymptote) {
-                        // VẼ 2 GẠCH DỌC (||)
+                        // VẼ 2 GẠCH DỌC (||) xuyên suốt từ y' xuống hết bảng
                         yPrimeDisplay = (
                             <g>
                                 <line x1={cx - 2} y1={rowHeight} x2={cx - 2} y2={totalHeight} stroke="black" strokeWidth="1" />
@@ -88,8 +89,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     } else if (data.yPrimeVals?.[i]) {
                         yPrimeDisplay = (
-                            <foreignObject x={cx - 15} y={rowHeight + 12} width={30} height={25}>
-                                 <div className="flex justify-center w-full h-full font-bold text-xs">
+                            <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
+                                 <div className="flex justify-center w-full h-full font-bold text-sm">
                                     <LatexText text={cleanMath(data.yPrimeVals[i])} />
                                  </div>
                             </foreignObject>
@@ -101,8 +102,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                     if (i < data.xNodes.length - 1 && data.yPrimeSigns?.[i]) {
                         const signCx = cx + colWidth / 2;
                          signDisplay = (
-                             <foreignObject x={signCx - 15} y={rowHeight + 12} width={30} height={25}>
-                                <div className="flex justify-center w-full h-full font-bold text-base">
+                             <foreignObject x={signCx - 20} y={rowHeight + 15} width={40} height={30}>
+                                <div className="flex justify-center w-full h-full font-bold text-lg">
                                     <LatexText text={cleanMath(data.yPrimeSigns[i])} />
                                 </div>
                              </foreignObject>
@@ -125,13 +126,13 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         yDisplay = (
                             <g>
                                 {/* Giá trị bên trái tiệm cận */}
-                                <foreignObject x={cx - 35} y={leftY - 12} width={30} height={30}>
+                                <foreignObject x={cx - 45} y={leftY - 15} width={40} height={30}>
                                     <div className="flex justify-end w-full h-full font-bold text-xs bg-white/90">
                                         <LatexText text={cleanMath(leftVal)} />
                                     </div>
                                 </foreignObject>
                                 {/* Giá trị bên phải tiệm cận */}
-                                <foreignObject x={cx + 5} y={rightY - 12} width={30} height={30}>
+                                <foreignObject x={cx + 5} y={rightY - 15} width={40} height={30}>
                                     <div className="flex justify-start w-full h-full font-bold text-xs bg-white/90">
                                         <LatexText text={cleanMath(rightVal)} />
                                     </div>
@@ -142,7 +143,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         // Giá trị thường
                         const yPos = getYPos(rawY);
                         yDisplay = (
-                             <foreignObject x={cx - 30} y={yPos - 12} width={60} height={30}>
+                             <foreignObject x={cx - 40} y={yPos - 15} width={80} height={40}>
                                  <div className="flex justify-center w-full h-full font-bold text-xs bg-white/90 px-1">
                                     <LatexText text={cleanMath(rawY)} />
                                  </div>
@@ -156,7 +157,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         const currentYRaw = data.yNodes[i];
                         const nextYRaw = data.yNodes[i+1];
                         
-                        const nextCx = startX + 30 + (i+1) * colWidth;
+                        const nextCx = startX + 40 + (i+1) * colWidth;
                         const currCx = cx;
 
                         // Start Point
@@ -181,15 +182,37 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             y2 = getYPos(nextYRaw);
                         }
 
-                        // Logic: Không vẽ nếu xuyên qua tiệm cận đứng (đã được xử lý bởi logic || ở trên)
-                        // Chỉ cần vẽ nối tiếp
-                        arrowLine = (
-                            <line 
-                                x1={x1} y1={y1} 
-                                x2={x2} y2={y2} 
-                                stroke="black" strokeWidth="1" markerEnd="url(#arrowhead)" 
-                            />
-                        );
+                        // Chỉ vẽ nếu không bị chặn bởi tiệm cận ở giữa
+                        if (data.yPrimeVals?.[i] !== '||' && data.yPrimeVals?.[i+1] !== '||') {
+                             arrowLine = (
+                                <line 
+                                    x1={x1} y1={y1} 
+                                    x2={x2} y2={y2} 
+                                    stroke="black" strokeWidth="1.2" markerEnd="url(#arrowhead)" 
+                                />
+                            );
+                        }
+                        
+                        // Xử lý đặc biệt: Nếu điểm hiện tại là tiệm cận, vẫn vẽ mũi tên xuất phát từ nó
+                        if (isAsymptote) {
+                             arrowLine = (
+                                <line 
+                                    x1={x1} y1={y1} 
+                                    x2={x2} y2={y2} 
+                                    stroke="black" strokeWidth="1.2" markerEnd="url(#arrowhead)" 
+                                />
+                            );
+                        }
+                         // Xử lý đặc biệt: Nếu điểm đích là tiệm cận
+                        if (data.yPrimeVals?.[i+1] === '||') {
+                             arrowLine = (
+                                <line 
+                                    x1={x1} y1={y1} 
+                                    x2={x2} y2={y2} 
+                                    stroke="black" strokeWidth="1.2" markerEnd="url(#arrowhead)" 
+                                />
+                            );
+                        }
                     }
 
                     return (

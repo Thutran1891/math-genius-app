@@ -15,26 +15,25 @@ interface Props {
 }
 
 export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, onDataChange }) => {
-  const difficultyMap: Record<string, string> = {
-    'BIET': 'Biết',
-    'HIEU': 'Hiểu',
-    'VANDUNG': 'Vận dụng'
-  };
   const [showExplanation, setShowExplanation] = useState(false);
+  
+  // State lưu câu trả lời
   const [userAnswer, setUserAnswer] = useState<any>(null);
+  
   const [isChecked, setIsChecked] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const graphRef = useRef<HTMLDivElement>(null);
 
-
-
+  // Reset state khi chuyển câu hỏi
   useEffect(() => {
     if (question.userAnswer) {
+        // Khôi phục trạng thái nếu đã làm (Xem lại lịch sử)
         setUserAnswer(question.userAnswer);
         setIsChecked(true);
         setIsCorrect(!!question.isCorrect);
-        setShowExplanation(false); 
+        setShowExplanation(false);
     } else {
+        // Reset nếu là bài làm mới
         setUserAnswer(question.type === 'DS' ? {} : '');
         setIsChecked(false);
         setIsCorrect(false);
@@ -42,60 +41,71 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
     }
   }, [question.id, question.userAnswer]);
 
+  // Hàm phát âm thanh
   const playSound = (correct: boolean) => {
-    if (onUpdateScore) {
+    if (onUpdateScore) { // Chỉ phát khi đang làm bài
         const audio = new Audio(correct ? '/correct.mp3' : '/wrong.mp3');
         audio.volume = 1.0; 
         audio.play().catch(() => {});
     }
   };
 
+  // --- LOGIC VẼ ĐỒ THỊ (ĐÃ NÂNG CẤP) ---
   useEffect(() => {
     if (question.graphFunction && graphRef.current && window.functionPlot) {
         try {
             graphRef.current.innerHTML = '';
-            let fn = question.graphFunction.replace(/\$/g, '').replace(/\^/g, '**');
+            
+            // Xử lý công thức toán học thành JavaScript
+            let fn = question.graphFunction
+                .replace(/\$/g, '')       // Bỏ dấu $
+                .replace(/\^/g, '**')     // Đổi ^ thành ** (Lũy thừa)
+                .replace(/\\/g, '')       // Bỏ dấu gạch chéo
+                .replace(/(\d)([a-zA-Z(])/g, '$1*$2')  // Thêm dấu nhân: 2x -> 2*x, 3( -> 3*(
+                .replace(/(\))([a-zA-Z0-9(])/g, '$1*$2') // Thêm dấu nhân: )x -> )*x
+                .trim();
+
             window.functionPlot({
-                target: graphRef.current, width: 450, height: 300, grid: true,
-                data: [{ fn: fn, sampler: 'builtIn', graphType: 'polyline' }]
+                target: graphRef.current,
+                width: 450, 
+                height: 300, 
+                grid: true,
+                data: [{ 
+                    fn: fn, 
+                    sampler: 'builtIn', 
+                    graphType: 'polyline',
+                    color: '#2563eb'
+                }],
+                xAxis: { domain: [-5, 5] },
+                yAxis: { domain: [-5, 5] }
             });
-        } catch (e) {}
+        } catch (e) { 
+            console.error("Lỗi vẽ đồ thị:", e);
+            // Không hiện lỗi ra giao diện để tránh làm rối mắt người dùng
+        }
     }
   }, [question.graphFunction, question.id]);
 
-  // --- LOGIC CHẤM ĐIỂM CHUẨN XÁC ---
+  // Logic kiểm tra kết quả
   const handleCheckResult = () => {
       if (!userAnswer) return;
       
       let correct = false;
-      
       if (question.type === 'TN') {
-          // Lấy ký tự người dùng chọn: "A", "B"...
-          const userChar = (userAnswer as string).trim().toUpperCase(); 
-          
-          // Lấy ký tự đáp án từ AI (Chắc chắn chỉ là A, B, C hoặc D do Prompt đã ép)
-          // Thêm logic slice(0,1) để phòng hờ AI vẫn trả về "A."
-          const aiChar = (question.correctAnswer || '').trim().toUpperCase().charAt(0); 
-
-          correct = userChar === aiChar;
-
+          const userClean = (userAnswer as string).trim().toUpperCase();
+          // Lấy ký tự đầu tiên của đáp án AI (A, B, C, D)
+          const correctClean = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
+          correct = userClean === correctClean;
       } else if (question.type === 'TLN') {
-          // Chuẩn hóa: Thay dấu phẩy (,) thành dấu chấm (.) để tính toán
-          const normalizeNum = (val: string) => parseFloat(val.replace(/,/g, '.').trim());
-          
-          const userVal = normalizeNum(userAnswer as string);
-          // Lọc lấy số từ đáp án AI (phòng trường hợp AI trả về text)
-          const aiValMatch = (question.correctAnswer || '').replace(/,/g, '.').match(/-?[\d.]+/);
+          const userVal = parseFloat((userAnswer as string).replace(',', '.'));
+          const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
           const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
           
           if (!isNaN(userVal) && !isNaN(aiVal)) {
-              // Chấp nhận sai số nhỏ (0.05) do làm tròn
-              correct = Math.abs(userVal - aiVal) < 0.05; 
+              correct = Math.abs(userVal - aiVal) < 0.05;
           } else {
-              // So sánh chuỗi (nếu đáp án không phải số)
               correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
           }
-
       } else if (question.type === 'DS') {
           const allCorrect = question.statements?.every(stmt => 
              userAnswer[stmt.id] === stmt.isCorrect
@@ -109,6 +119,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
       
       if (onUpdateScore) onUpdateScore(correct);
 
+      // Gửi dữ liệu về App để lưu
       if (onDataChange) {
           onDataChange({
               ...question,
@@ -121,13 +132,12 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
       <div className="flex justify-between items-start mb-4">
-      <div className="flex items-center gap-2">
-    <span className="bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded text-sm">Câu {index + 1}</span>
-    {/* Thêm whitespace-nowrap để chữ luôn nằm trên 1 dòng, ô tự giãn rộng */}
-    <span className="text-gray-500 text-xs border border-gray-300 px-2 py-1 rounded font-medium whitespace-nowrap min-w-fit">
-        {question.type} - {difficultyMap[question.difficulty] || question.difficulty}
-    </span>
-    </div>        
+        <div className="flex items-center gap-2">
+            <span className="bg-blue-100 text-blue-800 font-bold px-3 py-1 rounded text-sm">Câu {index + 1}</span>
+            <span className="text-gray-500 text-xs border border-gray-300 px-2 py-1 rounded font-medium whitespace-nowrap min-w-fit">
+                {question.type} - {question.difficulty === 'BIET' ? 'Biết' : question.difficulty === 'HIEU' ? 'Hiểu' : 'Vận dụng'}
+            </span>
+        </div>
         {isChecked && (
              <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold animate-pulse ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                 {isCorrect ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
@@ -140,13 +150,19 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
          <LatexText text={question.questionText} />
       </div>
 
+      {/* KHU VỰC VẼ HÌNH */}
       <div className="flex justify-center mb-6 flex-col items-center gap-4">
+          {/* 1. Bảng biến thiên */}
           {question.variationTableData && <VariationTable data={question.variationTableData} />}
+          
+          {/* 2. Hình học không gian (SVG) */}
           {question.geometryGraph && (
               <div className="border rounded p-4 bg-gray-50 shadow-inner">
                   <DynamicGeometry graph={question.geometryGraph} />
               </div>
           )}
+
+          {/* 3. Đồ thị hàm số (FunctionPlot) */}
           {question.graphFunction && <div ref={graphRef} className="bg-white border rounded shadow-sm overflow-hidden" />}
       </div>
 
@@ -154,12 +170,11 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
       {question.type === 'TN' && question.options && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
           {question.options.map((opt, i) => {
-            const label = String.fromCharCode(65 + i); // Tự động sinh A, B, C, D từ index 0, 1, 2, 3
+            const label = String.fromCharCode(65 + i); 
             const isSelected = userAnswer === label;
             let css = "p-3 border rounded-lg text-left hover:bg-gray-50 flex gap-2 transition-all ";
             
             if (isChecked) {
-                // Logic tô màu: So sánh ký tự đầu tiên của correctAnswer với label hiện tại
                 const aiChar = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
                 const isRightOption = aiChar === label;
 
@@ -180,12 +195,12 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         </div>
       )}
 
-      {/* 2. TỰ LUẬN (TLN) - Cho phép nhập dấu phẩy */}
+      {/* 2. TỰ LUẬN */}
       {question.type === 'TLN' && (
           <div className="flex gap-2 mb-4">
               <input 
                   className="border-2 border-gray-300 p-3 rounded-lg flex-1 focus:border-blue-500 outline-none font-bold text-lg" 
-                  placeholder="Nhập đáp số (VD: 2,5)..." 
+                  placeholder="Nhập đáp số..." 
                   value={userAnswer || ''}
                   onChange={e => setUserAnswer(e.target.value)}
                   disabled={isChecked}
@@ -194,7 +209,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
           </div>
       )}
 
-      {/* 3. ĐÚNG / SAI (DS) */}
+      {/* 3. ĐÚNG / SAI */}
       {question.type === 'DS' && question.statements && (
           <div className="mb-6 space-y-2">
             {question.statements.map((stmt) => {
@@ -231,6 +246,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
           </div>
       )}
 
+      {/* Footer */}
       <div className="border-t pt-4 flex justify-between items-center">
           {!isChecked ? (
               <button 
