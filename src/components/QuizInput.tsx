@@ -73,7 +73,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       </button>
 
       <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-2">AI TẠO ĐỀ CỦNG CỐ KIẾN THỨC</h1>
+        <h1 className="text-3xl font-bold text-primary mb-2">AI TẠO ĐỀ</h1>
         {/* GIỮ NGUYÊN LỜI CHÀO CỦA BẠN */}
         <p className="text-gray-500">Cô Thu mến chào, {auth.currentUser?.displayName}!</p>
       </div>
@@ -81,7 +81,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       {/* --- KHU VỰC NHẬP API KEY --- */}
       <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
         <div className="flex justify-between items-center mb-2">
-            <label className="block text-sm font-bold text-yellow-800 flex items-center gap-2">
+        <label className="text-sm font-bold text-yellow-800 flex items-center gap-2">
                 <KeyRound size={18}/> Gemini API Key
             </label>
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
