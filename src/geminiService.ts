@@ -150,6 +150,8 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - Nếu đề bài cần hình, hãy nói "Cho đồ thị như hình bên." và dùng các trường bên dưới để vẽ.
         - 'explanation': Lời giải chi tiết. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
         - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
+        - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
+         - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
 
       2. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
@@ -162,8 +164,11 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
          - BẮT BUỘC dùng trường 'graphFunction'.
          - Điền công thức JS chuẩn: "x**3 - 3*x + 1".
 
-      5. BẢNG BIẾN THIÊN:
-         - BẮT BUỘC dùng trường 'variationTableData'.
+      5. DỮ LIỆU BẢNG BIẾN THIÊN ('variationTableData'):
+         - xNodes: Các mốc (VD: ["$-\\infty$", "-1", "1", "$+\\infty$"]).
+         - yPrimeSigns: Dấu y' (VD: ["+", "-", "+"]).
+         - yPrimeVals: Giá trị tại dòng y'. QUAN TRỌNG: Tại tiệm cận đứng phải điền "||", tại cực trị điền "0".
+         - yNodes: Giá trị y. QUAN TRỌNG: Tại tiệm cận đứng, phải ghi 2 giá trị ngăn cách bởi "||" (VD: "$+\\infty$||$-\\infty$").
 
       6. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
          - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
