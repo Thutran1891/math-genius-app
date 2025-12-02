@@ -165,10 +165,26 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
          - Điền công thức JS chuẩn: "x**3 - 3*x + 1".
 
       5. DỮ LIỆU BẢNG BIẾN THIÊN ('variationTableData'):
-         - xNodes: Các mốc (VD: ["$-\\infty$", "-1", "1", "$+\\infty$"]).
-         - yPrimeSigns: Dấu y' (VD: ["+", "-", "+"]).
-         - yPrimeVals: Giá trị tại dòng y'. QUAN TRỌNG: Tại tiệm cận đứng phải điền "||", tại cực trị điền "0".
-         - yNodes: Giá trị y. QUAN TRỌNG: Tại tiệm cận đứng, phải ghi 2 giá trị ngăn cách bởi "||" (VD: "$+\\infty$||$-\\infty$").
+        5.1. Với MỌI câu hỏi cần bảng biến thiên (dù hàm số bậc 3, phân thức, lượng giác…), BẮT BUỘC phải điền đầy đủ trường:
+          "variationTableData": {
+            "xNodes": ["$-\\infty$", "-2", "0", "1", "$+\\infty$"],  // ví dụ
+            "yPrimeSigns": ["+", "-", "+"],
+            "yPrimeVals": ["", "0", "", "0", ""],
+            "yNodes": ["$+\\infty$", "5", "1", "3", "$-\\infty$"]
+          }
+
+        5.2. TUYỆT ĐỐI KHÔNG được viết bất kỳ đoạn LaTeX nào của bảng biến thiên (\\begin{array}, \\hline, v.v.) vào questionText hoặc explanation.
+          Chỉ được viết đúng 1 câu duy nhất trong questionText:
+          "Cho bảng biến thiên như hình bên."
+
+        5.3. Nếu có tiệm cận đứng (x = k), thì:
+          - yPrimeVals tại cột đó: "||"
+          - yNodes tại cột đó: "$+\\infty$||$-\\infty$" hoặc ngược lại
+
+        5.4. Với hàm bậc ba chuẩn (dẫn xuất bậc 2): luôn có 5 cột x, 3 dấu y', 2 điểm cực trị ghi "0" ở yPrimeVals.
+        5.5. Với hàm bậc bốn chuẩn (dẫn xuất bậc 3): luôn có 6 cột x, 4 dấu y', 3 điểm cực trị ghi "0" ở yPrimeVals.
+
+        5.6. Với hàm phân thức hữu tỉ có tiệm cận đứng và tiệm cận ngang: luôn có ít nhất 5–6 cột, có "||" ở đúng vị trí.
 
       6. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
          - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
