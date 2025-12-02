@@ -121,7 +121,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
     const prompt = `
       Bạn là Chuyên Gia Giáo Dục. Tạo ${totalQuestions} câu hỏi:
- 1. CHỦ ĐỀ: "${config.topic}"
+      1. CHỦ ĐỀ: "${config.topic}"
       2. BỔ SUNG: "${config.additionalPrompt || "Không có"}"
       
       3. PHÂN PHỐI CHI TIẾT (BẮT BUỘC TUÂN THỦ CẤP ĐỘ):
@@ -140,52 +140,59 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + Mức Hiểu: ${config.distribution.DS.HIEU || 0} câu
             + Mức Vận dụng: ${config.distribution.DS.VANDUNG || 0} câu
 
-      QUY TẮC:
-      - 'questionText': Nội dung câu hỏi (LaTeX $).    
-      - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
-      - PHÂN SỐ: Bắt buộc dùng LaTeX '\dfrac{a}{b}' (Ví dụ: $\dfrac{1}{2}$) thay vì viết '1/2'.
+      QUY TẮC HIỂN THỊ (TUYỆT ĐỐI TUÂN THỦ):
       
-      QUY TẮC CÂU ĐÚNG/SAI (DS):
+      1. NỘI DUNG CÂU HỎI (questionText):
+        - CHỈ chứa đề bài text và công thức LaTeX ($...$).
+        - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
+        - PHÂN SỐ: Bắt buộc dùng LaTeX '\dfrac{a}{b}' (Ví dụ: $\dfrac{1}{2}$) thay vì viết '1/2'.
+        - TUYỆT ĐỐI KHÔNG viết lời mô tả hình ảnh vào đây (Ví dụ SAI: "(Hình vẽ mô tả một đồ thị...)").
+        - Nếu đề bài cần hình, hãy nói "Cho đồ thị như hình bên." và dùng các trường bên dưới để vẽ.
+        - 'explanation': Lời giải chi tiết. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
+        - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
+
+      2. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
       - Mỗi phát biểu có 'content' và 'isCorrect' (true/false).
-      - KHÔNG được để trống 'statements'.
+      - KHÔNG được để trống 'statements'.  
 
-      QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
+      3. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
 
-      QUY TẮC VẼ HÌNH KHÔNG GIAN (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT):
-      
-      1. HÌNH CHÓP S.ABCD (Đáy là hình bình hành/chữ nhật):
-         - Đỉnh khuất là A (góc trong cùng).
-         - Các cạnh xuất phát từ A phải là nét đứt ('DASHED'): AB, AD, SA.
-         - Các cạnh còn lại là nét liền ('SOLID').
-         - Tọa độ mẫu: A(0,0,0), B(4,0,0), C(6,2,0), D(2,2,0), S(3,1,5).
+      4. ĐỒ THỊ HÀM SỐ (Giải tích):
+         - BẮT BUỘC dùng trường 'graphFunction'.
+         - Điền công thức JS chuẩn: "x**3 - 3*x + 1".
 
-      2. HÌNH CHÓP S.ABC (Đáy là tam giác):         
-         - Chỉ cạnh AC là nét đứt ('DASHED').
-         - Các cạnh còn lại là nét liền ('SOLID').
-         - Tọa độ mẫu: A(0,0,0), B(3,0,0), C(0,7,0), S(3,1,5).
+      5. BẢNG BIẾN THIÊN:
+         - BẮT BUỘC dùng trường 'variationTableData'.
 
-      3. HÌNH HỘP CHỮ NHẬT ABCD.A'B'C'D':
-         - Đỉnh khuất là A (góc trong cùng dưới đáy).
-         - Các cạnh xuất phát từ A phải là nét đứt ('DASHED'): AB, AD, AA'.
-         - Các cạnh còn lại là nét liền ('SOLID').
-         - Tọa độ mẫu: A(0,0,0), B(4,0,0), C(4,3,0), D(0,3,0), A'(0,0,4)...
+      6. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
+         - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
+            
+        a. HÌNH CHÓP S.ABCD (Đáy là hình bình hành/chữ nhật):
+          - Đỉnh khuất là A (góc trong cùng).
+          - Các cạnh xuất phát từ A phải là nét đứt ('DASHED'): AB, AD, SA.
+          - Các cạnh còn lại là nét liền ('SOLID').
+          - Tọa độ mẫu: A(0,0,0), B(4,0,0), C(6,2,0), D(2,2,0), S(3,1,5).
 
-      4. HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C':
-         - Cạnh khuất thường là cạnh đáy bên trong (ví dụ AC) hoặc cạnh bên khuất.
-         - Hãy suy luận logic để set 'style': 'DASHED' cho đúng cạnh bị che.
+        b. HÌNH CHÓP S.ABC (Đáy là tam giác):         
+          - Chỉ cạnh AC là nét đứt ('DASHED').
+          - Các cạnh còn lại là nét liền ('SOLID').
+          - Tọa độ mẫu: A(0,0,0), B(3,0,0), C(0,7,0), S(3,1,4).
 
-     HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình vuông...:
-       - TUYỆT ĐỐI Đặt tất cả tọa độ Z = 0.
-       - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID' (Nét liền).
-       - KHÔNG ĐƯỢC dùng 'DASHED' cho hình phẳng 2D.
+        c. HÌNH HỘP CHỮ NHẬT ABCD.A'B'C'D':
+          - Đỉnh khuất là A (góc trong cùng dưới đáy).
+          - Các cạnh xuất phát từ A phải là nét đứt ('DASHED'): AB, AD, AA'.
+          - Các cạnh còn lại là nét liền ('SOLID').
+          - Tọa độ mẫu: A(0,0,0), B(4,0,0), C(4,3,0), D(0,3,0), A'(0,0,4)...
 
-      QUY TẮC CHUNG:
-      - 'questionText': Nội dung câu hỏi (LaTeX $).
-      - Đồ thị hàm số: Dùng 'graphFunction'.
-      - Bảng biến thiên: Dùng 'variationTableData'.
-      - 'explanation': Lời giải chi tiết. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
-      - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
+        d. HÌNH LĂNG TRỤ TAM GIÁC ABC.A'B'C':
+          - Cạnh khuất thường là cạnh đáy bên trong (ví dụ AC) hoặc cạnh bên khuất.
+          - Hãy suy luận logic để set 'style': 'DASHED' cho đúng cạnh bị che.
+
+        e. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình vuông...:
+          - TUYỆT ĐỐI Đặt tất cả tọa độ Z = 0.
+          - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID' (Nét liền).
+          - KHÔNG ĐƯỢC dùng 'DASHED' cho hình phẳng 2D.
 
       Trả về JSON mảng ${totalQuestions} câu.
     `;
