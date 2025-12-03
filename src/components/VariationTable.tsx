@@ -1,4 +1,3 @@
-// src/components/VariationTable.tsx
 import React from 'react';
 import { VariationTableData } from '../types';
 import { LatexText } from './LatexText';
@@ -8,176 +7,232 @@ interface Props {
 }
 
 export const VariationTable: React.FC<Props> = ({ data }) => {
-    if (!data?.xNodes?.length) {
-        return <div className="text-red-600 font-bold text-center p-10 bg-red-50 rounded-xl border-2 border-red-400">
-            ⚠️ Thiếu dữ liệu bảng biến thiên!
-        </div>;
-    }
-
-    const width = 950;
+    // 1. CẤU HÌNH KÍCH THƯỚC (Rộng rãi để không bị cắt)
+    const width = 800;
+    const paddingRight = 60;
     const rowHeight = 60;
-    const graphHeight = 170;
-    const totalHeight = rowHeight * 2 + graphHeight;
-    const startX = 90;
-    const usableWidth = width - startX - 70;
-    const colWidth = usableWidth / (data.xNodes.length - 1);
+    const yRowHeight = 120; // Chiều cao dòng Y lớn để mũi tên dốc rõ ràng
+    const totalHeight = rowHeight * 2 + yRowHeight;
+    const startX = 80; 
+    
+    const usableWidth = width - startX - paddingRight; 
+    const colWidth = usableWidth / Math.max(1, data.xNodes.length - 1); 
 
-    const yTop = rowHeight * 2 + 25;
-    const yBot = rowHeight * 2 + graphHeight - 25;
-
-    // Chuẩn hóa mọi dạng ∞ thành LaTeX đúng
-    const clean = (s: string | undefined): string => {
-        if (!s) return '';
-        let str = s.trim();
-        str = str.replace(/\+inf|\+∞/gi, '+\\infty');
-        str = str.replace(/-inf|-∞/gi, '-\\infty');
-        str = str.replace(/inf|∞/gi, '\\infty');
-        if (!str.startsWith('$')) str = `$${str}$`;
-        return str;
+    const cleanMath = (val: string): string => {
+        if (!val) return "";
+        let s = val.trim();
+        if (!s.includes('\\infty') && !s.includes('\u221e')) {
+            if (s.toLowerCase().includes('-inf')) s = '-\\infty';
+            else if (s.toLowerCase().includes('+inf') || s.toLowerCase().includes('inf')) s = '+\\infty';
+        }
+        if (!s.startsWith('$')) return `$${s}$`;
+        return s;
     };
 
-    // Xác định vị trí Y chính xác theo dấu y' (chuẩn SGK 100%)
-    const getYPos = (i: number): number => {
-        const val = data.yNodes[i];
-        const isAsym = data.yPrimeVals?.[i] === '||' || (typeof val === 'string' && val.includes('||'));
-        if (isAsym) return rowHeight * 2 + graphHeight / 2;
+    // --- THUẬT TOÁN TÍNH VỊ TRÍ Y (Theo logic của bạn) ---
+    const getYPos = (val: string, index: number, isLeftOfAsymptote: boolean = false, isRightOfAsymptote: boolean = false) => {
+        const yTop = rowHeight * 2 + 25;     // Vị trí CAO
+        const yBot = totalHeight - 25;       // Vị trí THẤP
+        const yMid = rowHeight * 2 + yRowHeight / 2; // Vị trí GIỮA
 
-        const signLeft = i > 0 ? data.yPrimeSigns[i - 1] : null;
-        const signRight = i < data.yPrimeSigns.length ? data.yPrimeSigns[i] : null;
+        const v = val.toLowerCase();
+        // 1. Ưu tiên Vô cực
+        if (v.includes('-\\infty') || v.includes('-inf')) return yBot;
+        if (v.includes('+\\infty') || v.includes('+inf') || (v.includes('inf') && !v.includes('-'))) return yTop;
 
-        if (i === 0) return signRight === '+' ? yBot : yTop;
-        if (i === data.xNodes.length - 1) return signLeft === '+' ? yTop : yBot;
-        return signLeft === '+' ? yTop : yBot;
+        // 2. Xử lý số hữu hạn dựa vào dấu đạo hàm
+        // Lấy dấu bên trái và bên phải của điểm hiện tại
+        // Lưu ý: Mảng yPrimeSigns có độ dài = xNodes.length - 1
+        
+        let leftSign = index > 0 ? data.yPrimeSigns?.[index - 1] : null;
+        let rightSign = index < (data.yPrimeSigns?.length || 0) ? data.yPrimeSigns?.[index] : null;
+
+        // Xử lý đặc biệt cho Tiệm Cận (khi tách đôi giá trị)
+        if (isLeftOfAsymptote) rightSign = null; // Nếu đang xét bên trái tiệm cận, bỏ qua dấu bên phải
+        if (isRightOfAsymptote) leftSign = null; // Nếu đang xét bên phải tiệm cận, bỏ qua dấu bên trái
+
+        // LOGIC SUY LUẬN:
+        
+        // Trường hợp A: Cực trị (Giữa bảng)
+        if (leftSign === '+' && rightSign === '-') return yTop; // Cực đại
+        if (leftSign === '-' && rightSign === '+') return yBot; // Cực tiểu
+
+        // Trường hợp B: Mép trái ngoài cùng (hoặc bên phải tiệm cận)
+        if (!leftSign && rightSign) {
+            if (rightSign === '+') return yBot; // Đồng biến đi lên -> Bắt đầu từ thấp
+            if (rightSign === '-') return yTop; // Nghịch biến đi xuống -> Bắt đầu từ cao
+        }
+
+        // Trường hợp C: Mép phải ngoài cùng (hoặc bên trái tiệm cận)
+        if (leftSign && !rightSign) {
+            if (leftSign === '+') return yTop; // Đồng biến đi lên -> Kết thúc ở cao
+            if (leftSign === '-') return yBot; // Nghịch biến đi xuống -> Kết thúc ở thấp
+        }
+        
+        // Trường hợp D: Điểm uốn hoặc đơn điệu qua điểm (VD: y' = 0 nhưng không đổi dấu)
+        // + 0 + -> Đi từ dưới lên trên
+        if (leftSign === '+' && rightSign === '+') return yMid; 
+        if (leftSign === '-' && rightSign === '-') return yMid;
+
+        return yMid; // Mặc định
     };
 
     return (
-        <div className="overflow-x-auto border-3 border-gray-900 rounded-2xl p-6 bg-white shadow-2xl my-10">
-            <svg width={width} height={totalHeight} className="select-none">
+        <div className="w-full max-w-full overflow-x-auto border border-gray-300 rounded p-4 bg-white shadow-sm mb-6 flex justify-start pl-2">
+            <svg width={width} height={totalHeight} className="select-none" style={{minWidth: width}}>
                 <defs>
-                    <marker id="arrow" markerWidth="12" markerHeight="10" refX="11" refY="5" orient="auto">
-                        <path d="M0,0 L12,5 L0,10 Z" fill="#dc2626" />
+                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="black" />
                     </marker>
                 </defs>
 
-                {/* Đường ngang */}
-                {[rowHeight, rowHeight * 2].map(y => (
-                    <line key={y} x1="0" y1={y} x2={width} y2={y} stroke="black" strokeWidth="3" />
-                ))}
-
-                <line x1={startX} y1="0" x2={startX} y2={totalHeight} stroke="black" strokeWidth="3" />
+                {/* Khung kẻ bảng */}
+                <line x1="0" y1={rowHeight} x2={width} y2={rowHeight} stroke="black" strokeWidth="1" />
+                <line x1="0" y1={rowHeight*2} x2={width} y2={rowHeight*2} stroke="black" strokeWidth="1" />
+                <line x1={startX} y1="0" x2={startX} y2={totalHeight} stroke="black" strokeWidth="1" />
 
                 {/* Tiêu đề */}
-                <text x={startX/2} y={rowHeight/2 + 12} textAnchor="middle" fontWeight="bold" fontSize="20">x</text>
-                <text x={startX/2} y={rowHeight*1.5 + 12} textAnchor="middle" fontWeight="bold" fontSize="20">y'</text>
-                <text x={startX/2} y={rowHeight*2 + graphHeight/2} textAnchor="middle" fontWeight="bold" fontSize="20">y</text>
+                <text x={startX/2} y={rowHeight/2 + 5} textAnchor="middle" className="font-bold italic text-lg font-serif">x</text>
+                <text x={startX/2} y={rowHeight + rowHeight/2 + 5} textAnchor="middle" className="font-bold italic text-lg font-serif">y'</text>
+                <text x={startX/2} y={rowHeight*2 + yRowHeight/2} textAnchor="middle" className="font-bold italic text-lg font-serif">y</text>
 
-                {data.xNodes.map((node, i) => {
-                    const cx = startX + i * colWidth;
-                    const isAsymptote = data.yPrimeVals?.[i] === '||' || (typeof data.yNodes[i] === 'string' && data.yNodes[i].includes('||'));
+                {/* Nội dung */}
+                {data.xNodes.map((x, i) => {
+                    const cx = startX + 40 + i * colWidth;
+                    const isAsymptote = data.yPrimeVals?.[i] === '||' || data.yNodes[i].includes('||');
+
+                    // 1. Hàng X
+                    const xDisplay = (
+                        <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
+                             <div className="flex justify-center w-full h-full font-bold text-sm">
+                                <LatexText text={cleanMath(x)} />
+                             </div>
+                        </foreignObject>
+                    );
+
+                    // 2. Hàng Y' (Giá trị hoặc ||)
+                    let yPrimeDisplay = null;
+                    if (isAsymptote) {
+                        // Vẽ 2 gạch dọc (||)
+                        yPrimeDisplay = (
+                            <g>
+                                <line x1={cx - 3} y1={rowHeight} x2={cx - 3} y2={totalHeight} stroke="black" strokeWidth="1" />
+                                <line x1={cx + 3} y1={rowHeight} x2={cx + 3} y2={totalHeight} stroke="black" strokeWidth="1" />
+                            </g>
+                        );
+                    } else if (data.yPrimeVals?.[i]) {
+                        yPrimeDisplay = (
+                            <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
+                                 <div className="flex justify-center w-full h-full font-bold text-sm">
+                                    <LatexText text={cleanMath(data.yPrimeVals[i])} />
+                                 </div>
+                            </foreignObject>
+                        );
+                    }
+
+                    // 3. Dấu Y'
+                    let signDisplay = null;
+                    if (i < data.xNodes.length - 1 && data.yPrimeSigns?.[i]) {
+                        const signCx = cx + colWidth / 2;
+                         signDisplay = (
+                             <foreignObject x={signCx - 20} y={rowHeight + 15} width={40} height={30}>
+                                <div className="flex justify-center w-full h-full font-bold text-lg">
+                                    <LatexText text={cleanMath(data.yPrimeSigns[i])} />
+                                </div>
+                             </foreignObject>
+                         );
+                    }
+
+                    // 4. Hàng Y (Giá trị + Mũi tên)
+                    let yDisplay = null;
+                    const rawY = data.yNodes[i];
+                    
+                    if (isAsymptote && rawY.includes('||')) {
+                        // --- TRƯỜNG HỢP TIỆM CẬN: TÁCH ĐÔI ---
+                        const parts = rawY.split('||');
+                        const leftVal = parts[0];
+                        const rightVal = parts[1] || "";
+                        
+                        // Tính vị trí riêng biệt: Trái coi như mép phải của khoảng trước, Phải coi như mép trái của khoảng sau
+                        const leftY = getYPos(leftVal, i, true, false);
+                        const rightY = getYPos(rightVal, i, false, true);
+
+                        yDisplay = (
+                            <g>
+                                <foreignObject x={cx - 45} y={leftY - 15} width={40} height={30}>
+                                    <div className="flex justify-end w-full h-full font-bold text-sm bg-white/80">
+                                        <LatexText text={cleanMath(leftVal)} />
+                                    </div>
+                                </foreignObject>
+                                <foreignObject x={cx + 5} y={rightY - 15} width={40} height={30}>
+                                    <div className="flex justify-start w-full h-full font-bold text-sm bg-white/80">
+                                        <LatexText text={cleanMath(rightVal)} />
+                                    </div>
+                                </foreignObject>
+                            </g>
+                        );
+                    } else {
+                        // --- TRƯỜNG HỢP THƯỜNG ---
+                        const yPos = getYPos(rawY, i);
+                        yDisplay = (
+                             <foreignObject x={cx - 40} y={yPos - 15} width={80} height={30}>
+                                 <div className="flex justify-center w-full h-full font-bold text-sm bg-white/90 px-1">
+                                    <LatexText text={cleanMath(rawY)} />
+                                 </div>
+                            </foreignObject>
+                        );
+                    }
+
+                    // 5. Vẽ Mũi Tên nối sang cột sau
+                    let arrowLine = null;
+                    if (i < data.xNodes.length - 1) {
+                        const currentYRaw = data.yNodes[i];
+                        const nextYRaw = data.yNodes[i+1];
+                        const nextCx = startX + 40 + (i+1) * colWidth;
+                        
+                        // Tính điểm đầu (x1, y1)
+                        let y1; 
+                        let x1 = cx + 20;
+                        if (currentYRaw.includes('||')) {
+                            // Nếu điểm hiện tại là tiệm cận -> Lấy giá trị bên phải
+                            const rightVal = currentYRaw.split('||')[1];
+                            y1 = getYPos(rightVal, i, false, true);
+                            x1 = cx + 10; 
+                        } else {
+                            y1 = getYPos(currentYRaw, i);
+                        }
+
+                        // Tính điểm cuối (x2, y2)
+                        let y2;
+                        let x2 = nextCx - 20;
+                        if (nextYRaw.includes('||')) {
+                            // Nếu điểm đích là tiệm cận -> Lấy giá trị bên trái
+                            const leftVal = nextYRaw.split('||')[0];
+                            y2 = getYPos(leftVal, i+1, true, false);
+                            x2 = nextCx - 10;
+                        } else {
+                            y2 = getYPos(nextYRaw, i+1);
+                        }
+
+                        // Chỉ vẽ nếu không bị chặn bởi tiệm cận ở giữa (yPrimeVals)
+                        if (data.yPrimeVals?.[i] !== '||' && data.yPrimeVals?.[i+1] !== '||') {
+                             arrowLine = (
+                                <line 
+                                    x1={x1} y1={y1} 
+                                    x2={x2} y2={y2} 
+                                    stroke="black" strokeWidth="1.2" markerEnd="url(#arrowhead)" 
+                                />
+                            );
+                        }
+                    }
 
                     return (
                         <g key={i}>
-                            {/* Tiệm cận đứng */}
-                            {isAsymptote && (
-                                <>
-                                    <line x1={cx-6} y1={rowHeight} x2={cx-6} y2={totalHeight} stroke="black" strokeWidth="5" />
-                                    <line x1={cx+6} y1={rowHeight} x2={cx+6} y2={totalHeight} stroke="black" strokeWidth="5" />
-                                </>
-                            )}
-
-                            {/* Mốc x */}
-                            <foreignObject x={cx-50} y={5} width={100} height={50}>
-                                <div className="text-center font-bold text-base">
-                                    <LatexText text={clean(node)} />
-                                </div>
-                            </foreignObject>
-
-                            {/* Dấu y' */}
-                            {i < data.yPrimeSigns.length && data.yPrimeSigns[i] && (
-                                <text x={cx + colWidth/2} y={rowHeight + 35} textAnchor="middle" fontSize="32" fontWeight="bold" fill="#a855f7">
-                                    {data.yPrimeSigns[i]}
-                                </text>
-                            )}
-
-                            {/* Giá trị y' */}
-                            {data.yPrimeVals?.[i] && data.yPrimeVals[i] !== '||' && (
-                                <foreignObject x={cx-35} y={rowHeight+8} width={70} height={40}>
-                                    <div className="text-center font-bold text-sm">
-                                        <LatexText text={clean(data.yPrimeVals[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {/* Giá trị y – xử lý ∞ và tiệm cận */}
-                            {(() => {
-                                const yVal = data.yNodes[i];
-                                if (isAsymptote && typeof yVal === 'string' && yVal.includes('||')) {
-                                    const [left, right] = yVal.split('||');
-                                    return (
-                                        <>
-                                            <foreignObject x={cx-110} y={yTop-20} width={100} height={40}>
-                                                <div className="text-right font-bold text-base"><LatexText text={clean(left)} /></div>
-                                            </foreignObject>
-                                            <foreignObject x={cx+20} y={yBot-20} width={100} height={40}>
-                                                <div className="text-left font-bold text-base"><LatexText text={clean(right)} /></div>
-                                            </foreignObject>
-                                        </>
-                                    );
-                                }
-
-                                const yPos = getYPos(i);
-                                return (
-                                    <foreignObject x={cx-60} y={yPos-22} width={120} height={45}>
-                                        <div className="text-center font-bold text-base">
-                                            <LatexText text={clean(yVal as string)} />
-                                        </div>
-                                    </foreignObject>
-                                );
-                            })()}
-
-                            {/* MŨI TÊN – QUAN TRỌNG NHẤT: KHÔNG VẼ XUYÊN TIỆM CẬN */}
-                            {i < data.xNodes.length - 1 && (
-                                <>
-                                    {/* Chỉ vẽ nếu không có tiệm cận ở 2 đầu đoạn */}
-                                    {!(isAsymptote || data.yPrimeVals?.[i+1] === '||') && (
-                                        <line
-                                            x1={cx + 45}
-                                            y1={getYPos(i)}
-                                            x2={startX + (i+1)*colWidth - 45}
-                                            y2={getYPos(i+1)}
-                                            stroke="#dc2626"
-                                            strokeWidth="5"
-                                            markerEnd="url(#arrow)"
-                                        />
-                                    )}
-
-                                    {/* Nếu có tiệm cận ở đầu đoạn sau → dừng trước tiệm cận */}
-                                    {data.yPrimeVals?.[i+1] === '||' && (
-                                        <line
-                                            x1={cx + 45}
-                                            y1={getYPos(i)}
-                                            x2={startX + (i+1)*colWidth - 70}
-                                            y2={getYPos(i)}
-                                            stroke="#dc2626"
-                                            strokeWidth="5"
-                                            markerEnd="url(#arrow)"
-                                        />
-                                    )}
-
-                                    {/* Nếu có tiệm cận ở đầu đoạn hiện tại → bắt đầu từ sau tiệm cận */}
-                                    {isAsymptote && (
-                                        <line
-                                            x1={cx + 70}
-                                            y1={getYPos(i)}
-                                            x2={startX + (i+1)*colWidth - 45}
-                                            y2={getYPos(i+1)}
-                                            stroke="#dc2626"
-                                            strokeWidth="5"
-                                            markerEnd="url(#arrow)"
-                                        />
-                                    )}
-                                </>
-                            )}
+                            {xDisplay}
+                            {yPrimeDisplay}
+                            {signDisplay}
+                            {arrowLine}
+                            {yDisplay}
                         </g>
                     );
                 })}
