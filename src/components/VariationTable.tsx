@@ -7,16 +7,17 @@ interface Props {
 }
 
 export const VariationTable: React.FC<Props> = ({ data }) => {
-    // 1. CẤU HÌNH KÍCH THƯỚC
-    const width = 800;
-    const paddingRight = 60;
-    const rowHeight = 60;
-    const yRowHeight = 140; // Tăng chiều cao để tạo độ dốc lớn
+    // 1. CẤU HÌNH KÍCH THƯỚC (SCALE 80%)
+    const width = 640;          // 800 * 0.8
+    const paddingRight = 48;    // 60 * 0.8
+    const rowHeight = 48;       // 60 * 0.8
+    const yRowHeight = 112;     // 140 * 0.8
     const totalHeight = rowHeight * 2 + yRowHeight;
-    const startX = 80; 
-    
+    const startX = 64;          // 80 * 0.8
+
+    // Tính toán độ rộng cột
     const usableWidth = width - startX - paddingRight; 
-    const colWidth = usableWidth / Math.max(1, data.xNodes.length - 1); 
+    const colWidth = usableWidth / Math.max(1, data.xNodes.length - 1);
 
     // Hàm làm sạch và chuẩn hóa LaTeX
     const cleanMath = (val: string): string => {
@@ -34,8 +35,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
 
     // --- THUẬT TOÁN TÍNH VỊ TRÍ Y ---
     const getYPos = (val: string, index: number, isLeftOfAsymptote: boolean = false, isRightOfAsymptote: boolean = false) => {
-        const yTop = rowHeight * 2 + 25;       // Sát mép trên
-        const yBot = totalHeight - 25;         // Sát mép dưới
+        const yTop = rowHeight * 2 + 20;       // Sát mép trên
+        const yBot = totalHeight - 20;         // Sát mép dưới
         const yMid = rowHeight * 2 + yRowHeight / 2;
 
         // Chuẩn hóa string để so sánh

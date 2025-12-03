@@ -152,6 +152,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
         - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
          - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
+         - Nếu đề bài cho bảng số liệu ghép nhóm thì dùng môi trường bảng array của LaTeX để vẽ bảng và bao bọc trong center.
 
       2. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
