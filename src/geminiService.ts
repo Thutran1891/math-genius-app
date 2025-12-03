@@ -65,7 +65,10 @@ const questionSchema: any = {
     // --- THÊM DÒNG NÀY VÀO ---
     difficulty: { type: SchemaType.STRING, enum: ["BIET", "HIEU", "VANDUNG"], description: "Mức độ câu hỏi" },
     // -------------------------
-    questionText: { type: SchemaType.STRING, description: "Nội dung câu hỏi (LaTeX $). KHÔNG HTML. Trừ bảng thống kê." },
+    questionText: { 
+      type: SchemaType.STRING, 
+      description: "Nội dung câu hỏi (LaTeX $). KHÔNG trả về HTML (như <table>). Nếu cần vẽ bảng thống kê, hãy dùng LaTeX Array." 
+  },
     options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     correctAnswer: { type: SchemaType.STRING, description: "TN: Chỉ trả về 'A', 'B', 'C' hoặc 'D'. TLN: Số." },
     explanation: { type: SchemaType.STRING, description: "Lời giải chi tiết. Dùng ký tự '\\n' để xuống dòng giữa các bước giải. Trình bày thoáng, dễ đọc." },
@@ -152,7 +155,6 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
         - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
          - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
-         - Hãy vẽ bảng HTML chuẩn (<table>, <tr>, <td> có border) trực tiếp vào 'questionText'.
 
       2. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
