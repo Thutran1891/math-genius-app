@@ -67,7 +67,7 @@ const questionSchema: any = {
     // -------------------------
     questionText: { 
       type: SchemaType.STRING, 
-      description: "Nội dung câu hỏi (LaTeX $). KHÔNG trả về HTML (như <table>). Nếu cần vẽ bảng thống kê, hãy dùng LaTeX Array." 
+      description: "Nội dung câu hỏi (LaTeX $). KHÔNG trả về HTML (như <table>). Nếu cần vẽ bảng thống kê, hãy dùng LaTeX Array. Đối với câu hỏi về hàm số thì chỉ cho duy nhất một trong các dạng thức: công thức, đồ thị, bảng biến thiên, đạo hàm, đồ thị đạo hàm."
   },
     options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     correctAnswer: { type: SchemaType.STRING, description: "TN: Chỉ trả về 'A', 'B', 'C' hoặc 'D'. TLN: Số." },
@@ -118,7 +118,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
         temperature: 0.3,
         // TĂNG LÊN MỨC CAO ĐỂ TRÁNH BỊ CẮT CỤT JSON
-        maxOutputTokens: 15000,
+        maxOutputTokens: 20000,
       }
     });
 
