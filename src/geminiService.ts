@@ -218,6 +218,22 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID' (Nét liền).
           - KHÔNG ĐƯỢC dùng 'DASHED' cho hình phẳng 2D.
 
+          M MỚI PHẦN NÀY ---
+      7. NGUYÊN TẮC ĐỘC NHẤT DỮ LIỆU (QUAN TRỌNG):
+         Đối với mỗi câu hỏi về hàm số, CHỈ ĐƯỢC CHỌN 1 trong 3 dạng dữ liệu sau (Không được để dư thừa):
+         
+         - DẠNG 1: CHO CÔNG THỨC (Algebraic):
+           + Nội dung câu hỏi chứa công thức hàm số cụ thể (Ví dụ: "$y = x^3 - 3x + 1$").
+           + Yêu cầu: variationTableData = null, geometryGraph = null.
+           
+         - DẠNG 2: CHO BẢNG BIẾN THIÊN (Tabular):
+           + Nội dung câu hỏi chỉ ghi: "Cho hàm số $y=f(x)$ có bảng biến thiên như hình bên:" (Tuyệt đối KHÔNG viết công thức hàm số cụ thể trong lời dẫn).
+           + Yêu cầu: variationTableData = { ...có dữ liệu... }, geometryGraph = null.
+           
+         - DẠNG 3: CHO ĐỒ THỊ (Graphical):
+           + Nội dung câu hỏi chỉ ghi: "Cho hàm số $y=f(x)$ có đồ thị như hình bên:" (Tuyệt đối KHÔNG viết công thức hàm số cụ thể trong lời dẫn).
+           + Yêu cầu: geometryGraph = { ...có dữ liệu... }, variationTableData = null.
+
       Trả về JSON mảng ${totalQuestions} câu.
     `;
 
