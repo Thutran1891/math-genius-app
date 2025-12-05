@@ -213,11 +213,14 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           - Cạnh khuất thường là cạnh đáy bên trong (ví dụ AC) hoặc cạnh bên khuất.
           - Hãy suy luận logic để set 'style': 'DASHED' cho đúng cạnh bị che.
 
-      7. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình vuông...:
-          - TUYỆT ĐỐI Đặt tất cả tọa độ Z = 0.
-          - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID' (Nét liền). KHÔNG ĐƯỢC dùng 'DASHED' cho hình phẳng 2D.
-          - Vẽ đúng với số đo góc, vuông chuẩn vuông.
-          - Đúng tỉ lệ độ dài các đoạn thẳng.
+      7. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình thang...:
+          - BẮT BUỘC Đặt tất cả tọa độ Z = 0.
+          - SỬ DỤNG HỆ TRỤC TỌA ĐỘ OXY CHUẨN:
+            + Trục hoành là x, Trục tung là y.
+            + Để vẽ góc vuông chuẩn, hãy đặt các cạnh song song với trục tọa độ.
+            + Ví dụ Tam giác ABC vuông tại A: A(0,0,0), B(0,4,0), C(3,0,0). (Vuông tại gốc tọa độ).
+            + Ví dụ Hình chữ nhật: (0,0,0), (4,0,0), (4,2,0), (0,2,0).
+          - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID'.
           
       8. NGUYÊN TẮC ĐỘC NHẤT DỮ LIỆU (QUAN TRỌNG):
          Đối với mỗi câu hỏi về hàm số, CHỈ ĐƯỢC CHỌN 1 trong 3 dạng dữ liệu sau (Không được để dư thừa):

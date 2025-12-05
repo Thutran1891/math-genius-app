@@ -150,36 +150,36 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
          <LatexText text={question.questionText} />
       </div>
 
-{/* KHU VỰC VẼ HÌNH – BẢNG BIẾN THIÊN, HÌNH HỌC, ĐỒ THỊ */}
-<div className="space-y-6">
+    {/* KHU VỰC VẼ HÌNH – BẢNG BIẾN THIÊN, HÌNH HỌC, ĐỒ THỊ */}
+    <div className="space-y-6">
 
-    {/* 1. Bảng biến thiên – CÓ FALLBACK SIÊU ỔN ĐỊNH */}
-    {question.variationTableData ? (
-        <VariationTable data={question.variationTableData} />
-    ) : question.questionText.includes("bảng biến thiên") || 
-      question.questionText.includes("hình bên") ? (
-        <div className="text-center my-12 p-8 bg-red-50 border-2 border-red-300 rounded-xl">
-            <div className="text-red-700 font-bold text-lg">
-                ⚠️ AI chưa cung cấp dữ liệu bảng biến thiên!
+        {/* 1. Bảng biến thiên – CÓ FALLBACK SIÊU ỔN ĐỊNH */}
+        {question.variationTableData ? (
+            <VariationTable data={question.variationTableData} />
+        ) : question.questionText.includes("bảng biến thiên") || 
+          question.questionText.includes("hình bên") ? (
+            <div className="text-center my-12 p-8 bg-red-50 border-2 border-red-300 rounded-xl">
+                <div className="text-red-700 font-bold text-lg">
+                    ⚠️ AI chưa cung cấp dữ liệu bảng biến thiên!
+                </div>
+                <div className="text-sm text-red-600 mt-2">
+                    Đang cải thiện prompt... (Sẽ đẹp 100% trong vài giây tới)
+                </div>
             </div>
-            <div className="text-sm text-red-600 mt-2">
-                Đang cải thiện prompt... (Sẽ đẹp 100% trong vài giây tới)
+        ) : null}
+
+        {/* 2. Hình học không gian (SVG) */}
+        {question.geometryGraph && (
+            <div className="border rounded-lg p-4 bg-gray-50 shadow-inner">
+                <DynamicGeometry graph={question.geometryGraph} />
             </div>
-        </div>
-    ) : null}
+        )}
 
-    {/* 2. Hình học không gian (SVG) */}
-    {question.geometryGraph && (
-        <div className="border rounded-lg p-4 bg-gray-50 shadow-inner">
-            <DynamicGeometry graph={question.geometryGraph} />
-        </div>
-    )}
-
-    {/* 3. Đồ thị hàm số (FunctionPlot) */}
-    {question.graphFunction && (
-        <div ref={graphRef} className="bg-white border-2 border-gray-300 rounded-lg shadow-sm overflow-hidden" />
-    )}
-</div>
+        {/* 3. Đồ thị hàm số (FunctionPlot) */}
+        {question.graphFunction && (
+            <div ref={graphRef} className="bg-white border-2 border-gray-300 rounded-lg shadow-sm overflow-hidden" />
+        )}
+    </div>
 
       {/* 1. TRẮC NGHIỆM */}
       {question.type === 'TN' && question.options && (

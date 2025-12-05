@@ -5,30 +5,38 @@ interface Props { graph: GeometryGraph; }
 
 export const DynamicGeometry: React.FC<Props> = ({ graph }) => {
     const SCALE_FACTOR = 50; // Giảm scale một chút để hình đỡ bị to quá khổ
+    // 1. [CHÈN THÊM ĐOẠN NÀY] 
+    // Logic: Kiểm tra xem tất cả các điểm có Z = 0 không
+    // -----------------------------------------------------------
+    const is2DMode = useMemo(() => {
+        if (!graph.nodes || graph.nodes.length === 0) return false;
+        // Nếu tất cả tọa độ z đều xấp xỉ 0 (hoặc không tồn tại), thì là 2D
+        return graph.nodes.every(node => Math.abs(node.z || 0) < 0.01);
+    }, [graph]);
 
     // --- PHÉP CHIẾU TRỤC ĐO (Góc nhìn SGK) ---
     // Input: Tọa độ 3D (x, y, z)
     // Output: Tọa độ 2D (sx, sy) trên màn hình SVG
+// 2. [THAY THẾ HOÀN TOÀN HÀM PROJECT CŨ BẰNG ĐOẠN NÀY]
+    // -----------------------------------------------------------
     const project = (x: number, y: number, z: number) => {
-        // Cấu hình trục Ox (Trục chiều sâu)
-        // Góc 45 độ (Math.PI / 4) so với phương ngang tạo cảm giác nhìn từ phải sang trái
-        const angle = Math.PI / 6; // 30 độ cho độ nghiêng vừa phải
-        const depthScale = 0.5;    // Hệ số co của trục sâu (thường là 0.5)
+        // CASE 1: NẾU LÀ 2D -> VẼ PHẲNG (Orthographic)
+        if (is2DMode) {
+            return {
+                x: x * SCALE_FACTOR,       // X giữ nguyên
+                y: -y * SCALE_FACTOR       // Y đảo dấu (vì SVG trục Y hướng xuống)
+            };
+        }
 
-        // Công thức biến đổi:
-        // 1. Trục Oy (y): Giữ nguyên hướng sang phải (+y)
-        // 2. Trục Oz (z): Hướng lên trên (-z vì trục Y của SVG hướng xuống)
-        // 3. Trục Ox (x): Hướng chéo xuống góc trái (làm lệch cả x và y)
-        
-        // sx = y - x * (độ lệch ngang)
+        // CASE 2: NẾU LÀ 3D -> DÙNG PHÉP CHIẾU TRỤC ĐO (Giữ nguyên logic cũ của bạn)
+        const angle = Math.PI / 6; 
+        const depthScale = 0.5;    
+
         const sx = (y - x * depthScale * Math.cos(angle)) * SCALE_FACTOR;
-        
-        // sy = -z + x * (độ lệch dọc)
         const sy = (-z + x * depthScale * Math.sin(angle)) * SCALE_FACTOR;
 
         return { x: sx, y: sy };
     };
-
     const { projectedNodes, viewBox } = useMemo(() => {
         if (!graph.nodes || graph.nodes.length === 0) return { projectedNodes: {}, viewBox: "0 0 300 300" };
         
