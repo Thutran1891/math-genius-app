@@ -151,10 +151,12 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + Mức Vận dụng: ${config.distribution.DS.VANDUNG || 0} câu
 
       QUY TẮC HIỂN THỊ (TUYỆT ĐỐI TUÂN THỦ):
-      
+
       RULE 1. NỘI DUNG CÂU HỎI (questionText):
-        - TUYỆT ĐỐI KHÔNG lặp lại nội dung. Chỉ viết đề bài 1 lần duy nhất.
         - CHỈ chứa đề bài text và công thức LaTeX ($...$).
+        - KHÔNG được mô tả hình ảnh bằng lời (Ví dụ SAI: "Hình vẽ bên là...").
+        - Nếu đề bài dùng hình ảnh (Đồ thị/BBT/Hình không gian), hãy viết: "Cho hàm số có đồ thị/bảng biến thiên như hình bên." hoặc "Cho hình chóp...".
+        - Đối với câu hỏi Hàm số: Nếu ĐÃ cung cấp dữ liệu hình ảnh (graphFunction hoặc variationTableData) thì trong text KHÔNG viết lại công thức hàm số tường minh nữa để tránh lộ đáp án.
         - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
         - PHÂN SỐ: Bắt buộc dùng LaTeX '\dfrac{a}{b}' (Ví dụ: $\dfrac{1}{2}$) thay vì viết '1/2'.
         - TUYỆT ĐỐI KHÔNG viết lời mô tả hình ảnh vào đây (Ví dụ SAI: "(Hình vẽ mô tả một đồ thị...)").
@@ -243,12 +245,28 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
               * Nếu y' là "-" -> yNodes phải giảm.
         - MẸO: Hãy tự kiểm tra logic: "Dương đi lên, Âm đi xuống".
 
-      RULE 9. NGUYÊN TẮC ĐỘC NHẤT (CHỐNG TRÙNG LẶP):
-        - Với mỗi câu hỏi, CHỈ ĐƯỢC CUNG CẤP 1 TRONG 3 LOẠI DỮ LIỆU SAU:
-          1. variationTableData (Nếu đề là Bảng biến thiên)
-          2. graphFunction (Nếu đề là Đồ thị)
-          3. geometryGraph (Nếu là Hình học không gian)
-        - KHÔNG ĐƯỢC trả về cùng lúc 2 loại (Ví dụ: Đã có bảng biến thiên thì KHÔNG trả về graphFunction nữa).
+      RULE 9. NGUYÊN TẮC PHÂN LOẠI DỮ LIỆU (QUAN TRỌNG - SỬA ĐỔI):
+        
+        A. NẾU LÀ CÂU HỎI HÌNH HỌC (Oxyz, Hình không gian, Hình phẳng):
+           - BẮT BUỘC trả về 'geometryGraph' để vẽ hình.
+           - KHÔNG trả về 'variationTableData' hay 'graphFunction'.
+
+        B. NẾU LÀ CÂU HỎI GIẢI TÍCH / HÀM SỐ:
+           - Bắt buộc chọn DUY NHẤT 1 trong 3 hình thức hiển thị sau (Không được trộn lẫn):
+           
+           Option 1: CHO BẰNG CÔNG THỨC (Đại số)
+             - Chỉ cung cấp text và công thức trong 'questionText'.
+             - Để null các trường: 'graphFunction', 'variationTableData', 'geometryGraph'.
+             
+           Option 2: CHO BẰNG ĐỒ THỊ
+             - Trả về 'graphFunction' (và 'asymptotes' nếu có).
+             - Để null các trường: 'variationTableData', 'geometryGraph'.
+             - Trong 'questionText' phải ghi: "Cho đồ thị hàm số y=f(x) như hình bên."
+             
+           Option 3: CHO BẰNG BẢNG BIẾN THIÊN
+             - Trả về 'variationTableData'.
+             - Để null các trường: 'graphFunction', 'geometryGraph'.
+             - Trong 'questionText' phải ghi: "Cho bảng biến thiên như hình bên."
 
          Trả về JSON mảng ${totalQuestions} câu.
     `;

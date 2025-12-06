@@ -223,12 +223,11 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         <LatexText text={question.questionText.replace(/\\n/g, '\n')} />
       </div>
 
-    {/* KHU VỰC VẼ HÌNH – BẢNG BIẾN THIÊN, HÌNH HỌC, ĐỒ THỊ */}
-
     {/* --- SỬA LẠI KHU VỰC NÀY ĐỂ TRÁNH TRÙNG LẶP --- */}
-    <div className="space-y-6 flex justify-center">
+    {/* KHU VỰC VẼ HÌNH ẢNH MINH HỌA */}
+    <div className="space-y-6 flex justify-center mb-6">
         {(() => {
-            // ƯU TIÊN 1: Hình học không gian (Oxyz / Hình phẳng)
+            // CASE 1: HÌNH HỌC (Ưu tiên cao nhất, độc lập hoàn toàn)
             if (question.geometryGraph) {
                 return (
                     <div className="border rounded-lg p-4 bg-gray-50 shadow-inner w-full max-w-md">
@@ -237,24 +236,29 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                 );
             }
 
-            // ƯU TIÊN 2: Bảng biến thiên (Nếu có data chuẩn)
+            // CASE 2: HÀM SỐ (Chỉ hiển thị 1 trong 2 loại visual: BBT hoặc Đồ thị)
+            // Nếu câu hỏi dạng Công thức thuần túy thì cả 2 cái này đều null -> Không vẽ gì (Đúng ý đồ).
+            
+            // 2.1. Bảng biến thiên
             if (question.variationTableData && question.variationTableData.xNodes.length > 0) {
                 return <VariationTable data={question.variationTableData} />;
             }
 
-            // ƯU TIÊN 3: Đồ thị hàm số (Nếu có công thức vẽ)
+            // 2.2. Đồ thị hàm số
             if (question.graphFunction) {
                 return (
                      <div ref={graphRef} className="bg-white border-2 border-gray-300 rounded-lg shadow-sm overflow-hidden" />
                 );
             }
 
-            // FALLBACK: Nếu đề bài nhắc đến hình mà AI không trả về dữ liệu gì cả
-            if (question.questionText.toLowerCase().includes("hình bên") || 
-                question.questionText.toLowerCase().includes("bảng biến thiên")) {
+            // FALLBACK: Chỉ hiện khi text đề cập đến hình mà data lại rỗng (Lỗi AI)
+            const textLower = question.questionText.toLowerCase();
+            if ((textLower.includes("đồ thị") && !question.graphFunction) || 
+                (textLower.includes("bảng biến thiên") && !question.variationTableData) ||
+                (textLower.includes("hình bên") && !question.geometryGraph)) {
                 return (
-                    <div className="text-center p-6 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 text-sm">
-                        ⚠️ Đang tải dữ liệu hình ảnh... (Nếu không thấy, hãy thử tạo lại đề)
+                    <div className="text-center p-4 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 text-sm italic">
+                        (Hình ảnh minh họa đang được tải hoặc không khả dụng)
                     </div>
                 );
             }
