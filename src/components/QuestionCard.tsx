@@ -56,29 +56,37 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         try {
             graphRef.current.innerHTML = '';
             
-            // Xử lý công thức toán học thành JavaScript
+            // Xử lý công thức toán học thành JavaScript chuẩn
             let fn = question.graphFunction
-                .replace(/\$/g, '')       // Bỏ dấu $
-                .replace(/\^/g, '**')     // Đổi ^ thành ** (Lũy thừa)
-                .replace(/\\/g, '')       // Bỏ dấu gạch chéo
-                .replace(/(\d)([a-zA-Z(])/g, '$1*$2')  // Thêm dấu nhân: 2x -> 2*x, 3( -> 3*(
-                .replace(/(\))([a-zA-Z0-9(])/g, '$1*$2') // Thêm dấu nhân: )x -> )*x
+                .replace(/\$/g, '')           // Bỏ dấu $
+                .replace(/\^/g, '**')         // Đổi ^ thành **
+                .replace(/\\/g, '')           // Bỏ ký tự lạ
+                .replace(/ln\(/g, 'log(')     // Đổi ln -> log (JS mặc định log là ln)
+                .replace(/e\*\*/g, 'exp(')    // e mũ
+                // Tự động thêm Math. cho các hàm lượng giác nếu thiếu
+                .replace(/\b(sin|cos|tan|sqrt|abs|log|exp)\b/g, 'Math.$1') 
+                // Xử lý lỗi lặp Math.Math (nếu AI đã thêm rồi)
+                .replace(/Math\.Math\./g, 'Math.')
                 .trim();
 
             window.functionPlot({
-                target: graphRef.current,
-                width: 450, 
-                height: 300, 
-                grid: true,
-                data: [{ 
-                    fn: fn, 
-                    sampler: 'builtIn', 
-                    graphType: 'polyline',
-                    color: '#2563eb'
-                }],
-                xAxis: { domain: [-5, 5] },
-                yAxis: { domain: [-5, 5] }
-            });
+              target: graphRef.current,
+              width: 450, 
+              height: 300, 
+              grid: true,
+              data: [{ 
+                  fn: fn, 
+                  sampler: 'builtIn',  // Dùng builtIn để vẽ mượt hơn
+                  graphType: 'polyline',
+                  color: '#2563eb'
+              }],
+              xAxis: { domain: [-5, 5] },
+              yAxis: { domain: [-5, 5] },
+              tip: {
+                  xLine: true,    // Hiện đường gióng khi di chuột
+                  yLine: true,
+              }
+          });
         } catch (e) { 
             console.error("Lỗi vẽ đồ thị:", e);
             // Không hiện lỗi ra giao diện để tránh làm rối mắt người dùng
@@ -151,35 +159,48 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
       </div>
 
     {/* KHU VỰC VẼ HÌNH – BẢNG BIẾN THIÊN, HÌNH HỌC, ĐỒ THỊ */}
-    <div className="space-y-6">
+    <div className="text-lg text-gray-800 mb-4 leading-relaxed">
+         <LatexText text={question.questionText} />
+      </div>
 
-        {/* 1. Bảng biến thiên – CÓ FALLBACK SIÊU ỔN ĐỊNH */}
-        {question.variationTableData ? (
-            <VariationTable data={question.variationTableData} />
-        ) : question.questionText.includes("bảng biến thiên") || 
-          question.questionText.includes("hình bên") ? (
-            <div className="text-center my-12 p-8 bg-red-50 border-2 border-red-300 rounded-xl">
-                <div className="text-red-700 font-bold text-lg">
-                    ⚠️ AI chưa cung cấp dữ liệu bảng biến thiên!
-                </div>
-                <div className="text-sm text-red-600 mt-2">
-                    Đang cải thiện prompt... (Sẽ đẹp 100% trong vài giây tới)
-                </div>
-            </div>
-        ) : null}
+    {/* --- SỬA LẠI KHU VỰC NÀY ĐỂ TRÁNH TRÙNG LẶP --- */}
+    <div className="space-y-6 flex justify-center">
+        {(() => {
+            // ƯU TIÊN 1: Hình học không gian (Oxyz / Hình phẳng)
+            if (question.geometryGraph) {
+                return (
+                    <div className="border rounded-lg p-4 bg-gray-50 shadow-inner w-full max-w-md">
+                        <DynamicGeometry graph={question.geometryGraph} />
+                    </div>
+                );
+            }
 
-        {/* 2. Hình học không gian (SVG) */}
-        {question.geometryGraph && (
-            <div className="border rounded-lg p-4 bg-gray-50 shadow-inner">
-                <DynamicGeometry graph={question.geometryGraph} />
-            </div>
-        )}
+            // ƯU TIÊN 2: Bảng biến thiên (Nếu có data chuẩn)
+            if (question.variationTableData && question.variationTableData.xNodes.length > 0) {
+                return <VariationTable data={question.variationTableData} />;
+            }
 
-        {/* 3. Đồ thị hàm số (FunctionPlot) */}
-        {question.graphFunction && (
-            <div ref={graphRef} className="bg-white border-2 border-gray-300 rounded-lg shadow-sm overflow-hidden" />
-        )}
+            // ƯU TIÊN 3: Đồ thị hàm số (Nếu có công thức vẽ)
+            if (question.graphFunction) {
+                return (
+                     <div ref={graphRef} className="bg-white border-2 border-gray-300 rounded-lg shadow-sm overflow-hidden" />
+                );
+            }
+
+            // FALLBACK: Nếu đề bài nhắc đến hình mà AI không trả về dữ liệu gì cả
+            if (question.questionText.toLowerCase().includes("hình bên") || 
+                question.questionText.toLowerCase().includes("bảng biến thiên")) {
+                return (
+                    <div className="text-center p-6 bg-orange-50 border border-orange-200 rounded-lg text-orange-700 text-sm">
+                        ⚠️ Đang tải dữ liệu hình ảnh... (Nếu không thấy, hãy thử tạo lại đề)
+                    </div>
+                );
+            }
+
+            return null;
+        })()}
     </div>
+    {/* ------------------------------------------------ */}    
 
       {/* 1. TRẮC NGHIỆM */}
       {question.type === 'TN' && question.options && (

@@ -163,33 +163,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
       3. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
 
-      4. ĐỒ THỊ HÀM SỐ (Giải tích):
-         - BẮT BUỘC dùng trường 'graphFunction'.
-         - Điền công thức JS chuẩn: "x**3 - 3*x + 1".
-
-      5. DỮ LIỆU BẢNG BIẾN THIÊN ('variationTableData'):
-        5.1. Với MỌI câu hỏi cần bảng biến thiên (dù hàm số bậc 3, phân thức, lượng giác…), BẮT BUỘC phải điền đầy đủ trường:
-          "variationTableData": {
-            "xNodes": ["$-\\infty$", "-2", "0", "1", "$+\\infty$"],  // ví dụ
-            "yPrimeSigns": ["+", "-", "+"],
-            "yPrimeVals": ["", "0", "", "0", ""],
-            "yNodes": ["$+\\infty$", "5", "1", "3", "$-\\infty$"]
-          }
-
-        5.2. TUYỆT ĐỐI KHÔNG được viết bất kỳ đoạn LaTeX nào của bảng biến thiên (\\begin{array}, \\hline, v.v.) vào questionText hoặc explanation.
-          Chỉ được viết đúng 1 câu duy nhất trong questionText:
-          "Cho bảng biến thiên như hình bên."
-
-        5.3. Nếu có tiệm cận đứng (x = k), thì:
-          - yPrimeVals tại cột đó: "||"
-          - yNodes tại cột đó: "$+\\infty$||$-\\infty$" hoặc ngược lại
-
-        5.4. Với hàm bậc ba chuẩn (dẫn xuất bậc 2): luôn có 5 cột x, 3 dấu y', 2 điểm cực trị ghi "0" ở yPrimeVals.
-        5.5. Với hàm bậc bốn chuẩn (dẫn xuất bậc 3): luôn có 6 cột x, 4 dấu y', 3 điểm cực trị ghi "0" ở yPrimeVals.
-
-        5.6. Với hàm phân thức hữu tỉ có tiệm cận đứng và tiệm cận ngang: luôn có ít nhất 5–6 cột, có "||" ở đúng vị trí.
-
-      6. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
+      4. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
          - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
             
         a. HÌNH CHÓP S.ABCD (Đáy là hình bình hành/chữ nhật):
@@ -213,7 +187,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           - Cạnh khuất thường là cạnh đáy bên trong (ví dụ AC) hoặc cạnh bên khuất.
           - Hãy suy luận logic để set 'style': 'DASHED' cho đúng cạnh bị che.
 
-      7. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình thang...:
+      5. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình thang...:
           - BẮT BUỘC Đặt tất cả tọa độ Z = 0.
           - SỬ DỤNG HỆ TRỤC TỌA ĐỘ OXY CHUẨN:
             + Trục hoành là x, Trục tung là y.
@@ -222,22 +196,33 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + Ví dụ Hình chữ nhật: (0,0,0), (4,0,0), (4,2,0), (0,2,0).
           - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID'.
           
-      8. NGUYÊN TẮC ĐỘC NHẤT DỮ LIỆU (QUAN TRỌNG):
-         Đối với mỗi câu hỏi về hàm số, CHỈ ĐƯỢC CHỌN 1 trong 3 dạng dữ liệu sau (Không được để dư thừa):
-         
-         - DẠNG 1: CHO CÔNG THỨC (Algebraic):
-           + Nội dung câu hỏi chứa công thức hàm số cụ thể (Ví dụ: "$y = x^3 - 3x + 1$").
-           + Yêu cầu: variationTableData = null, geometryGraph = null.
-           
-         - DẠNG 2: CHO BẢNG BIẾN THIÊN (Tabular):
-           + Nội dung câu hỏi chỉ ghi: "Cho hàm số $y=f(x)$ có bảng biến thiên như hình bên:" (Tuyệt đối KHÔNG viết công thức hàm số cụ thể trong lời dẫn).
-           + Yêu cầu: variationTableData = { ...có dữ liệu... }, geometryGraph = null.
-           
-         - DẠNG 3: CHO ĐỒ THỊ (Graphical):
-           + Nội dung câu hỏi chỉ ghi: "Cho hàm số $y=f(x)$ có đồ thị như hình bên:" (Tuyệt đối KHÔNG viết công thức hàm số cụ thể trong lời dẫn).
-           + Yêu cầu: geometryGraph = { ...có dữ liệu... }, variationTableData = null.
+      6. QUY TẮC ĐỒ THỊ HÀM SỐ (QUAN TRỌNG):
+              - Nếu câu hỏi yêu cầu nhìn đồ thị để tìm cực trị, đồng biến/nghịch biến...:
+              - BẮT BUỘC trả về trường 'graphFunction'.
+              - CÚ PHÁP PHẢI LÀ JAVASCRIPT THUẦN (Không dùng LaTeX):
+                  + SAI: x^3 - 3x, sin(x), \frac{1}{x}
+                  + ĐÚNG: x*x*x - 3*x, Math.sin(x), 1/x, (x+1)/(x-2)
+              - Ví dụ hàm bậc 3: "x*x*x - 3*x + 1"
+              - Ví dụ hàm phân thức: "(2*x + 1)/(x - 1)"
 
-      Trả về JSON mảng ${totalQuestions} câu.
+      7. QUY TẮC BẢNG BIẾN THIÊN (VariationTable):
+        - Nếu câu hỏi là "Cho bảng biến thiên như hình bên", BẮT BUỘC phải sinh dữ liệu 'variationTableData'.
+        - Cấu trúc CHUẨN KỸ THUẬT:
+            + xNodes: ["$-\\infty$", "x1", "x2", "$+\\infty$"] (Luôn bắt đầu và kết thúc bằng vô cực nếu là hàm đa thức)
+            + yPrimeSigns: ["+", "-", "+"] (Số lượng phải ít hơn xNodes 1 đơn vị)
+            + yNodes: Phải khớp logic với dấu của y'.
+              * Nếu y' là "+" -> yNodes phải tăng (ví dụ: từ $-\\infty$ lên Cực đại).
+              * Nếu y' là "-" -> yNodes phải giảm.
+        - MẸO: Hãy tự kiểm tra logic: "Dương đi lên, Âm đi xuống".
+
+      8. NGUYÊN TẮC ĐỘC NHẤT (CHỐNG TRÙNG LẶP):
+        - Với mỗi câu hỏi, CHỈ ĐƯỢC CUNG CẤP 1 TRONG 3 LOẠI DỮ LIỆU SAU:
+          1. variationTableData (Nếu đề là Bảng biến thiên)
+          2. graphFunction (Nếu đề là Đồ thị)
+          3. geometryGraph (Nếu là Hình học không gian)
+        - KHÔNG ĐƯỢC trả về cùng lúc 2 loại (Ví dụ: Đã có bảng biến thiên thì KHÔNG trả về graphFunction nữa).
+
+         Trả về JSON mảng ${totalQuestions} câu.
     `;
 
     const result = await model.generateContent(prompt);
