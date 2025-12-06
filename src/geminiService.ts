@@ -90,6 +90,13 @@ const questionSchema: any = {
     
     variationTableData: { ...variationTableSchema, nullable: true },
     graphFunction: { type: SchemaType.STRING },
+    // --- THÊM DÒNG NÀY ---
+    asymptotes: { 
+      type: SchemaType.ARRAY, 
+      items: { type: SchemaType.STRING }, 
+      description: "Mảng chứa các đường tiệm cận. Ví dụ: ['x=2', 'y=1', 'y = 2*x + 1]" 
+  },
+  // ---------------------
     geometryGraph: { ...geometryGraphSchema, nullable: true },
     plotlyData: { ...plotlyDataSchema, nullable: true }
   },
@@ -214,6 +221,17 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
                   + ĐÚNG: x*x*x - 3*x, Math.sin(x), 1/x, (x+1)/(x-2)
               - Ví dụ hàm bậc 3: "x*x*x - 3*x + 1"
               - Ví dụ hàm phân thức: "(2*x + 1)/(x - 1)"
+            - Nếu đồ thị có tiệm cận, BẮT BUỘC trả về mảng 'asymptotes'.
+            - Cú pháp tiệm cận:
+                + Tiệm cận ngang y = 1 -> Viết: "y=1"
+                + Tiệm cận đứng x = 2 -> Viết: "x=2"
+                + Tiệm cận xiên y = 2x - 1 -> Viết: "y=2*x-1" (Nhớ có dấu * nhân)
+            - Ví dụ đầy đủ: 
+              {
+                "graphFunction": "(2*x + 1)/(x - 1)",
+                "asymptotes": ["x=1", "y=2"]
+              }
+
 
       RULE 8. QUY TẮC BẢNG BIẾN THIÊN (VariationTable):
         - Nếu câu hỏi là "Cho bảng biến thiên như hình bên", BẮT BUỘC phải sinh dữ liệu 'variationTableData'.

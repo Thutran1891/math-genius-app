@@ -52,6 +52,7 @@ export interface Question {
   
   // Hình ảnh
   graphFunction?: string; 
+  asymptotes?: string[]; // <-- Thêm dòng này
   geometryGraph?: GeometryGraph; 
   variationTableData?: VariationTableData; 
   

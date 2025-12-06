@@ -50,36 +50,99 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
     }
   };
 
-  // --- LOGIC VẼ ĐỒ THỊ (ĐÃ NÂNG CẤP) ---
+  // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ NÂNG CẤP HOÀN CHỈNH) ---
   useEffect(() => {
-    if (question.graphFunction && graphRef.current && window.functionPlot) {
+    // Chỉ chạy khi có dữ liệu đồ thị HOẶC tiệm cận, và thư viện đã sẵn sàng
+    if ((question.graphFunction || question.asymptotes) && graphRef.current && window.functionPlot) {
         try {
+            // Xóa hình cũ trước khi vẽ mới
             graphRef.current.innerHTML = '';
             
-            // Xử lý công thức toán học thành JavaScript chuẩn
-            let fn = question.graphFunction
-                .replace(/\$/g, '')           // Bỏ dấu $
-                .replace(/\^/g, '**')         // Đổi ^ thành **
-                .replace(/\\/g, '')           // Bỏ ký tự lạ
-                .replace(/ln\(/g, 'log(')     // Đổi ln -> log (JS mặc định log là ln)
-                .replace(/e\*\*/g, 'exp(')    // e mũ
-                // Tự động thêm Math. cho các hàm lượng giác nếu thiếu
-                .replace(/\b(sin|cos|tan|sqrt|abs|log|exp)\b/g, 'Math.$1') 
-                // Xử lý lỗi lặp Math.Math (nếu AI đã thêm rồi)
-                .replace(/Math\.Math\./g, 'Math.')
-                .trim();
+            // Mảng chứa tất cả các đường cần vẽ (Hàm chính + Tiệm cận)
+            const dataToPlot: any[] = [];
 
+            // ---------------------------------------------------------
+            // 1. XỬ LÝ HÀM SỐ CHÍNH (Nếu có)
+            // ---------------------------------------------------------
+            if (question.graphFunction) {
+                // Làm sạch chuỗi công thức từ AI (LaTeX -> Javascript)
+                let fn = question.graphFunction
+                    .replace(/\$/g, '')           // Bỏ dấu $
+                    .replace(/\^/g, '**')         // Đổi mũ ^ thành **
+                    .replace(/\\/g, '')           // Bỏ ký tự lạ của LaTeX
+                    .replace(/ln\(/g, 'log(')     // Đổi ln -> log
+                    .replace(/e\*\*/g, 'exp(')    // Đổi e mũ
+                    // Tự động thêm Math. cho các hàm lượng giác/toán học
+                    .replace(/\b(sin|cos|tan|cot|sqrt|abs|log|exp)\b/g, 'Math.$1') 
+                    // Sửa lỗi nếu lỡ thêm Math.Math.
+                    .replace(/Math\.Math\./g, 'Math.')
+                    .trim();
+
+                dataToPlot.push({
+                    fn: fn, 
+                    sampler: 'builtIn',  // Dùng sampler mặc định cho mượt
+                    graphType: 'polyline',
+                    color: '#2563eb',    // Màu xanh dương chủ đạo
+                    range: [-10, 10]
+                });
+            }
+
+            // ---------------------------------------------------------
+            // 2. XỬ LÝ TIỆM CẬN (Ngang, Đứng, Xiên)
+            // ---------------------------------------------------------
+            if (question.asymptotes && question.asymptotes.length > 0) {
+                question.asymptotes.forEach(asym => {
+                    // Chuẩn hóa: Xóa khoảng trắng, chuyển về chữ thường
+                    const cleanAsym = asym.replace(/\s/g, '').toLowerCase();
+                    
+                    // Tách vế trái (x hoặc y) và vế phải (biểu thức)
+                    // Ví dụ: "y = 2*x + 1" -> parts[0]="y", parts[1]="2*x+1"
+                    const parts = cleanAsym.split('=');
+                    if (parts.length !== 2) return; // Bỏ qua nếu sai cú pháp
+
+                    const type = parts[0]; // 'x' hoặc 'y'
+                    let val = parts[1];    
+
+                    // QUAN TRỌNG: Làm sạch biểu thức tiệm cận (để vẽ được tiệm cận xiên)
+                    // Áp dụng quy tắc y hệt như hàm chính
+                    val = val
+                        .replace(/\^/g, '**')
+                        .replace(/\\/g, '')
+                        .replace(/ln\(/g, 'log(')
+                        .replace(/\b(sin|cos|tan|sqrt|abs|log|exp)\b/g, 'Math.$1')
+                        .replace(/Math\.Math\./g, 'Math.');
+
+                    if (type === 'y') {
+                        // CASE A: Tiệm cận NGANG (y=2) hoặc XIÊN (y=2*x+1)
+                        // Thư viện functionPlot vẽ tốt cả 2 dạng này dưới dạng hàm số
+                        dataToPlot.push({
+                            fn: val, 
+                            graphType: 'polyline',
+                            color: '#dc2626', // Màu đỏ báo hiệu đường phụ
+                            attr: { "stroke-dasharray": "4,4" } // Nét đứt
+                        });
+                    } else if (type === 'x') {
+                        // CASE B: Tiệm cận ĐỨNG (x=1)
+                        // Phải dùng dạng hàm ẩn (implicit): x - val = 0
+                        dataToPlot.push({
+                            fn: `x - (${val})`, 
+                            fnType: 'implicit',
+                            color: '#dc2626',
+                            attr: { "stroke-dasharray": "4,4" }
+                        });
+                    }
+                });
+            }
+
+            // ---------------------------------------------------------
+            // 3. TIẾN HÀNH VẼ
+            // ---------------------------------------------------------
             window.functionPlot({
               target: graphRef.current,
               width: 450, 
               height: 300, 
               grid: true,
-              data: [{ 
-                  fn: fn, 
-                  sampler: 'builtIn',  // Dùng builtIn để vẽ mượt hơn
-                  graphType: 'polyline',
-                  color: '#2563eb'
-              }],
+              data: dataToPlot, // Đẩy toàn bộ dữ liệu đã xử lý vào đây
               xAxis: { domain: [-5, 5] },
               yAxis: { domain: [-5, 5] },
               tip: {
@@ -87,12 +150,14 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                   yLine: true,
               }
           });
+
         } catch (e) { 
             console.error("Lỗi vẽ đồ thị:", e);
-            // Không hiện lỗi ra giao diện để tránh làm rối mắt người dùng
+            // Không hiển thị lỗi ra UI để tránh làm người dùng bối rối
         }
     }
-  }, [question.graphFunction, question.id]);
+  }, [question.graphFunction, question.asymptotes, question.id]); 
+  // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
   // Logic kiểm tra kết quả
   const handleCheckResult = () => {
@@ -154,8 +219,8 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         )}
       </div>
 
-      <div className="text-lg text-gray-800 mb-4 leading-relaxed">
-         <LatexText text={question.questionText} />
+      <div className="text-lg text-gray-800 mb-4 leading-relaxed whitespace-pre-wrap">
+        <LatexText text={question.questionText.replace(/\\n/g, '\n')} />
       </div>
 
     {/* KHU VỰC VẼ HÌNH – BẢNG BIẾN THIÊN, HÌNH HỌC, ĐỒ THỊ */}
@@ -305,7 +370,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
           <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-gray-800 text-sm animate-in fade-in">
               <div className="font-bold mb-2 text-yellow-800 uppercase text-xs tracking-wider">Lời giải chi tiết</div>
               <div className="leading-relaxed">
-                <LatexText text={question.explanation} />
+                <LatexText text={question.explanation.replace(/\\n/g, '\n')} />
               </div>
           </div>
       )}
