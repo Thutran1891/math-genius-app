@@ -60,18 +60,34 @@ function App() {
   };
   // ------------------------------
 
+  // Tìm đến hàm này:
   const handleSaveResult = async () => {
     if (!user || !config || isSaved) return;
     try {
-      await addDoc(collection(db, "results"), {
+      // --- [ĐOẠN CŨ - XÓA HOẶC COMMENT LẠI] ---
+      /* await addDoc(collection(db, "results"), {
         userId: user.uid,
         topic: config.topic,
         score: score,
         total: questions.length,
         date: serverTimestamp(),
-        // Lưu toàn bộ câu hỏi KÈM đáp án người dùng (nhờ hàm handleQuestionUpdate ở trên)
         fullData: JSON.stringify(questions) 
       });
+      */
+
+      // --- [ĐOẠN MỚI - THAY THẾ VÀO ĐÂY] ---
+      // Lưu vào: users -> [ID của user] -> examHistory -> [Bài thi]
+      const historyRef = collection(db, "users", user.uid, "examHistory");
+      
+      await addDoc(historyRef, {
+        // Không cần lưu userId nữa vì đã nằm trong folder của họ rồi
+        topic: config.topic,
+        score: score,
+        total: questions.length,
+        date: serverTimestamp(),
+        fullData: JSON.stringify(questions) 
+      });
+      // ----------------------------------------
       
       setIsSaved(true);
       alert("Đã lưu kết quả thành công!");

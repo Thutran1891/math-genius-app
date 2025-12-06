@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Clock, Calendar, Trophy, ChevronLeft } from 'lucide-react';
 import { Question } from '../types';
@@ -23,16 +23,24 @@ export const History: React.FC<Props> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [selectedExam, setSelectedExam] = useState<Question[] | null>(null);
 
+  // Tìm đến đoạn useEffect fetchHistory:
   useEffect(() => {
     const fetchHistory = async () => {
       if (!auth.currentUser) return;
       try {
+        // --- [CODE MỚI - SỬA LẠI ĐOẠN NÀY] ---
+        // 1. Trỏ vào đúng sub-collection của user đang đăng nhập
+        const historyRef = collection(db, "users", auth.currentUser.uid, "examHistory");
+
+        // 2. Query đơn giản hơn (không cần where userId nữa)
         const q = query(
-          collection(db, "results"),
-          where("userId", "==", auth.currentUser.uid),
+          historyRef,
           orderBy("date", "desc")
         );
+        // -------------------------------------
+
         const querySnapshot = await getDocs(q);
+        // ... (phần xử lý data bên dưới giữ nguyên)
         const data: HistoryItem[] = [];
         querySnapshot.forEach((doc) => {
           data.push({ id: doc.id, ...doc.data() } as HistoryItem);
