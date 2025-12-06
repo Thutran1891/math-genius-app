@@ -159,9 +159,6 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
       </div>
 
     {/* KHU VỰC VẼ HÌNH – BẢNG BIẾN THIÊN, HÌNH HỌC, ĐỒ THỊ */}
-    <div className="text-lg text-gray-800 mb-4 leading-relaxed">
-         <LatexText text={question.questionText} />
-      </div>
 
     {/* --- SỬA LẠI KHU VỰC NÀY ĐỂ TRÁNH TRÙNG LẶP --- */}
     <div className="space-y-6 flex justify-center">
