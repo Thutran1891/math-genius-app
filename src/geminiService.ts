@@ -145,7 +145,8 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
       QUY TẮC HIỂN THỊ (TUYỆT ĐỐI TUÂN THỦ):
       
-      1. NỘI DUNG CÂU HỎI (questionText):
+      RULE 1. NỘI DUNG CÂU HỎI (questionText):
+        - TUYỆT ĐỐI KHÔNG lặp lại nội dung. Chỉ viết đề bài 1 lần duy nhất.
         - CHỈ chứa đề bài text và công thức LaTeX ($...$).
         - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
         - PHÂN SỐ: Bắt buộc dùng LaTeX '\dfrac{a}{b}' (Ví dụ: $\dfrac{1}{2}$) thay vì viết '1/2'.
@@ -156,14 +157,23 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
          - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
 
-      2. QUY TẮC CÂU ĐÚNG/SAI (DS):
+      RULE 2: NGUYÊN TẮC ĐÁP ÁN ĐÚNG DUY NHẤT (QUAN TRỌNG NHẤT)
+        - Với câu hỏi Trắc nghiệm (TN), trong 4 phương án A, B, C, D:
+        - CHỈ ĐƯỢC PHÉP CÓ 1 PHƯƠNG ÁN ĐÚNG. 3 phương án còn lại PHẢI LÀ SAI (Phương án nhiễu).
+        - Xử lý lỗi thường gặp về tính Đơn điệu (Đồng biến/Nghịch biến):
+            + Nếu hàm số đồng biến trên cả 2 khoảng $(-\\infty; -1)$ và $(1; +\\infty)$.
+            + THÌ: Chỉ được đưa 1 trong 2 khoảng đó vào đáp án đúng (Ví dụ chọn A là $(1; +\\infty)$).
+            + TUYỆT ĐỐI KHÔNG đưa khoảng đúng còn lại (là $(-\\infty; -1)$) vào các phương án B, C, D.
+            + Các phương án nhiễu phải là các khoảng nghịch biến hoặc khoảng sai hẳn.
+
+      RULE 3. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
       - Mỗi phát biểu có 'content' và 'isCorrect' (true/false).
       - KHÔNG được để trống 'statements'.  
 
-      3. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
+      RULE 4. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
 
-      4. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
+      RULE 5. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
          - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
             
         a. HÌNH CHÓP S.ABCD (Đáy là hình bình hành/chữ nhật):
@@ -187,7 +197,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           - Cạnh khuất thường là cạnh đáy bên trong (ví dụ AC) hoặc cạnh bên khuất.
           - Hãy suy luận logic để set 'style': 'DASHED' cho đúng cạnh bị che.
 
-      5. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình thang...:
+      RULE 6. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình thang...:
           - BẮT BUỘC Đặt tất cả tọa độ Z = 0.
           - SỬ DỤNG HỆ TRỤC TỌA ĐỘ OXY CHUẨN:
             + Trục hoành là x, Trục tung là y.
@@ -196,7 +206,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + Ví dụ Hình chữ nhật: (0,0,0), (4,0,0), (4,2,0), (0,2,0).
           - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID'.
           
-      6. QUY TẮC ĐỒ THỊ HÀM SỐ (QUAN TRỌNG):
+      RULE 7. QUY TẮC ĐỒ THỊ HÀM SỐ (QUAN TRỌNG):
               - Nếu câu hỏi yêu cầu nhìn đồ thị để tìm cực trị, đồng biến/nghịch biến...:
               - BẮT BUỘC trả về trường 'graphFunction'.
               - CÚ PHÁP PHẢI LÀ JAVASCRIPT THUẦN (Không dùng LaTeX):
@@ -205,7 +215,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
               - Ví dụ hàm bậc 3: "x*x*x - 3*x + 1"
               - Ví dụ hàm phân thức: "(2*x + 1)/(x - 1)"
 
-      7. QUY TẮC BẢNG BIẾN THIÊN (VariationTable):
+      RULE 8. QUY TẮC BẢNG BIẾN THIÊN (VariationTable):
         - Nếu câu hỏi là "Cho bảng biến thiên như hình bên", BẮT BUỘC phải sinh dữ liệu 'variationTableData'.
         - Cấu trúc CHUẨN KỸ THUẬT:
             + xNodes: ["$-\\infty$", "x1", "x2", "$+\\infty$"] (Luôn bắt đầu và kết thúc bằng vô cực nếu là hàm đa thức)
@@ -215,7 +225,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
               * Nếu y' là "-" -> yNodes phải giảm.
         - MẸO: Hãy tự kiểm tra logic: "Dương đi lên, Âm đi xuống".
 
-      8. NGUYÊN TẮC ĐỘC NHẤT (CHỐNG TRÙNG LẶP):
+      RULE 9. NGUYÊN TẮC ĐỘC NHẤT (CHỐNG TRÙNG LẶP):
         - Với mỗi câu hỏi, CHỈ ĐƯỢC CUNG CẤP 1 TRONG 3 LOẠI DỮ LIỆU SAU:
           1. variationTableData (Nếu đề là Bảng biến thiên)
           2. graphFunction (Nếu đề là Đồ thị)
