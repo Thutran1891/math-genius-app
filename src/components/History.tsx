@@ -126,8 +126,12 @@ export const History: React.FC<Props> = ({ onBack }) => {
                       <div className="flex-1 pr-4">
                         <h3 className="font-bold text-gray-800 text-base mb-1 line-clamp-2 group-hover:text-blue-700 transition-colors">{item.topic}</h3>
                         <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span className="flex items-center gap-1"><Calendar size={12}/> {dateObj.toLocaleDateString('vi-VN')}</span>
+                          <span className="flex items-center gap-1">
+                              <Calendar size={12}/> 
+                              {dateObj.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                          </span>
                           <span className="flex items-center gap-1"><Trophy size={12}/> {item.score}/{item.total} câu đúng</span>
+
                         </div>
                       </div>
                       
