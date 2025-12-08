@@ -20,6 +20,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
 
     // --- HELPER FUNCTIONS ---
     
+    // Làm sạch chuỗi LaTeX
     const cleanMath = (val: string): string => {
         if (!val) return "";
         let s = val.trim();
@@ -32,10 +33,11 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
     };
 
     const isPos = (val: string | null | undefined) => val && val.trim() === '+';
+    // Bắt tất cả các loại dấu trừ
     const isNeg = (val: string | null | undefined) => val && ['-', '−', '–', '—', '\u2212'].includes(val.trim());
 
     // --- LOGIC PHÂN CẤP ĐỘ CAO (HIERARCHY LOGIC) ---
-    // Không đoán mò, chỉ xét đúng bản chất giá trị
+    // Đây là phần quan trọng nhất để sửa lỗi của bạn
     const getYPos = (val: string, index: number) => {
         const yTop = rowHeight * 2 + 20;           // Level 1: +Infinity
         const yHighMid = rowHeight * 2 + 40;       // Level 2: Cực Đại
@@ -59,13 +61,16 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
         const rightSign = index < (data.yPrimeSigns?.length || 0) ? data.yPrimeSigns?.[index] : null;
 
         // Trường hợp CỰC ĐẠI: Lên (+) rồi Xuống (-)
+        // Số nằm giữa 2 dấu -> Cao vừa
         if (isPos(leftSign) && isNeg(rightSign)) return yHighMid;
 
         // Trường hợp CỰC TIỂU: Xuống (-) rồi Lên (+)
+        // Số nằm giữa 2 dấu -> Thấp vừa
         if (isNeg(leftSign) && isPos(rightSign)) return yLowMid;
 
-        // Trường hợp còn lại: Tiệm cận ngang (Hàm 1/1) hoặc điểm biên không đổi chiều
-        // Mặc định nằm GIỮA để mũi tên đi lên/xuống về phía vô cực
+        // Trường hợp còn lại: Tiệm cận ngang (Hàm 1/1)
+        // Số này không phải cực trị, nó là điểm bắt đầu hoặc kết thúc của nhánh
+        // Mặc định cho nằm GIỮA (Center)
         return yCenter;
     };
 
@@ -92,7 +97,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                 {data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
                     
-                    // Check Tiệm cận đứng (dựa vào ||)
+                    // Check Tiệm cận đứng (dựa vào || ở dòng y' hoặc y)
                     const isAsymptote = data.yPrimeVals?.[i]?.includes('||') || (data.yNodes[i] && data.yNodes[i].includes('||'));
 
                     // --- 1. Draw X ---
