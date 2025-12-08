@@ -7,70 +7,87 @@ interface Props {
 }
 
 export const VariationTable: React.FC<Props> = ({ data }) => {
-    // 1. CẤU HÌNH KÍCH THƯỚC (SCALE 80%)
-    const width = 640;          
-    const paddingRight = 48;    
-    const rowHeight = 48;       
-    const yRowHeight = 112;     
+    // 1. CẤU HÌNH KÍCH THƯỚC (Giữ nguyên tỉ lệ hiển thị tốt)
+    const width = 640;
+    const paddingRight = 48;
+    const rowHeight = 48;
+    const yRowHeight = 112;
     const totalHeight = rowHeight * 2 + yRowHeight;
-    const startX = 64;          
+    const startX = 64;
 
-    const usableWidth = width - startX - paddingRight; 
+    const usableWidth = width - startX - paddingRight;
     const colWidth = usableWidth / Math.max(1, data.xNodes.length - 1);
 
-    // --- HÀM BỔ TRỢ XỬ LÝ CHUỖI ---
+    // --- 2. HÀM XỬ LÝ CHUỖI MẠNH MẼ HƠN ---
+    
+    // Làm sạch LaTeX và ký tự lạ
     const cleanMath = (val: string): string => {
         if (!val) return "";
         let s = val.trim();
+        // Chuẩn hóa vô cực
         if (!s.includes('\\infty') && !s.includes('\u221e')) {
             if (s.toLowerCase().includes('-inf')) s = '-\\infty';
             else if (s.toLowerCase().includes('+inf') || s.toLowerCase().includes('inf')) s = '+\\infty';
         }
+        // Đóng gói LaTeX nếu cần
         if (!s.startsWith('$')) return `$${s}$`;
         return s;
     };
 
-    // Hàm kiểm tra dấu an toàn (tránh lỗi do khoảng trắng)
-    const isPos = (val: string | null | undefined) => val && val.trim() === '+';
-    const isNeg = (val: string | null | undefined) => val && (val.trim() === '-' || val.trim() === '\u2212'); // \u2212 là dấu trừ toán học
+    // Kiểm tra dấu: Bắt tất cả các loại dấu trừ (hyphen, en-dash, minus sign...)
+    const isNeg = (val: string | null | undefined): boolean => {
+        if (!val) return false;
+        const s = val.trim();
+        return ['-', '−', '–', '—', '\u2212'].includes(s); 
+    };
 
-    // --- THUẬT TOÁN TÍNH VỊ TRÍ Y ---
+    const isPos = (val: string | null | undefined): boolean => {
+        if (!val) return false;
+        return val.trim() === '+';
+    };
+
+    // --- 3. THUẬT TOÁN TÍNH VỊ TRÍ Y (Đã sửa lỗi logic) ---
     const getYPos = (val: string, index: number, isLeftOfAsymptote: boolean = false, isRightOfAsymptote: boolean = false) => {
-        const yTop = rowHeight * 2 + 25;       // Cách mép trên một chút
-        const yBot = totalHeight - 25;         // Cách mép dưới một chút
-        const yMid = rowHeight * 2 + yRowHeight / 2;
+        const yTop = rowHeight * 2 + 25;       // Vị trí CAO NHẤT
+        const yBot = totalHeight - 25;         // Vị trí THẤP NHẤT
+        const yMid = rowHeight * 2 + yRowHeight / 2; // Vị trí GIỮA
 
-        const v = val ? val.toLowerCase().replace(/\$|\\/g, '') : ""; 
+        const v = val ? val.toLowerCase().replace(/\$|\\/g, '') : "";
 
-        // 1. Ưu tiên TUYỆT ĐỐI cho Vô cực
+        // A. Ưu tiên TUYỆT ĐỐI cho giá trị Vô cực hiển thị trong ô Y
         if (v.includes('infty') || v.includes('inf') || v.includes('\u221e')) {
-            if (v.includes('-')) return yBot; 
-            return yTop;                      
+            if (v.includes('-') || isNeg(val)) return yBot; 
+            return yTop;
         }
 
-        // 2. Logic suy luận dựa vào đạo hàm (nếu giá trị y không phải vô cực)
+        // B. Logic suy luận khi KHÔNG có giá trị Y cụ thể (ví dụ tại tiệm cận)
+        // Lấy dấu đạo hàm bên trái và bên phải điểm đang xét
         let leftSign = index > 0 ? data.yPrimeSigns?.[index - 1] : null;
         let rightSign = index < (data.yPrimeSigns?.length || 0) ? data.yPrimeSigns?.[index] : null;
 
+        // Nếu đang đứng cạnh tiệm cận, bỏ qua phía bên kia tiệm cận
         if (isLeftOfAsymptote) rightSign = null; 
         if (isRightOfAsymptote) leftSign = null;
 
-        // A. Cực Trị (Đổi dấu)
+        // CASE 1: ĐIỂM BẮT ĐẦU CỦA MŨI TÊN (Sau tiệm cận hoặc biên trái)
+        // Logic: Chỉ quan tâm dấu đạo hàm của khoảng TIẾP THEO (rightSign)
+        if (!leftSign && rightSign) {
+            if (isPos(rightSign)) return yBot; // Đồng biến (+) -> Bắt đầu THẤP để đi lên
+            if (isNeg(rightSign)) return yTop; // Nghịch biến (-) -> Bắt đầu CAO để đi xuống
+        }
+
+        // CASE 2: ĐIỂM KẾT THÚC CỦA MŨI TÊN (Trước tiệm cận hoặc biên phải)
+        // Logic: Chỉ quan tâm dấu đạo hàm của khoảng TRƯỚC ĐÓ (leftSign)
+        if (leftSign && !rightSign) {
+            if (isPos(leftSign)) return yTop; // Đồng biến (+) -> Kết thúc CAO
+            if (isNeg(leftSign)) return yBot; // Nghịch biến (-) -> Kết thúc THẤP
+        }
+
+        // CASE 3: CỰC TRỊ (Giao điểm giữa 2 khoảng)
         if (isPos(leftSign) && isNeg(rightSign)) return yTop; // Cực đại
         if (isNeg(leftSign) && isPos(rightSign)) return yBot; // Cực tiểu
 
-        // B. Điểm bắt đầu (Sau tiệm cận hoặc biên trái)
-        if (!leftSign && rightSign) {
-            if (isPos(rightSign)) return yBot; // Đồng biến -> Bắt đầu thấp để đi lên
-            if (isNeg(rightSign)) return yTop; // Nghịch biến -> Bắt đầu cao để đi xuống
-        }
-
-        // C. Điểm kết thúc (Trước tiệm cận hoặc biên phải)
-        if (leftSign && !rightSign) {
-            if (isPos(leftSign)) return yTop; // Đồng biến -> Kết thúc cao
-            if (isNeg(leftSign)) return yBot; // Nghịch biến -> Kết thúc thấp
-        }
-
+        // Mặc định trả về giữa nếu không suy luận được
         return yMid;
     };
 
@@ -93,13 +110,14 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                 <text x={startX/2} y={rowHeight + rowHeight/2 + 5} textAnchor="middle" className="font-bold italic text-lg font-serif">y'</text>
                 <text x={startX/2} y={rowHeight*2 + yRowHeight/2} textAnchor="middle" className="font-bold italic text-lg font-serif">y</text>
 
-                {/* Render Loop */}
+                {/* Vòng lặp Render từng cột */}
                 {data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
                     
-                    const isAsymptote = data.yPrimeVals?.[i] === '||' || (data.yNodes[i] && data.yNodes[i].includes('||'));
+                    // Kiểm tra xem tại x[i] có phải là tiệm cận đứng không (dựa vào || ở dòng y' hoặc y)
+                    const isAsymptote = data.yPrimeVals?.[i]?.includes('||') || (data.yNodes[i] && data.yNodes[i].includes('||'));
 
-                    // 1. Render X
+                    // 1. Render X Value
                     const xDisplay = (
                         <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                              <div className="flex justify-center w-full h-full font-bold text-sm items-center">
@@ -108,9 +126,10 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         </foreignObject>
                     );
 
-                    // 2. Render Y' Value
+                    // 2. Render Y' Value (số 0 hoặc ||)
                     let yPrimeDisplay = null;
                     if (isAsymptote) {
+                        // Vẽ 2 đường sọc đứng xuyên suốt
                         yPrimeDisplay = (
                             <g>
                                 <line x1={cx - 3} y1={rowHeight} x2={cx - 3} y2={totalHeight} stroke="black" strokeWidth="1" />
@@ -127,7 +146,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
-                    // 3. Render Y' Sign
+                    // 3. Render Dấu Y' (+ hoặc -) nằm giữa các cột
                     let signDisplay = null;
                     if (i < data.xNodes.length - 1 && data.yPrimeSigns?.[i]) {
                         const signCx = cx + colWidth / 2;
@@ -140,17 +159,18 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                          );
                     }
 
-                    // 4. Render Y Nodes & Arrows
+                    // 4. Render Giá trị Y và Mũi tên
                     let yDisplay = null;
                     let arrowLine = null;
                     const rawY = data.yNodes[i] || "";
                     
-                    // --- Render giá trị Y ---
+                    // --- A. Render Text Giá trị Y ---
                     if (isAsymptote) {
                         const parts = rawY.split('||');
                         const leftVal = parts[0] ? parts[0].trim() : "";
                         const rightVal = parts[1] ? parts[1].trim() : "";
 
+                        // Tính vị trí text dựa trên logic tiệm cận
                         const leftY = getYPos(leftVal, i, true, false);
                         const rightY = getYPos(rightVal, i, false, true);
 
@@ -179,16 +199,17 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
-                    // --- Render Mũi tên ---
+                    // --- B. Tính toán và Vẽ Mũi tên ---
                     if (i < data.xNodes.length - 1) {
                         let x1, y1, x2, y2;
                         const currentYRaw = data.yNodes[i] || "";
                         const nextYRaw = data.yNodes[i+1] || "";
                         const nextCx = startX + 40 + (i+1) * colWidth;
 
-                        // Điểm đầu
+                        // TÍNH ĐIỂM ĐẦU (x1, y1)
                         if (currentYRaw.includes('||')) {
                             const rightVal = currentYRaw.split('||')[1] || "";
+                            // Quan trọng: Truyền isRightOfAsymptote = true để ép logic xét dấu phải
                             y1 = getYPos(rightVal, i, false, true);
                             x1 = cx + 15; 
                         } else {
@@ -196,9 +217,10 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             x1 = cx + 20; 
                         }
 
-                        // Điểm cuối
+                        // TÍNH ĐIỂM CUỐI (x2, y2)
                         if (nextYRaw.includes('||')) {
                             const leftVal = nextYRaw.split('||')[0] || "";
+                            // Quan trọng: Truyền isLeftOfAsymptote = true để ép logic xét dấu trái
                             y2 = getYPos(leftVal, i+1, true, false);
                             x2 = nextCx - 15;
                         } else {
@@ -206,6 +228,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             x2 = nextCx - 20;
                         }
 
+                        // Vẽ đường nối
                         arrowLine = (
                             <line 
                                 x1={x1} y1={y1} 
