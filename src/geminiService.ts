@@ -71,8 +71,7 @@ const questionSchema: any = {
   },
     options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     correctAnswer: { type: SchemaType.STRING, description: "TN: Chỉ trả về 'A', 'B', 'C' hoặc 'D'. TLN: Số." },
-    explanation: { type: SchemaType.STRING, description: "Lời giải chi tiết. BẮT BUỘC dùng '\\n' để ngắt dòng giữa các bước giải. Ví dụ: 'Bước 1: Tính đạo hàm...\\nBước 2: Xét dấu...'. Không viết dính liền." },
-    
+    explanation: { type: SchemaType.STRING, description: "Lời giải chi tiết. Dùng ký tự '\\n' để xuống dòng giữa các bước giải. Trình bày thoáng, dễ đọc." },
 
     // Cấu trúc bắt buộc cho câu Đúng/Sai
     statements: {
@@ -160,10 +159,10 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - Đối với câu hỏi Hàm số: Nếu ĐÃ cung cấp dữ liệu hình ảnh (graphFunction hoặc variationTableData) thì trong text KHÔNG viết lại công thức hàm số tường minh nữa để tránh lộ đáp án.
         - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
         - PHÂN SỐ: Bắt buộc dùng LaTeX '\dfrac{a}{b}' (Ví dụ: $\dfrac{1}{2}$) thay vì viết '1/2'.
-        - Ký hiệu giới hạn thì viết: '\displaystyle \lim\ limits', kí hiệu nguyên hàm/tích phân thì viết '\displaystyle \int'.
+        - Ký hiệu giới hạn thì viết: '\displaystyle\lim\limits', kí hiệu nguyên hàm/tích phân thì viết '\displaystyle\int'.
         - TUYỆT ĐỐI KHÔNG viết lời mô tả hình ảnh vào đây (Ví dụ SAI: "(Hình vẽ mô tả một đồ thị...)").
         - Nếu đề bài cần hình, hãy nói "Cho đồ thị như hình bên." và dùng các trường bên dưới để vẽ.
-        - 'explanation': Lời giải chi tiết. TUYỆT ĐỐI KHÔNG viết thành 1 đoạn văn dài. PHẢI dùng '\\n' để tách riêng từng bước giải (Tập xác định -> Đạo hàm -> Nghiệm -> Kết luận). Mỗi bước là một dòng riêng.
+        - 'explanation': Lời giải chi tiết. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
         - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
         - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
          - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
@@ -181,11 +180,10 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
       - Mỗi phát biểu có 'content' và 'isCorrect' (true/false).
       - KHÔNG được để trống 'statements'.  
-      - Với cấp độ 'Biết' thì tạo các phát biểu là lý thuyết; Với cấp độ 'Hiểu' thì tạo đề bài tập mức trung bình; Với cấp độ 'Vận dụng' thì tạo đề bài tập mức khó (chủ yếu là bài toán ứng dụng thực tế - tuỳ chủ đề).
 
       RULE 4. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
 
-      RULE 5. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT):
+      RULE 5. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
          - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
             
         a. HÌNH CHÓP S.ABCD (Đáy là hình bình hành/chữ nhật):

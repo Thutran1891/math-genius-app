@@ -41,27 +41,21 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
     }
   }, [question.id, question.userAnswer]);
 
-  // Hàm phát âm thanh (Đã tối ưu Cleanup)
+  // Hàm phát âm thanh
   const playSound = (correct: boolean) => {
     if (onUpdateScore) { // Chỉ phát khi đang làm bài
         const audio = new Audio(correct ? '/correct.mp3' : '/wrong.mp3');
         audio.volume = 1.0; 
-        
-        // Giúp Garbage Collector thu hồi bộ nhớ nhanh hơn
-        audio.onended = () => {
-            (audio as any) = null;
-        };
-
         audio.play().catch(() => {});
     }
   };
 
-  // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ TỐI ƯU CLEANUP) ---
+  // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ NÂNG CẤP HOÀN CHỈNH) ---
   useEffect(() => {
     // Chỉ chạy khi có dữ liệu đồ thị HOẶC tiệm cận, và thư viện đã sẵn sàng
     if ((question.graphFunction || question.asymptotes) && graphRef.current && window.functionPlot) {
         try {
-            // Xóa hình cũ trước khi vẽ mới (Đảm bảo sạch sẽ)
+            // Xóa hình cũ trước khi vẽ mới
             graphRef.current.innerHTML = '';
             
             // Mảng chứa tất cả các đường cần vẽ (Hàm chính + Tiệm cận)
@@ -162,15 +156,6 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
             // Không hiển thị lỗi ra UI để tránh làm người dùng bối rối
         }
     }
-
-    // [CLEANUP FUNCTION] - QUAN TRỌNG
-    // React sẽ chạy hàm này khi component unmount hoặc trước khi chạy lại useEffect
-    return () => {
-        if (graphRef.current) {
-            graphRef.current.innerHTML = ''; // Xóa sạch nội dung trong div
-        }
-    };
-
   }, [question.graphFunction, question.asymptotes, question.id]); 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
@@ -376,33 +361,10 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
 
       {showExplanation && (
           <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-gray-800 text-sm animate-in fade-in">
-              <div className="font-bold mb-3 text-yellow-800 uppercase text-xs tracking-wider border-b border-yellow-200 pb-2">
-                  Lời giải chi tiết
+              <div className="font-bold mb-2 text-yellow-800 uppercase text-xs tracking-wider">Lời giải chi tiết</div>
+              <div className="leading-relaxed">
+                <LatexText text={question.explanation.replace(/\\n/g, '\n')} />
               </div>
-              
-              {/* --- BẮT ĐẦU SỬA ĐỔI --- */}
-              <div className="leading-relaxed text-base">
-                {question.explanation
-                    // Bước 1: Chuẩn hóa xuống dòng (xử lý cả \n của JSON và \\n do AI gen)
-                    .replace(/\\n/g, '\n')
-                    .replace(/\\displaystyleint/g, '\\displaystyle \\int') // Tách tích phân
-                    .replace(/\\displaystylelim/g, '\\displaystyle \\lim') // Tách giới hạn (phòng hờ)
-                    .replace(/\\displaystylesum/g, '\\displaystyle \\sum') // Tách tổng (phòng hờ)
-                    // Bước 2: Tách chuỗi thành mảng các dòng
-                    .split('\n')
-                    // Bước 3: Render từng dòng
-                    .map((line, idx) => {
-                        // Bỏ qua dòng trống nếu muốn
-                        if (!line.trim()) return null; 
-                        return (
-                            <div key={idx} className="mb-3 last:mb-0 text-gray-800">
-                                <LatexText text={line} />
-                            </div>
-                        );
-                    })
-                }
-              </div>
-              {/* --- KẾT THÚC SỬA ĐỔI --- */}
           </div>
       )}
     </div>
