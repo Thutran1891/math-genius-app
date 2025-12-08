@@ -41,21 +41,27 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
     }
   }, [question.id, question.userAnswer]);
 
-  // Hàm phát âm thanh
+  // Hàm phát âm thanh (Đã tối ưu Cleanup)
   const playSound = (correct: boolean) => {
     if (onUpdateScore) { // Chỉ phát khi đang làm bài
         const audio = new Audio(correct ? '/correct.mp3' : '/wrong.mp3');
         audio.volume = 1.0; 
+        
+        // Giúp Garbage Collector thu hồi bộ nhớ nhanh hơn
+        audio.onended = () => {
+            (audio as any) = null;
+        };
+
         audio.play().catch(() => {});
     }
   };
 
-  // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ NÂNG CẤP HOÀN CHỈNH) ---
+  // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ TỐI ƯU CLEANUP) ---
   useEffect(() => {
     // Chỉ chạy khi có dữ liệu đồ thị HOẶC tiệm cận, và thư viện đã sẵn sàng
     if ((question.graphFunction || question.asymptotes) && graphRef.current && window.functionPlot) {
         try {
-            // Xóa hình cũ trước khi vẽ mới
+            // Xóa hình cũ trước khi vẽ mới (Đảm bảo sạch sẽ)
             graphRef.current.innerHTML = '';
             
             // Mảng chứa tất cả các đường cần vẽ (Hàm chính + Tiệm cận)
@@ -156,6 +162,15 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
             // Không hiển thị lỗi ra UI để tránh làm người dùng bối rối
         }
     }
+
+    // [CLEANUP FUNCTION] - QUAN TRỌNG
+    // React sẽ chạy hàm này khi component unmount hoặc trước khi chạy lại useEffect
+    return () => {
+        if (graphRef.current) {
+            graphRef.current.innerHTML = ''; // Xóa sạch nội dung trong div
+        }
+    };
+
   }, [question.graphFunction, question.asymptotes, question.id]); 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
