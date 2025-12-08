@@ -8,72 +8,67 @@ interface Props {
 
 export const VariationTable: React.FC<Props> = ({ data }) => {
     // 1. CẤU HÌNH KÍCH THƯỚC (SCALE 80%)
-    const width = 640;          // 800 * 0.8
-    const paddingRight = 48;    // 60 * 0.8
-    const rowHeight = 48;       // 60 * 0.8
-    const yRowHeight = 112;     // 140 * 0.8
+    const width = 640;          
+    const paddingRight = 48;    
+    const rowHeight = 48;       
+    const yRowHeight = 112;     
     const totalHeight = rowHeight * 2 + yRowHeight;
-    const startX = 64;          // 80 * 0.8
+    const startX = 64;          
 
-    // Tính toán độ rộng cột
     const usableWidth = width - startX - paddingRight; 
     const colWidth = usableWidth / Math.max(1, data.xNodes.length - 1);
 
-    // Hàm làm sạch và chuẩn hóa LaTeX
+    // --- HÀM BỔ TRỢ XỬ LÝ CHUỖI ---
     const cleanMath = (val: string): string => {
         if (!val) return "";
         let s = val.trim();
-        // Chuẩn hóa các ký hiệu vô cực
         if (!s.includes('\\infty') && !s.includes('\u221e')) {
             if (s.toLowerCase().includes('-inf')) s = '-\\infty';
             else if (s.toLowerCase().includes('+inf') || s.toLowerCase().includes('inf')) s = '+\\infty';
         }
-        // Thêm dấu $ nếu chưa có (để LatexText render đúng)
         if (!s.startsWith('$')) return `$${s}$`;
         return s;
     };
 
+    // Hàm kiểm tra dấu an toàn (tránh lỗi do khoảng trắng)
+    const isPos = (val: string | null | undefined) => val && val.trim() === '+';
+    const isNeg = (val: string | null | undefined) => val && (val.trim() === '-' || val.trim() === '\u2212'); // \u2212 là dấu trừ toán học
+
     // --- THUẬT TOÁN TÍNH VỊ TRÍ Y ---
     const getYPos = (val: string, index: number, isLeftOfAsymptote: boolean = false, isRightOfAsymptote: boolean = false) => {
-        const yTop = rowHeight * 2 + 20;       // Sát mép trên
-        const yBot = totalHeight - 20;         // Sát mép dưới
+        const yTop = rowHeight * 2 + 25;       // Cách mép trên một chút
+        const yBot = totalHeight - 25;         // Cách mép dưới một chút
         const yMid = rowHeight * 2 + yRowHeight / 2;
 
-        // Chuẩn hóa string để so sánh
         const v = val ? val.toLowerCase().replace(/\$|\\/g, '') : ""; 
 
-        // 1. Ưu tiên TUYỆT ĐỐI cho Vô cực (Bất kể dấu y')
-        // Check "infty", "inf", "∞"
+        // 1. Ưu tiên TUYỆT ĐỐI cho Vô cực
         if (v.includes('infty') || v.includes('inf') || v.includes('\u221e')) {
-            if (v.includes('-')) return yBot; // Âm vô cực -> Đáy
-            return yTop;                      // Dương vô cực -> Đỉnh
+            if (v.includes('-')) return yBot; 
+            return yTop;                      
         }
 
-        // 2. Logic cho số hữu hạn dựa vào đạo hàm
+        // 2. Logic suy luận dựa vào đạo hàm (nếu giá trị y không phải vô cực)
         let leftSign = index > 0 ? data.yPrimeSigns?.[index - 1] : null;
         let rightSign = index < (data.yPrimeSigns?.length || 0) ? data.yPrimeSigns?.[index] : null;
 
-        // Nếu là điểm nằm sát tiệm cận, ta bỏ qua phía bên kia của tiệm cận
         if (isLeftOfAsymptote) rightSign = null; 
         if (isRightOfAsymptote) leftSign = null;
 
-        // A. Cực Trị (Có dấu 2 bên)
-        if (leftSign && rightSign) {
-            if (leftSign === '+' && rightSign === '-') return yTop; // Cực đại
-            if (leftSign === '-' && rightSign === '+') return yBot; // Cực tiểu
-            return yMid;
-        }
+        // A. Cực Trị (Đổi dấu)
+        if (isPos(leftSign) && isNeg(rightSign)) return yTop; // Cực đại
+        if (isNeg(leftSign) && isPos(rightSign)) return yBot; // Cực tiểu
 
-        // B. Mép Trái (hoặc bên Phải tiệm cận) - Bắt đầu mũi tên
+        // B. Điểm bắt đầu (Sau tiệm cận hoặc biên trái)
         if (!leftSign && rightSign) {
-            if (rightSign === '+') return yBot; // Đồng biến đi lên -> Bắt đầu Thấp
-            if (rightSign === '-') return yTop; // Nghịch biến đi xuống -> Bắt đầu Cao
+            if (isPos(rightSign)) return yBot; // Đồng biến -> Bắt đầu thấp để đi lên
+            if (isNeg(rightSign)) return yTop; // Nghịch biến -> Bắt đầu cao để đi xuống
         }
 
-        // C. Mép Phải (hoặc bên Trái tiệm cận) - Kết thúc mũi tên
+        // C. Điểm kết thúc (Trước tiệm cận hoặc biên phải)
         if (leftSign && !rightSign) {
-            if (leftSign === '+') return yTop; // Đồng biến đi lên -> Kết thúc Cao
-            if (leftSign === '-') return yBot; // Nghịch biến đi xuống -> Kết thúc Thấp
+            if (isPos(leftSign)) return yTop; // Đồng biến -> Kết thúc cao
+            if (isNeg(leftSign)) return yBot; // Nghịch biến -> Kết thúc thấp
         }
 
         return yMid;
@@ -98,14 +93,13 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                 <text x={startX/2} y={rowHeight + rowHeight/2 + 5} textAnchor="middle" className="font-bold italic text-lg font-serif">y'</text>
                 <text x={startX/2} y={rowHeight*2 + yRowHeight/2} textAnchor="middle" className="font-bold italic text-lg font-serif">y</text>
 
-                {/* Render Data Loops */}
+                {/* Render Loop */}
                 {data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
                     
-                    // Kiểm tra Tiệm cận đứng: Dựa vào yPrimeVals='||' HOẶC yNodes chứa '||'
                     const isAsymptote = data.yPrimeVals?.[i] === '||' || (data.yNodes[i] && data.yNodes[i].includes('||'));
 
-                    // 1. Render X Values
+                    // 1. Render X
                     const xDisplay = (
                         <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                              <div className="flex justify-center w-full h-full font-bold text-sm items-center">
@@ -114,10 +108,9 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         </foreignObject>
                     );
 
-                    // 2. Render Y' Values (Dấu || hoặc số 0)
+                    // 2. Render Y' Value
                     let yPrimeDisplay = null;
                     if (isAsymptote) {
-                        // Vẽ 2 đường tiệm cận xuyên suốt từ dòng y' xuống hết bảng
                         yPrimeDisplay = (
                             <g>
                                 <line x1={cx - 3} y1={rowHeight} x2={cx - 3} y2={totalHeight} stroke="black" strokeWidth="1" />
@@ -134,7 +127,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
-                    // 3. Render Dấu Y' (+ hoặc -)
+                    // 3. Render Y' Sign
                     let signDisplay = null;
                     if (i < data.xNodes.length - 1 && data.yPrimeSigns?.[i]) {
                         const signCx = cx + colWidth / 2;
@@ -147,13 +140,13 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                          );
                     }
 
-                    // 4. Render Y Values (Xử lý tách đôi nếu là tiệm cận)
+                    // 4. Render Y Nodes & Arrows
                     let yDisplay = null;
+                    let arrowLine = null;
                     const rawY = data.yNodes[i] || "";
                     
+                    // --- Render giá trị Y ---
                     if (isAsymptote) {
-                        // Tách giá trị trái/phải tiệm cận
-                        // Ví dụ rawY = "$+\infty$||$-\infty$"
                         const parts = rawY.split('||');
                         const leftVal = parts[0] ? parts[0].trim() : "";
                         const rightVal = parts[1] ? parts[1].trim() : "";
@@ -163,13 +156,11 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
 
                         yDisplay = (
                             <g>
-                                {/* Giá trị bên TRÁI tiệm cận */}
                                 <foreignObject x={cx - 55} y={leftY - 15} width={50} height={30}>
                                     <div className="flex justify-end w-full h-full font-bold text-sm bg-white/0 items-center pr-2">
                                         <LatexText text={cleanMath(leftVal)} />
                                     </div>
                                 </foreignObject>
-                                {/* Giá trị bên PHẢI tiệm cận */}
                                 <foreignObject x={cx + 5} y={rightY - 15} width={50} height={30}>
                                     <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center pl-2">
                                         <LatexText text={cleanMath(rightVal)} />
@@ -178,7 +169,6 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             </g>
                         );
                     } else {
-                        // Giá trị thường
                         const yPos = getYPos(rawY, i);
                         yDisplay = (
                              <foreignObject x={cx - 40} y={yPos - 15} width={80} height={30}>
@@ -189,40 +179,33 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
-                    // 5. Render Mũi Tên (Arrow)
-                    // Logic mới: Luôn vẽ nối sang cột sau, tự động tránh tiệm cận
-                    let arrowLine = null;
+                    // --- Render Mũi tên ---
                     if (i < data.xNodes.length - 1) {
                         let x1, y1, x2, y2;
                         const currentYRaw = data.yNodes[i] || "";
                         const nextYRaw = data.yNodes[i+1] || "";
                         const nextCx = startX + 40 + (i+1) * colWidth;
 
-                        // --- TÍNH ĐIỂM ĐẦU (x1, y1) ---
+                        // Điểm đầu
                         if (currentYRaw.includes('||')) {
-                            // Nếu xuất phát từ Tiệm Cận -> Lấy nhánh PHẢI
                             const rightVal = currentYRaw.split('||')[1] || "";
                             y1 = getYPos(rightVal, i, false, true);
-                            x1 = cx + 15; // Dịch ra khỏi vạch || một chút
+                            x1 = cx + 15; 
                         } else {
-                            // Xuất phát thường
                             y1 = getYPos(currentYRaw, i);
                             x1 = cx + 20; 
                         }
 
-                        // --- TÍNH ĐIỂM ĐÍCH (x2, y2) ---
+                        // Điểm cuối
                         if (nextYRaw.includes('||')) {
-                            // Nếu đích đến là Tiệm Cận -> Lấy nhánh TRÁI
                             const leftVal = nextYRaw.split('||')[0] || "";
                             y2 = getYPos(leftVal, i+1, true, false);
-                            x2 = nextCx - 15; // Dừng trước vạch || một chút
+                            x2 = nextCx - 15;
                         } else {
-                            // Đích đến thường
                             y2 = getYPos(nextYRaw, i+1);
                             x2 = nextCx - 20;
                         }
 
-                        // Vẽ mũi tên (Không còn điều kiện chặn if yPrimeVals === || nữa)
                         arrowLine = (
                             <line 
                                 x1={x1} y1={y1} 
