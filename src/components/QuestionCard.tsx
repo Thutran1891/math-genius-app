@@ -361,10 +361,30 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
 
       {showExplanation && (
           <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200 text-gray-800 text-sm animate-in fade-in">
-              <div className="font-bold mb-2 text-yellow-800 uppercase text-xs tracking-wider">Lời giải chi tiết</div>
-              <div className="leading-relaxed">
-                <LatexText text={question.explanation.replace(/\\n/g, '\n')} />
+              <div className="font-bold mb-3 text-yellow-800 uppercase text-xs tracking-wider border-b border-yellow-200 pb-2">
+                  Lời giải chi tiết
               </div>
+              
+              {/* --- BẮT ĐẦU SỬA ĐỔI --- */}
+              <div className="leading-relaxed text-base">
+                {question.explanation
+                    // Bước 1: Chuẩn hóa xuống dòng (xử lý cả \n của JSON và \\n do AI gen)
+                    .replace(/\\n/g, '\n')
+                    // Bước 2: Tách chuỗi thành mảng các dòng
+                    .split('\n')
+                    // Bước 3: Render từng dòng
+                    .map((line, idx) => {
+                        // Bỏ qua dòng trống nếu muốn
+                        if (!line.trim()) return null; 
+                        return (
+                            <div key={idx} className="mb-3 last:mb-0 text-gray-800">
+                                <LatexText text={line} />
+                            </div>
+                        );
+                    })
+                }
+              </div>
+              {/* --- KẾT THÚC SỬA ĐỔI --- */}
           </div>
       )}
     </div>
