@@ -370,6 +370,9 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                 {question.explanation
                     // Bước 1: Chuẩn hóa xuống dòng (xử lý cả \n của JSON và \\n do AI gen)
                     .replace(/\\n/g, '\n')
+                    .replace(/\\displaystyleint/g, '\\displaystyle \\int') // Tách tích phân
+                    .replace(/\\displaystylelim/g, '\\displaystyle \\lim') // Tách giới hạn (phòng hờ)
+                    .replace(/\\displaystylesum/g, '\\displaystyle \\sum') // Tách tổng (phòng hờ)
                     // Bước 2: Tách chuỗi thành mảng các dòng
                     .split('\n')
                     // Bước 3: Render từng dòng

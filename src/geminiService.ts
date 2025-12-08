@@ -160,7 +160,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - Đối với câu hỏi Hàm số: Nếu ĐÃ cung cấp dữ liệu hình ảnh (graphFunction hoặc variationTableData) thì trong text KHÔNG viết lại công thức hàm số tường minh nữa để tránh lộ đáp án.
         - Câu Vận Dụng: Phải khó hơn, lắt léo hơn câu Biết/Hiểu. Chủ yếu là bài toán ứng dụng thực tế - tuỳ bối cảnh.
         - PHÂN SỐ: Bắt buộc dùng LaTeX '\dfrac{a}{b}' (Ví dụ: $\dfrac{1}{2}$) thay vì viết '1/2'.
-        - Ký hiệu giới hạn thì viết: '\displaystyle\lim\limits', kí hiệu nguyên hàm/tích phân thì viết '\displaystyle\int'.
+        - Ký hiệu giới hạn thì viết: '\displaystyle \lim\limits', kí hiệu nguyên hàm/tích phân thì viết '\displaystyle \int'.
         - TUYỆT ĐỐI KHÔNG viết lời mô tả hình ảnh vào đây (Ví dụ SAI: "(Hình vẽ mô tả một đồ thị...)").
         - Nếu đề bài cần hình, hãy nói "Cho đồ thị như hình bên." và dùng các trường bên dưới để vẽ.
         - 'explanation': Lời giải chi tiết. TUYỆT ĐỐI KHÔNG viết thành 1 đoạn văn dài. PHẢI dùng '\\n' để tách riêng từng bước giải (Tập xác định -> Đạo hàm -> Nghiệm -> Kết luận). Mỗi bước là một dòng riêng.
