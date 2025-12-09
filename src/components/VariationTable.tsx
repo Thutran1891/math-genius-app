@@ -8,47 +8,43 @@ interface Props {
 }
 
 export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }) => {
-    // 1. CẤU HÌNH KÍCH THƯỚC (SCALE 80%)
+    // 1. CẤU HÌNH KÍCH THƯỚC
     const width = 640;
     const paddingRight = 48;
     const rowHeight = 48;
-    const yRowHeight = 112;
+    const yRowHeight = 112; // Chiều cao dòng y
     const totalHeight = rowHeight * 2 + yRowHeight;
     const startX = 64;
     const usableWidth = width - startX - paddingRight;
     
-    // Hàm làm sạch và chuẩn hóa LaTeX
+    // 2. HELPER FUNCTIONS
     const cleanMath = (val: string): string => {
         if (!val) return "";
         let s = val.trim();
+        // Chuẩn hóa vô cực
         if (!s.includes('\\infty') && !s.includes('\u221e')) {
             if (s.toLowerCase().includes('-inf')) s = '-\\infty';
             else if (s.toLowerCase().includes('+inf') || s.toLowerCase().includes('inf')) s = '+\\infty';
         }
+        // Thêm $ nếu chưa có
         if (!s.startsWith('$')) return `$${s}$`;
         return s;
     };
 
-    // Helper: Xác định vị trí Y (Top/Bottom) dựa trên giá trị text
+    // Xác định vị trí trên/dưới dựa vào giá trị
     const getYPosForValue = (val: string): 'top' | 'bottom' => {
         const s = val.toLowerCase();
-        // Nếu là âm vô cực hoặc số âm lớn (tùy logic) -> Bottom
-        // Ở đây ưu tiên check dấu trừ của vô cực
         if (s.includes('-\\infty') || s.includes('-inf')) return 'bottom';
-        // Nếu là dương vô cực -> Top
         if (s.includes('\\infty') || s.includes('+inf')) return 'top';
-        
-        // Mặc định cho số thường: Tùy ngữ cảnh, nhưng hàm này chủ yếu dùng cho Limit
-        return 'top'; 
+        return 'top'; // Mặc định
     };
 
-    // Hàm render giá trị Y tại vị trí Y cố định (Dùng cho các điểm cực trị hoặc đầu mút)
-    const renderYValue = (cx: number, yPosition: 'top' | 'middle' | 'bottom' | number, value: string) => {
+    // Render giá trị Y đơn (cho cực trị hoặc đầu mút thường)
+    const renderYValue = (cx: number, yPosition: 'top' | 'middle' | 'bottom', value: string) => {
         let yPos: number;
-        if (yPosition === 'top') yPos = rowHeight * 2 + 20;
+        if (yPosition === 'top') yPos = rowHeight * 2 + 25;
         else if (yPosition === 'middle') yPos = rowHeight * 2 + yRowHeight / 2;
-        else if (yPosition === 'bottom') yPos = totalHeight - 20;
-        else yPos = yPosition;
+        else yPos = totalHeight - 25; // bottom
 
         return (
             <foreignObject x={cx - 40} y={yPos - 15} width={80} height={30}>
@@ -59,27 +55,28 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
         );
     };
 
-    // Xử lý hiển thị giới hạn sát hai bên tiệm cận (NEW)
+    // Render 2 giá trị giới hạn sát tiệm cận đứng (Quan trọng cho hàm phân thức)
     const renderSplitLimit = (cx: number, rawValue: string) => {
         const parts = rawValue.split('||');
         const leftVal = parts[0] || '';
         const rightVal = parts[1] || '';
 
-        const yPosLeft = getYPosForValue(leftVal) === 'top' ? rowHeight * 2 + 20 : totalHeight - 20;
-        const yPosRight = getYPosForValue(rightVal) === 'top' ? rowHeight * 2 + 20 : totalHeight - 20;
+        // Xác định vị trí cao thấp
+        const yPosLeft = getYPosForValue(leftVal) === 'top' ? rowHeight * 2 + 25 : totalHeight - 25;
+        const yPosRight = getYPosForValue(rightVal) === 'top' ? rowHeight * 2 + 25 : totalHeight - 25;
 
         return (
             <>
-                {/* Bên trái: Align Right, sát vạch */}
-                <foreignObject x={cx - 50} y={yPosLeft - 15} width={45} height={30}>
-                    <div className="flex justify-end w-full h-full font-bold text-sm items-center pr-1">
+                {/* Bên trái: Căn phải (justify-end) để ép sát vạch */}
+                <foreignObject x={cx - 45} y={yPosLeft - 15} width={40} height={30}>
+                    <div className="flex justify-end w-full h-full font-bold text-sm items-center pr-1 bg-white/50">
                         <LatexText text={cleanMath(leftVal)} />
                     </div>
                 </foreignObject>
 
-                {/* Bên phải: Align Left, sát vạch */}
-                <foreignObject x={cx + 5} y={yPosRight - 15} width={45} height={30}>
-                    <div className="flex justify-start w-full h-full font-bold text-sm items-center pl-1">
+                {/* Bên phải: Căn trái (justify-start) để ép sát vạch */}
+                <foreignObject x={cx + 5} y={yPosRight - 15} width={40} height={30}>
+                    <div className="flex justify-start w-full h-full font-bold text-sm items-center pl-1 bg-white/50">
                         <LatexText text={cleanMath(rightVal)} />
                     </div>
                 </foreignObject>
@@ -87,7 +84,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
         );
     };
 
-    // Hàm render mũi tên
+    // Render mũi tên
     const renderArrow = (x1: number, y1: number, x2: number, y2: number) => (
         <line 
             x1={x1} y1={y1} 
@@ -96,247 +93,78 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
         />
     );
 
-    // Hàm render tiệm cận đứng (Đảm bảo vẽ xuyên suốt)
+    // Render tiệm cận đứng (2 vạch song song)
     const renderAsymptote = (cx: number) => (
         <g>
-            <line x1={cx - 3} y1={rowHeight} x2={cx - 3} y2={totalHeight} stroke="black" strokeWidth="1" />
-            <line x1={cx + 3} y1={rowHeight} x2={cx + 3} y2={totalHeight} stroke="black" strokeWidth="1" />
+            {/* Vẽ từ rowHeight (bắt đầu dòng y') xuống tận totalHeight (hết dòng y) */}
+            <line x1={cx - 2} y1={rowHeight} x2={cx - 2} y2={totalHeight} stroke="black" strokeWidth="1" />
+            <line x1={cx + 2} y1={rowHeight} x2={cx + 2} y2={totalHeight} stroke="black" strokeWidth="1" />
         </g>
     );
 
-    // RENDER TEMPLATE CHO TỪNG LOẠI HÀM
+    // 3. MAIN RENDER LOGIC
     const renderTemplate = () => {
         const colWidth = usableWidth / (data.xNodes.length - 1);
         
+        // Helper tính tọa độ Y cho đầu mũi tên dựa vào giá trị text tại node đó
+        const getArrowY = (index: number, position: 'start' | 'end') => {
+            // Nếu là node tiệm cận (split value)
+            if (data.yNodes[index]?.includes('||')) {
+                const parts = data.yNodes[index].split('||');
+                // Nếu tên mũi tên xuất phát từ đây (start), dùng giá trị bên phải (rightVal)
+                // Nếu mũi tên kết thúc tại đây (end), dùng giá trị bên trái (leftVal)
+                const val = position === 'start' ? parts[1] : parts[0];
+                return getYPosForValue(val || '') === 'top' ? rowHeight * 2 + 35 : totalHeight - 35;
+            }
+            // Node thường
+            return getYPosForValue(data.yNodes[index] || '') === 'top' ? rowHeight * 2 + 35 : totalHeight - 35;
+        };
+
         switch(functionType) {
-            // 1. HÀM BẬC 3
             case 'cubic':
-                return data.xNodes.map((x, i) => {
-                    const cx = startX + 40 + i * colWidth;
-                    const isExtremum = data.yPrimeVals?.[i] === '0' && i > 0 && i < data.xNodes.length - 1;
-                    
-                    return (
-                        <g key={i}>
-                            <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
-                                <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                    <LatexText text={cleanMath(x)} />
-                                </div>
-                            </foreignObject>
-
-                            {data.yPrimeVals?.[i] && (
-                                <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                        <LatexText text={cleanMath(data.yPrimeVals[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
-                                <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-lg items-center">
-                                        <LatexText text={cleanMath(data.yPrimeSigns[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {data.yNodes[i] && renderYValue(
-                                cx,
-                                isExtremum ? 
-                                    (data.yPrimeSigns?.[i-1] === '+' && data.yPrimeSigns?.[i] === '-') ? 'top' : 'bottom'
-                                    : 'middle',
-                                data.yNodes[i]
-                            )}
-
-                            {i < data.xNodes.length - 1 && renderArrow(
-                                cx + 20,
-                                i === 0 ? rowHeight * 2 + yRowHeight / 2 :
-                                data.yPrimeSigns?.[i] === '+' ? totalHeight - 30 : rowHeight * 2 + 30,
-                                cx + colWidth - 20,
-                                i === data.xNodes.length - 2 ? rowHeight * 2 + yRowHeight / 2 :
-                                data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
-                            )}
-                        </g>
-                    );
-                });
-
-            // 2. HÀM BẬC 4
             case 'quartic':
+                // Logic cũ cho hàm đa thức (giữ nguyên để không ảnh hưởng)
                 return data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
                     const isExtremum = data.yPrimeVals?.[i] === '0' && i > 0 && i < data.xNodes.length - 1;
-                    
                     return (
                         <g key={i}>
                             <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
-                                <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                    <LatexText text={cleanMath(x)} />
-                                </div>
+                                <div className="flex justify-center w-full h-full font-bold text-sm items-center"><LatexText text={cleanMath(x)} /></div>
                             </foreignObject>
-
-                            {data.yPrimeVals?.[i] && (
-                                <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                        <LatexText text={cleanMath(data.yPrimeVals[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
-                                <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-lg items-center">
-                                        <LatexText text={cleanMath(data.yPrimeSigns[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {data.yNodes[i] && renderYValue(
-                                cx,
-                                isExtremum ? (i === 1 || i === data.xNodes.length - 2) ? 'bottom' : 'top' : 'middle',
-                                data.yNodes[i]
-                            )}
+                            {data.yPrimeVals?.[i] && <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}><div className="flex justify-center w-full h-full font-bold text-sm items-center"><LatexText text={cleanMath(data.yPrimeVals[i])} /></div></foreignObject>}
+                            {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}><div className="flex justify-center w-full h-full font-bold text-lg items-center"><LatexText text={cleanMath(data.yPrimeSigns[i])} /></div></foreignObject>}
+                            
+                            {data.yNodes[i] && renderYValue(cx, isExtremum ? (data.yPrimeSigns?.[i-1] === '+' ? 'top' : 'bottom') : 'middle', data.yNodes[i])}
 
                             {i < data.xNodes.length - 1 && renderArrow(
                                 cx + 20,
-                                i === 0 ? rowHeight * 2 + yRowHeight / 2 :
-                                data.yPrimeSigns?.[i] === '+' ? totalHeight - 30 : rowHeight * 2 + 30,
+                                i===0 ? rowHeight*2 + yRowHeight/2 : (data.yPrimeSigns?.[i] === '+' ? totalHeight - 30 : rowHeight * 2 + 30),
                                 cx + colWidth - 20,
-                                i === data.xNodes.length - 2 ? rowHeight * 2 + yRowHeight / 2 :
-                                data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
+                                i===data.xNodes.length-2 ? rowHeight*2 + yRowHeight/2 : (data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30)
                             )}
                         </g>
                     );
                 });
 
-            // 3. HÀM BẬC 1/1 (LOGIC ĐÃ SỬA)
+            // LOGIC CHUNG CHO HÀM PHÂN THỨC (1/1 và 2/1)
             case 'rational11':
-                return data.xNodes.map((x, i) => {
-                    const cx = startX + 40 + i * colWidth;
-                    const isAsymptote = data.yPrimeVals?.[i] === '||';
-                    
-                    return (
-                        <g key={i}>
-                            <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
-                                <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                    <LatexText text={cleanMath(x)} />
-                                </div>
-                            </foreignObject>
-
-                            {/* Render y' val */}
-                            {!isAsymptote && data.yPrimeVals?.[i] && (
-                                <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                        <LatexText text={cleanMath(data.yPrimeVals[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {/* Dấu y' */}
-                            {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
-                                <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-lg items-center">
-                                        <LatexText text={cleanMath(data.yPrimeSigns[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {/* Y value (Non-asymptote) */}
-                            {data.yNodes[i] && !isAsymptote && renderYValue(
-                                cx,
-                                'middle', // Đầu mút hàm 1/1 thường ở giữa cho đẹp hoặc tùy chỉnh top/bottom nếu cần
-                                data.yNodes[i]
-                            )}
-
-                            {/* Y value (Asymptote - Split) - SÁT TIỆM CẬN */}
-                            {isAsymptote && data.yNodes[i] && renderSplitLimit(cx, data.yNodes[i])}
-
-                            {/* Arrow */}
-                            {i < data.xNodes.length - 1 && !isAsymptote && renderArrow(
-                                cx + 20,
-                                i === 0 ? rowHeight * 2 + yRowHeight / 2 :
-                                data.yPrimeSigns?.[i] === '+' ? totalHeight - 30 : rowHeight * 2 + 30,
-                                cx + colWidth - 20,
-                                i === data.xNodes.length - 2 ? rowHeight * 2 + yRowHeight / 2 :
-                                data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
-                            )}
-
-                            {/* VẼ TIỆM CẬN SAU CÙNG ĐỂ ĐÈ LÊN MỌI THỨ */}
-                            {isAsymptote && renderAsymptote(cx)}
-                        </g>
-                    );
-                });
-
-            // 4. HÀM BẬC 2/1 CÓ CỰC TRỊ (LOGIC ĐÃ SỬA)
             case 'rational21_with_extrema':
-                return data.xNodes.map((x, i) => {
-                    const cx = startX + 40 + i * colWidth;
-                    const isAsymptote = data.yPrimeVals?.[i] === '||';
-                    const isExtremum = data.yPrimeVals?.[i] === '0' && i > 0 && i < data.xNodes.length - 1;
-                    
-                    return (
-                        <g key={i}>
-                            <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
-                                <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                    <LatexText text={cleanMath(x)} />
-                                </div>
-                            </foreignObject>
-
-                            {!isAsymptote && data.yPrimeVals?.[i] && (
-                                <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-sm items-center">
-                                        <LatexText text={cleanMath(data.yPrimeVals[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
-                                <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
-                                    <div className="flex justify-center w-full h-full font-bold text-lg items-center">
-                                        <LatexText text={cleanMath(data.yPrimeSigns[i])} />
-                                    </div>
-                                </foreignObject>
-                            )}
-
-                            {/* Y Nodes: Xử lý Extremum và Đầu mút */}
-                            {data.yNodes[i] && !isAsymptote && renderYValue(
-                                cx,
-                                isExtremum ? (i === 1 ? 'top' : 'bottom') : // i=1 là CĐ (Top), i=3 là CT (Bottom)
-                                (data.yNodes[i].includes('-') ? 'bottom' : 'top'), // Đầu mút vô cực
-                                data.yNodes[i]
-                            )}
-
-                            {/* Y Nodes: Tiệm cận */}
-                            {isAsymptote && data.yNodes[i] && renderSplitLimit(cx, data.yNodes[i])}
-
-                            {/* Arrows */}
-                            {i < data.xNodes.length - 1 && !isAsymptote && renderArrow(
-                                cx + 20,
-                                i === 0 ? (data.yNodes[0]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
-                                data.yPrimeSigns?.[i] === '+' ? totalHeight - 30 : rowHeight * 2 + 30,
-                                cx + colWidth - 20,
-                                i === data.xNodes.length - 2 ? (data.yNodes[data.xNodes.length - 1]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
-                                data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
-                            )}
-
-                            {/* Render Tiệm cận sau cùng */}
-                            {isAsymptote && renderAsymptote(cx)}
-                        </g>
-                    );
-                });
-
-            // 5. HÀM BẬC 2/1 KHÔNG CÓ CỰC TRỊ (LOGIC ĐÃ SỬA)
             case 'rational21_no_extrema':
                 return data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
-                    const isAsymptote = data.yPrimeVals?.[i] === '||';
+                    const isAsymptote = data.yPrimeVals?.[i] === '||'; // Check tiệm cận
                     
                     return (
                         <g key={i}>
+                            {/* 1. X Value */}
                             <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                                 <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                     <LatexText text={cleanMath(x)} />
                                 </div>
                             </foreignObject>
 
+                            {/* 2. Y' Value (Nếu không phải tiệm cận) */}
                             {!isAsymptote && data.yPrimeVals?.[i] && (
                                 <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-sm items-center">
@@ -345,6 +173,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
+                            {/* 3. Dấu Y' */}
                             {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
                                 <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-lg items-center">
@@ -353,23 +182,40 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {data.yNodes[i] && !isAsymptote && renderYValue(
-                                cx,
-                                data.yNodes[i].includes('+') ? 'top' : 'bottom',
-                                data.yNodes[i]
+                            {/* 4. Y Values */}
+                            {!isAsymptote ? (
+                                // Node thường (Đầu mút hoặc Cực trị)
+                                data.yNodes[i] && renderYValue(
+                                    cx,
+                                    // Logic tự động check top/bottom dựa vào giá trị text
+                                    getYPosForValue(data.yNodes[i]),
+                                    data.yNodes[i]
+                                )
+                            ) : (
+                                // Node tiệm cận (Split 2 bên)
+                                data.yNodes[i] && renderSplitLimit(cx, data.yNodes[i])
                             )}
 
-                            {isAsymptote && data.yNodes[i] && renderSplitLimit(cx, data.yNodes[i])}
-
-                            {i < data.xNodes.length - 1 && !isAsymptote && renderArrow(
-                                cx + 20,
-                                i === 0 ? (data.yNodes[0]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
-                                data.yPrimeSigns?.[i] === '+' ? totalHeight - 30 : rowHeight * 2 + 30,
-                                cx + colWidth - 20,
-                                i === data.xNodes.length - 2 ? (data.yNodes[data.xNodes.length - 1]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
-                                data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
+                            {/* 5. Arrows */}
+                            {i < data.xNodes.length - 1 && !isAsymptote && (
+                                renderArrow(
+                                    cx + 30, // Start x (dịch ra khỏi text một chút)
+                                    getArrowY(i, 'start'), // Start y
+                                    cx + colWidth - 30, // End x
+                                    getArrowY(i + 1, 'end') // End y (dựa vào node tiếp theo)
+                                )
+                            )}
+                            {/* Xử lý mũi tên xuất phát từ tiệm cận (bên phải tiệm cận) */}
+                            {isAsymptote && i < data.xNodes.length - 1 && (
+                                renderArrow(
+                                    cx + 30, // Start x (bên phải tiệm cận)
+                                    getArrowY(i, 'start'), 
+                                    cx + colWidth - 30, 
+                                    getArrowY(i + 1, 'end')
+                                )
                             )}
 
+                            {/* 6. VẼ TIỆM CẬN SAU CÙNG (Để đè lên trên) */}
                             {isAsymptote && renderAsymptote(cx)}
                         </g>
                     );
@@ -399,7 +245,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                 <text x={startX/2} y={rowHeight + rowHeight/2 + 5} textAnchor="middle" className="font-bold italic text-lg font-serif">y'</text>
                 <text x={startX/2} y={rowHeight*2 + yRowHeight/2} textAnchor="middle" className="font-bold italic text-lg font-serif">y</text>
 
-                {/* Render template */}
+                {/* Render nội dung */}
                 {renderTemplate()}
             </svg>
         </div>
