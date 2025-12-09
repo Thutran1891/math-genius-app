@@ -33,6 +33,16 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
         return s;
     };
 
+    // --- CHUẨN BỊ: TÌM CHỈ SỐ TIỆM CẬN ĐỂ CHỈ VẼ 1 ĐƯỜNG Ở CHỈ SỐ "CHÍNH GIỮA" ---
+    // Tập hợp các index mà dữ liệu đánh dấu là tiệm cận (||)
+    const asymIndices: number[] = [];
+    for (let i = 0; i < data.xNodes.length; i++) {
+        const flag = data.yPrimeVals?.[i] === '||' || (data.yNodes[i] && data.yNodes[i].includes('||'));
+        if (flag) asymIndices.push(i);
+    }
+    // Nếu có nhiều hơn 1, chọn index nằm ở giữa mảng asymIndices (giữa các tiệm cận)
+    const asymIndexToDraw = asymIndices.length ? asymIndices[Math.floor(asymIndices.length / 2)] : null;
+
     // --- THUẬT TOÁN TÍNH VỊ TRÍ Y ---
     const getYPos = (val: string, index: number, isLeftOfAsymptote: boolean = false, isRightOfAsymptote: boolean = false) => {
         const yTop = rowHeight * 2 + 20;       // Sát mép trên
@@ -103,7 +113,9 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                     const cx = startX + 40 + i * colWidth;
                     
                     // Kiểm tra Tiệm cận đứng: Dựa vào yPrimeVals='||' HOẶC yNodes chứa '||'
-                    const isAsymptote = data.yPrimeVals?.[i] === '||' || (data.yNodes[i] && data.yNodes[i].includes('||'));
+                    const isAsymptoteFlag = data.yPrimeVals?.[i] === '||' || (data.yNodes[i] && data.yNodes[i].includes('||'));
+                    // chỉ vẽ TIỆM CẬN duy nhất tại asymIndexToDraw
+                    const isAsymptoteDrawn = isAsymptoteFlag && asymIndexToDraw !== null && i === asymIndexToDraw;
 
                     // 1. Render X Values
                     const xDisplay = (
@@ -116,12 +128,11 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
 
                     // 2. Render Y' Values (Dấu || hoặc số 0)
                     let yPrimeDisplay = null;
-                    if (isAsymptote) {
-                        // Vẽ 2 đường tiệm cận xuyên suốt từ dòng y' xuống hết bảng
+                    if (isAsymptoteDrawn) {
+                        // Vẽ 1 đường tiệm cận đứng duy nhất ở giữa cột (đường mảnh)
                         yPrimeDisplay = (
                             <g>
-                                <line x1={cx - 3} y1={rowHeight} x2={cx - 3} y2={totalHeight} stroke="black" strokeWidth="1" />
-                                <line x1={cx + 3} y1={rowHeight} x2={cx + 3} y2={totalHeight} stroke="black" strokeWidth="1" />
+                                <line x1={cx} y1={rowHeight} x2={cx} y2={totalHeight} stroke="black" strokeWidth="1" />
                             </g>
                         );
                     } else if (data.yPrimeVals?.[i]) {
@@ -151,7 +162,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                     let yDisplay = null;
                     const rawY = data.yNodes[i] || "";
                     
-                    if (isAsymptote) {
+                    if (isAsymptoteFlag) {
                         // Tách giá trị trái/phải tiệm cận
                         // Ví dụ rawY = "$+\infty$||$-\infty$"
                         const parts = rawY.split('||');
@@ -161,16 +172,17 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         const leftY = getYPos(leftVal, i, true, false);
                         const rightY = getYPos(rightVal, i, false, true);
 
+                        // ĐIỀU CHỈNH vị trí hiển thị: đặt sát mép tiệm cận hơn
                         yDisplay = (
                             <g>
-                                {/* Giá trị bên TRÁI tiệm cận */}
-                                <foreignObject x={cx - 55} y={leftY - 15} width={50} height={30}>
+                                {/* Giá trị bên TRÁI tiệm cận: đặt ngay sát trái cột tiệm cận */}
+                                <foreignObject x={cx - 48} y={leftY - 15} width={46} height={30}>
                                     <div className="flex justify-end w-full h-full font-bold text-sm bg-white/0 items-center pr-2">
                                         <LatexText text={cleanMath(leftVal)} />
                                     </div>
                                 </foreignObject>
-                                {/* Giá trị bên PHẢI tiệm cận */}
-                                <foreignObject x={cx + 5} y={rightY - 15} width={50} height={30}>
+                                {/* Giá trị bên PHẢI tiệm cận: đặt sát mép phải tiệm cận (gần hơn so với trước) */}
+                                <foreignObject x={cx + 2} y={rightY - 15} width={46} height={30}>
                                     <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center pl-2">
                                         <LatexText text={cleanMath(rightVal)} />
                                     </div>
@@ -203,7 +215,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             // Nếu xuất phát từ Tiệm Cận -> Lấy nhánh PHẢI
                             const rightVal = currentYRaw.split('||')[1] || "";
                             y1 = getYPos(rightVal, i, false, true);
-                            x1 = cx + 15; // Dịch ra khỏi vạch || một chút
+                            // Dịch ra khỏi vạch tiệm cận 1 khoảng nhỏ (điều chỉnh nhỏ từ +15 -> +8)
+                            x1 = cx + 8;
                         } else {
                             // Xuất phát thường
                             y1 = getYPos(currentYRaw, i);
@@ -215,7 +228,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             // Nếu đích đến là Tiệm Cận -> Lấy nhánh TRÁI
                             const leftVal = nextYRaw.split('||')[0] || "";
                             y2 = getYPos(leftVal, i+1, true, false);
-                            x2 = nextCx - 15; // Dừng trước vạch || một chút
+                            // Dừng trước vạch tiệm cận một khoảng nhỏ (điều chỉnh nhỏ từ -15 -> -8)
+                            x2 = nextCx - 8;
                         } else {
                             // Đích đến thường
                             y2 = getYPos(nextYRaw, i+1);
