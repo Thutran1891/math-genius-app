@@ -76,7 +76,6 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
             if (leftSign === '-') return yBot; // Nghịch biến đi xuống -> Kết thúc Thấp
         }
 
-        // D. Giá trị thường (không có dấu 2 bên)
         return yMid;
     };
 
@@ -159,24 +158,24 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         const leftVal = parts[0] ? parts[0].trim() : "";
                         const rightVal = parts[1] ? parts[1].trim() : "";
 
-                        // ĐẶC BIỆT: Với hàm phân thức, vô cực luôn đặt ở giữa cột (bên trái/phải tiệm cận)
+                        // ĐIỀU CHỈNH: Vô cực luôn đặt ngay sát cạnh đường tiệm cận
                         const leftY = leftVal ? getYPos(leftVal, i, true, false) : rowHeight * 2 + yRowHeight / 2;
                         const rightY = rightVal ? getYPos(rightVal, i, false, true) : rowHeight * 2 + yRowHeight / 2;
 
                         yDisplay = (
                             <g>
-                                {/* Giá trị bên TRÁI tiệm cận */}
+                                {/* Giá trị bên TRÁI tiệm cận - đặt ngay bên trái đường || */}
                                 {leftVal && (
-                                    <foreignObject x={cx - 55} y={leftY - 15} width={50} height={30}>
-                                        <div className="flex justify-end w-full h-full font-bold text-sm bg-white/0 items-center pr-2">
+                                    <foreignObject x={cx - 35} y={leftY - 15} width={30} height={30}>
+                                        <div className="flex justify-end w-full h-full font-bold text-sm bg-white/0 items-center pr-1">
                                             <LatexText text={cleanMath(leftVal)} />
                                         </div>
                                     </foreignObject>
                                 )}
-                                {/* Giá trị bên PHẢI tiệm cận */}
+                                {/* Giá trị bên PHẢI tiệm cận - đặt ngay bên phải đường || */}
                                 {rightVal && (
-                                    <foreignObject x={cx + 5} y={rightY - 15} width={50} height={30}>
-                                        <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center pl-2">
+                                    <foreignObject x={cx + 8} y={rightY - 15} width={30} height={30}>
+                                        <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center pl-1">
                                             <LatexText text={cleanMath(rightVal)} />
                                         </div>
                                     </foreignObject>
@@ -196,7 +195,6 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                     }
 
                     // 5. Render Mũi Tên (Arrow)
-                    // Logic mới: Luôn vẽ nối sang cột sau, tự động tránh tiệm cận
                     let arrowLine = null;
                     if (i < data.xNodes.length - 1) {
                         let x1, y1, x2, y2;
@@ -210,7 +208,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             const parts = currentYRaw.split('||');
                             const rightVal = parts[1] || "";
                             y1 = rightVal ? getYPos(rightVal, i, false, true) : rowHeight * 2 + yRowHeight / 2;
-                            x1 = cx + 15; // Dịch ra khỏi vạch || một chút
+                            x1 = cx + 10; // Xuất phát ngay sau đường ||
                         } else {
                             // Xuất phát thường
                             y1 = getYPos(currentYRaw, i);
@@ -223,14 +221,14 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             const parts = nextYRaw.split('||');
                             const leftVal = parts[0] || "";
                             y2 = leftVal ? getYPos(leftVal, i+1, true, false) : rowHeight * 2 + yRowHeight / 2;
-                            x2 = nextCx - 15; // Dừng trước vạch || một chút
+                            x2 = nextCx - 10; // Dừng ngay trước đường ||
                         } else {
                             // Đích đến thường
                             y2 = getYPos(nextYRaw, i+1);
                             x2 = nextCx - 20;
                         }
 
-                        // Vẽ mũi tên (Không còn điều kiện chặn if yPrimeVals === || nữa)
+                        // Vẽ mũi tên
                         arrowLine = (
                             <line 
                                 x1={x1} y1={y1} 
