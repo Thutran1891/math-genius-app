@@ -29,7 +29,20 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
         return s;
     };
 
-    // Hàm render giá trị Y tại vị trí Y cố định
+    // Helper: Xác định vị trí Y (Top/Bottom) dựa trên giá trị text
+    const getYPosForValue = (val: string): 'top' | 'bottom' => {
+        const s = val.toLowerCase();
+        // Nếu là âm vô cực hoặc số âm lớn (tùy logic) -> Bottom
+        // Ở đây ưu tiên check dấu trừ của vô cực
+        if (s.includes('-\\infty') || s.includes('-inf')) return 'bottom';
+        // Nếu là dương vô cực -> Top
+        if (s.includes('\\infty') || s.includes('+inf')) return 'top';
+        
+        // Mặc định cho số thường: Tùy ngữ cảnh, nhưng hàm này chủ yếu dùng cho Limit
+        return 'top'; 
+    };
+
+    // Hàm render giá trị Y tại vị trí Y cố định (Dùng cho các điểm cực trị hoặc đầu mút)
     const renderYValue = (cx: number, yPosition: 'top' | 'middle' | 'bottom' | number, value: string) => {
         let yPos: number;
         if (yPosition === 'top') yPos = rowHeight * 2 + 20;
@@ -39,10 +52,38 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
 
         return (
             <foreignObject x={cx - 40} y={yPos - 15} width={80} height={30}>
-                <div className="flex justify-center w-full h-full font-bold text-sm bg-white/90 px-1 items-center">
+                <div className="flex justify-center w-full h-full font-bold text-sm bg-white/90 px-1 items-center z-10">
                     <LatexText text={cleanMath(value)} />
                 </div>
             </foreignObject>
+        );
+    };
+
+    // Xử lý hiển thị giới hạn sát hai bên tiệm cận (NEW)
+    const renderSplitLimit = (cx: number, rawValue: string) => {
+        const parts = rawValue.split('||');
+        const leftVal = parts[0] || '';
+        const rightVal = parts[1] || '';
+
+        const yPosLeft = getYPosForValue(leftVal) === 'top' ? rowHeight * 2 + 20 : totalHeight - 20;
+        const yPosRight = getYPosForValue(rightVal) === 'top' ? rowHeight * 2 + 20 : totalHeight - 20;
+
+        return (
+            <>
+                {/* Bên trái: Align Right, sát vạch */}
+                <foreignObject x={cx - 50} y={yPosLeft - 15} width={45} height={30}>
+                    <div className="flex justify-end w-full h-full font-bold text-sm items-center pr-1">
+                        <LatexText text={cleanMath(leftVal)} />
+                    </div>
+                </foreignObject>
+
+                {/* Bên phải: Align Left, sát vạch */}
+                <foreignObject x={cx + 5} y={yPosRight - 15} width={45} height={30}>
+                    <div className="flex justify-start w-full h-full font-bold text-sm items-center pl-1">
+                        <LatexText text={cleanMath(rightVal)} />
+                    </div>
+                </foreignObject>
+            </>
         );
     };
 
@@ -55,7 +96,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
         />
     );
 
-    // Hàm render tiệm cận đứng
+    // Hàm render tiệm cận đứng (Đảm bảo vẽ xuyên suốt)
     const renderAsymptote = (cx: number) => (
         <g>
             <line x1={cx - 3} y1={rowHeight} x2={cx - 3} y2={totalHeight} stroke="black" strokeWidth="1" />
@@ -68,7 +109,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
         const colWidth = usableWidth / (data.xNodes.length - 1);
         
         switch(functionType) {
-            // 1. HÀM BẬC 3 CÓ 2 CỰC TRỊ
+            // 1. HÀM BẬC 3
             case 'cubic':
                 return data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
@@ -76,14 +117,12 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                     
                     return (
                         <g key={i}>
-                            {/* X value */}
                             <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                                 <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                     <LatexText text={cleanMath(x)} />
                                 </div>
                             </foreignObject>
 
-                            {/* Y' value */}
                             {data.yPrimeVals?.[i] && (
                                 <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-sm items-center">
@@ -92,7 +131,6 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y' sign */}
                             {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
                                 <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-lg items-center">
@@ -101,16 +139,14 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y value */}
                             {data.yNodes[i] && renderYValue(
                                 cx,
                                 isExtremum ? 
                                     (data.yPrimeSigns?.[i-1] === '+' && data.yPrimeSigns?.[i] === '-') ? 'top' : 'bottom'
-                                    : i === 0 || i === data.xNodes.length - 1 ? 'middle' : 'middle',
+                                    : 'middle',
                                 data.yNodes[i]
                             )}
 
-                            {/* Arrow */}
                             {i < data.xNodes.length - 1 && renderArrow(
                                 cx + 20,
                                 i === 0 ? rowHeight * 2 + yRowHeight / 2 :
@@ -123,7 +159,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                     );
                 });
 
-            // 2. HÀM BẬC 4 CÓ 3 CỰC TRỊ
+            // 2. HÀM BẬC 4
             case 'quartic':
                 return data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
@@ -131,14 +167,12 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                     
                     return (
                         <g key={i}>
-                            {/* X value */}
                             <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                                 <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                     <LatexText text={cleanMath(x)} />
                                 </div>
                             </foreignObject>
 
-                            {/* Y' value */}
                             {data.yPrimeVals?.[i] && (
                                 <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-sm items-center">
@@ -147,7 +181,6 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y' sign */}
                             {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
                                 <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-lg items-center">
@@ -156,16 +189,12 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y value */}
                             {data.yNodes[i] && renderYValue(
                                 cx,
-                                isExtremum ? 
-                                    (i === 1 || i === data.xNodes.length - 2) ? 'bottom' : 'top' // Cực đại ở vị trí 1 và 3
-                                    : i === 0 || i === data.xNodes.length - 1 ? 'middle' : 'middle',
+                                isExtremum ? (i === 1 || i === data.xNodes.length - 2) ? 'bottom' : 'top' : 'middle',
                                 data.yNodes[i]
                             )}
 
-                            {/* Arrow */}
                             {i < data.xNodes.length - 1 && renderArrow(
                                 cx + 20,
                                 i === 0 ? rowHeight * 2 + yRowHeight / 2 :
@@ -178,7 +207,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                     );
                 });
 
-            // 3. HÀM BẬC 1/1
+            // 3. HÀM BẬC 1/1 (LOGIC ĐÃ SỬA)
             case 'rational11':
                 return data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
@@ -186,15 +215,14 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                     
                     return (
                         <g key={i}>
-                            {/* X value */}
                             <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                                 <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                     <LatexText text={cleanMath(x)} />
                                 </div>
                             </foreignObject>
 
-                            {/* Y' value hoặc tiệm cận */}
-                            {isAsymptote ? renderAsymptote(cx) : data.yPrimeVals?.[i] && (
+                            {/* Render y' val */}
+                            {!isAsymptote && data.yPrimeVals?.[i] && (
                                 <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                         <LatexText text={cleanMath(data.yPrimeVals[i])} />
@@ -202,7 +230,7 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y' sign */}
+                            {/* Dấu y' */}
                             {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
                                 <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-lg items-center">
@@ -211,31 +239,15 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y value */}
+                            {/* Y value (Non-asymptote) */}
                             {data.yNodes[i] && !isAsymptote && renderYValue(
                                 cx,
-                                i === 0 || i === data.xNodes.length - 1 ? 'middle' : 'middle',
+                                'middle', // Đầu mút hàm 1/1 thường ở giữa cho đẹp hoặc tùy chỉnh top/bottom nếu cần
                                 data.yNodes[i]
                             )}
 
-                            {/* Vô cực bên trái/phải tiệm cận */}
-                            {isAsymptote && data.yNodes[i] && data.yNodes[i].includes('||') && (
-                                <>
-                                    {/* Vô cực bên trái tiệm cận */}
-                                    <foreignObject x={cx - 35} y={rowHeight * 2 + 20} width={30} height={30}>
-                                        <div className="flex justify-end w-full h-full font-bold text-sm items-center pr-1">
-                                            <LatexText text={cleanMath(data.yNodes[i].split('||')[0] || '')} />
-                                        </div>
-                                    </foreignObject>
-                                    
-                                    {/* Vô cực bên phải tiệm cận */}
-                                    <foreignObject x={cx + 8} y={totalHeight - 20} width={30} height={30}>
-                                        <div className="flex justify-start w-full h-full font-bold text-sm items-center pl-1">
-                                            <LatexText text={cleanMath(data.yNodes[i].split('||')[1] || '')} />
-                                        </div>
-                                    </foreignObject>
-                                </>
-                            )}
+                            {/* Y value (Asymptote - Split) - SÁT TIỆM CẬN */}
+                            {isAsymptote && data.yNodes[i] && renderSplitLimit(cx, data.yNodes[i])}
 
                             {/* Arrow */}
                             {i < data.xNodes.length - 1 && !isAsymptote && renderArrow(
@@ -246,11 +258,14 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 i === data.xNodes.length - 2 ? rowHeight * 2 + yRowHeight / 2 :
                                 data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
                             )}
+
+                            {/* VẼ TIỆM CẬN SAU CÙNG ĐỂ ĐÈ LÊN MỌI THỨ */}
+                            {isAsymptote && renderAsymptote(cx)}
                         </g>
                     );
                 });
 
-            // 4. HÀM BẬC 2/1 CÓ 2 CỰC TRỊ
+            // 4. HÀM BẬC 2/1 CÓ CỰC TRỊ (LOGIC ĐÃ SỬA)
             case 'rational21_with_extrema':
                 return data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
@@ -259,15 +274,13 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                     
                     return (
                         <g key={i}>
-                            {/* X value */}
                             <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                                 <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                     <LatexText text={cleanMath(x)} />
                                 </div>
                             </foreignObject>
 
-                            {/* Y' value hoặc tiệm cận */}
-                            {isAsymptote ? renderAsymptote(cx) : data.yPrimeVals?.[i] && (
+                            {!isAsymptote && data.yPrimeVals?.[i] && (
                                 <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                         <LatexText text={cleanMath(data.yPrimeVals[i])} />
@@ -275,7 +288,6 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y' sign */}
                             {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
                                 <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-lg items-center">
@@ -284,35 +296,18 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y value - vô cực ở đầu/cuối bảng */}
+                            {/* Y Nodes: Xử lý Extremum và Đầu mút */}
                             {data.yNodes[i] && !isAsymptote && renderYValue(
                                 cx,
-                                isExtremum ? (i === 1 ? 'top' : 'bottom') : // Cực đại ở vị trí 1, cực tiểu ở vị trí 3
-                                i === 0 || i === data.xNodes.length - 1 ? 
-                                    (data.yNodes[i].includes('+') ? 'top' : 'bottom') : 'middle',
+                                isExtremum ? (i === 1 ? 'top' : 'bottom') : // i=1 là CĐ (Top), i=3 là CT (Bottom)
+                                (data.yNodes[i].includes('-') ? 'bottom' : 'top'), // Đầu mút vô cực
                                 data.yNodes[i]
                             )}
 
-                            {/* Vô cực bên trái/phải tiệm cận */}
-                            {isAsymptote && data.yNodes[i] && data.yNodes[i].includes('||') && (
-                                <>
-                                    {/* Vô cực bên trái tiệm cận */}
-                                    <foreignObject x={cx - 35} y={rowHeight * 2 + 20} width={30} height={30}>
-                                        <div className="flex justify-end w-full h-full font-bold text-sm items-center pr-1">
-                                            <LatexText text={cleanMath(data.yNodes[i].split('||')[0] || '')} />
-                                        </div>
-                                    </foreignObject>
-                                    
-                                    {/* Vô cực bên phải tiệm cận */}
-                                    <foreignObject x={cx + 8} y={totalHeight - 20} width={30} height={30}>
-                                        <div className="flex justify-start w-full h-full font-bold text-sm items-center pl-1">
-                                            <LatexText text={cleanMath(data.yNodes[i].split('||')[1] || '')} />
-                                        </div>
-                                    </foreignObject>
-                                </>
-                            )}
+                            {/* Y Nodes: Tiệm cận */}
+                            {isAsymptote && data.yNodes[i] && renderSplitLimit(cx, data.yNodes[i])}
 
-                            {/* Arrow */}
+                            {/* Arrows */}
                             {i < data.xNodes.length - 1 && !isAsymptote && renderArrow(
                                 cx + 20,
                                 i === 0 ? (data.yNodes[0]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
@@ -321,11 +316,14 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 i === data.xNodes.length - 2 ? (data.yNodes[data.xNodes.length - 1]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
                                 data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
                             )}
+
+                            {/* Render Tiệm cận sau cùng */}
+                            {isAsymptote && renderAsymptote(cx)}
                         </g>
                     );
                 });
 
-            // 5. HÀM BẬC 2/1 KHÔNG CÓ CỰC TRỊ
+            // 5. HÀM BẬC 2/1 KHÔNG CÓ CỰC TRỊ (LOGIC ĐÃ SỬA)
             case 'rational21_no_extrema':
                 return data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
@@ -333,15 +331,13 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                     
                     return (
                         <g key={i}>
-                            {/* X value */}
                             <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                                 <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                     <LatexText text={cleanMath(x)} />
                                 </div>
                             </foreignObject>
 
-                            {/* Y' value hoặc tiệm cận */}
-                            {isAsymptote ? renderAsymptote(cx) : data.yPrimeVals?.[i] && (
+                            {!isAsymptote && data.yPrimeVals?.[i] && (
                                 <foreignObject x={cx - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-sm items-center">
                                         <LatexText text={cleanMath(data.yPrimeVals[i])} />
@@ -349,7 +345,6 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y' sign */}
                             {i < data.xNodes.length - 1 && data.yPrimeSigns?.[i] && (
                                 <foreignObject x={cx + colWidth / 2 - 20} y={rowHeight + 15} width={40} height={30}>
                                     <div className="flex justify-center w-full h-full font-bold text-lg items-center">
@@ -358,34 +353,14 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 </foreignObject>
                             )}
 
-                            {/* Y value - vô cực ở đầu/cuối bảng */}
                             {data.yNodes[i] && !isAsymptote && renderYValue(
                                 cx,
-                                i === 0 || i === data.xNodes.length - 1 ? 
-                                    (data.yNodes[i].includes('+') ? 'top' : 'bottom') : 'middle',
+                                data.yNodes[i].includes('+') ? 'top' : 'bottom',
                                 data.yNodes[i]
                             )}
 
-                            {/* Vô cực bên trái/phải tiệm cận */}
-                            {isAsymptote && data.yNodes[i] && data.yNodes[i].includes('||') && (
-                                <>
-                                    {/* Vô cực bên trái tiệm cận */}
-                                    <foreignObject x={cx - 35} y={rowHeight * 2 + 20} width={30} height={30}>
-                                        <div className="flex justify-end w-full h-full font-bold text-sm items-center pr-1">
-                                            <LatexText text={cleanMath(data.yNodes[i].split('||')[0] || '')} />
-                                        </div>
-                                    </foreignObject>
-                                    
-                                    {/* Vô cực bên phải tiệm cận */}
-                                    <foreignObject x={cx + 8} y={totalHeight - 20} width={30} height={30}>
-                                        <div className="flex justify-start w-full h-full font-bold text-sm items-center pl-1">
-                                            <LatexText text={cleanMath(data.yNodes[i].split('||')[1] || '')} />
-                                        </div>
-                                    </foreignObject>
-                                </>
-                            )}
+                            {isAsymptote && data.yNodes[i] && renderSplitLimit(cx, data.yNodes[i])}
 
-                            {/* Arrow */}
                             {i < data.xNodes.length - 1 && !isAsymptote && renderArrow(
                                 cx + 20,
                                 i === 0 ? (data.yNodes[0]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
@@ -394,6 +369,8 @@ export const VariationTable: React.FC<Props> = ({ data, functionType = 'cubic' }
                                 i === data.xNodes.length - 2 ? (data.yNodes[data.xNodes.length - 1]?.includes('+') ? rowHeight * 2 + 20 : totalHeight - 20) :
                                 data.yPrimeSigns?.[i] === '+' ? rowHeight * 2 + 30 : totalHeight - 30
                             )}
+
+                            {isAsymptote && renderAsymptote(cx)}
                         </g>
                     );
                 });
