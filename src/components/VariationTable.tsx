@@ -170,8 +170,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                                     </div>
                                 </foreignObject>
                                 {/* Giá trị bên PHẢI tiệm cận */}
-                                <foreignObject x={cx - 45} y={rightY - 15} width={50} height={30}>
-                                    <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center pl-2">
+                                <foreignObject x={cx + 1} y={rightY - 15} width={50} height={30}>
+                                    <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center pl-1">
                                         <LatexText text={cleanMath(rightVal)} />
                                     </div>
                                 </foreignObject>
