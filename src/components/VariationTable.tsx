@@ -185,7 +185,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         const yPos = getYPos(rawY, i);
                         yDisplay = (
                              <foreignObject x={cx - 40} y={yPos - 15} width={80} height={30}>
-                                 <div className="flex justify-center w-full h-full font-bold text-sm bg-white/90 px-1 items-center">
+                                 {/* SỬA 1: Bỏ bg-white/90, đổi thành bg-transparent hoặc bỏ hẳn class background */}
+                                 <div className="flex justify-center w-full h-full font-bold text-sm bg-transparent px-1 items-center">
                                     <LatexText text={cleanMath(rawY)} />
                                  </div>
                             </foreignObject>
@@ -193,7 +194,6 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                     }
 
                     // 5. Render Mũi Tên (Arrow)
-                    // Logic mới: Luôn vẽ nối sang cột sau, tự động tránh tiệm cận
                     let arrowLine = null;
                     if (i < data.xNodes.length - 1) {
                         let x1, y1, x2, y2;
@@ -203,29 +203,25 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
 
                         // --- TÍNH ĐIỂM ĐẦU (x1, y1) ---
                         if (currentYRaw.includes('||')) {
-                            // Nếu xuất phát từ Tiệm Cận -> Lấy nhánh PHẢI
                             const rightVal = currentYRaw.split('||')[1] || "";
                             y1 = getYPos(rightVal, i, false, true);
-                            x1 = cx + 15; // Dịch ra khỏi vạch || một chút
+                            x1 = cx + 10; // Chỉnh lại chút cho sát
                         } else {
-                            // Xuất phát thường
                             y1 = getYPos(currentYRaw, i);
-                            x1 = cx + 20; 
+                            x1 = cx + 25; // Dịch ra khỏi chữ số 1 chút
                         }
 
                         // --- TÍNH ĐIỂM ĐÍCH (x2, y2) ---
                         if (nextYRaw.includes('||')) {
-                            // Nếu đích đến là Tiệm Cận -> Lấy nhánh TRÁI
                             const leftVal = nextYRaw.split('||')[0] || "";
                             y2 = getYPos(leftVal, i+1, true, false);
-                            x2 = nextCx - 20; // Dừng trước vạch || một chút
-                        } else {
-                            // Đích đến thường
-                            y2 = getYPos(nextYRaw, i+1);
                             x2 = nextCx - 20;
+                        } else {
+                            y2 = getYPos(nextYRaw, i+1);
+                            // SỬA 2: Rút ngắn mũi tên lại để không đâm xuyên qua số (tránh rối mắt khi bỏ nền trắng)
+                            x2 = nextCx - 35; 
                         }
 
-                        // Vẽ mũi tên (Không còn điều kiện chặn if yPrimeVals === || nữa)
                         arrowLine = (
                             <line 
                                 x1={x1} y1={y1} 
