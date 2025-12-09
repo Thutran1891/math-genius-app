@@ -153,25 +153,28 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                     
                     if (isAsymptote) {
                         // Tách giá trị trái/phải tiệm cận
-                        // Ví dụ rawY = "$+\infty$||$-\infty$"
                         const parts = rawY.split('||');
                         const leftVal = parts[0] ? parts[0].trim() : "";
                         const rightVal = parts[1] ? parts[1].trim() : "";
-
+                    
                         const leftY = getYPos(leftVal, i, true, false);
                         const rightY = getYPos(rightVal, i, false, true);
-
+                    
                         yDisplay = (
                             <g>
-                                {/* Giá trị bên TRÁI tiệm cận */}
-                                <foreignObject x={cx - 55} y={leftY - 15} width={50} height={30}>
-                                    <div className="flex justify-end w-full h-full font-bold text-sm bg-white/0 items-center pr-2">
+                                {/* --- TRÁI TIỆM CẬN --- */}
+                                {/* x: lùi về 52px để chừa chỗ cho vạch. justify-end để số dồn về bên phải (sát vạch) */}
+                                <foreignObject x={cx - 52} y={leftY - 15} width={50} height={30}>
+                                    <div className="flex justify-end w-full h-full font-bold text-sm bg-white/0 items-center pr-1">
                                         <LatexText text={cleanMath(leftVal)} />
                                     </div>
                                 </foreignObject>
-                                {/* Giá trị bên PHẢI tiệm cận */}
-                                <foreignObject x={cx + 1} y={rightY - 15} width={50} height={30}>
-                                    <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center pl-1">
+                    
+                                {/* --- PHẢI TIỆM CẬN --- */}
+                                {/* x: chỉ cộng 2px để sát vạch. width: nhỏ gọn. justify-start: để số dồn về bên trái (sát vạch) */}
+                                {/* QUAN TRỌNG: pl-0 để bỏ khoảng trắng đệm */}
+                                <foreignObject x={cx + 2} y={rightY - 15} width={50} height={30}>
+                                    <div className="flex justify-start w-full h-full font-bold text-sm bg-white/0 items-center text-left pl-0">
                                         <LatexText text={cleanMath(rightVal)} />
                                     </div>
                                 </foreignObject>
@@ -215,7 +218,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             // Nếu đích đến là Tiệm Cận -> Lấy nhánh TRÁI
                             const leftVal = nextYRaw.split('||')[0] || "";
                             y2 = getYPos(leftVal, i+1, true, false);
-                            x2 = nextCx - 15; // Dừng trước vạch || một chút
+                            x2 = nextCx - 20; // Dừng trước vạch || một chút
                         } else {
                             // Đích đến thường
                             y2 = getYPos(nextYRaw, i+1);
