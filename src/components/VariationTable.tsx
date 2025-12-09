@@ -10,15 +10,17 @@ interface Props {
 const CONFIG = {
     width: 640,
     rowHeight: 40,
-    graphHeight: 160, // Chiều cao khu vực vẽ đồ thị
+    graphHeight: 180, // Tăng nhẹ chiều cao để bảng thoáng hơn
     startX: 60,
-    paddingY: 25,     // Khoảng đệm trên/dưới để mũi tên không chạm sát biên
+    paddingY: 30,     // Tăng padding để đỉnh/đáy không chạm mép
 };
 
 export const VariationTable: React.FC<Props> = ({ data }) => {
     const totalHeight = CONFIG.rowHeight * 2 + CONFIG.graphHeight;
     const usableWidth = CONFIG.width - CONFIG.startX - 40;
-    const colWidth = usableWidth / Math.max(1, data.xNodes.length - 1);
+    // Đảm bảo colWidth không quá nhỏ
+    const colWidth = Math.max(60, usableWidth / Math.max(1, data.xNodes.length - 1));
+    const svgWidth = Math.max(CONFIG.width, CONFIG.startX + 40 + (data.xNodes.length - 1) * colWidth + 20);
 
     // --- 1. HÀM LÀM SẠCH CHUỖI LATEX ---
     const cleanMath = (val: string): string => {
@@ -29,82 +31,104 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
             if (s.toLowerCase().includes('-inf')) s = '-\\infty';
             else if (s.toLowerCase().includes('+inf') || (s.toLowerCase().includes('inf') && !s.includes('-'))) s = '+\\infty';
         }
-        // Thêm dấu $ nếu chưa có để LatexText hiểu
+        // Thêm dấu $ nếu chưa có
         if (!s.startsWith('$')) return `$${s}$`;
         return s;
     };
 
     // --- 2. HÀM CHUYỂN ĐỔI GIÁ TRỊ ĐỂ SẮP XẾP ---
-    // Giúp so sánh được cả số, phân số và vô cực
     const parseValue = (val: string): number => {
         if (!val) return 0;
-        const v = val.toLowerCase().trim().replace(/\$/g, ''); // Bỏ dấu $
+        const v = val.toLowerCase().trim().replace(/\$/g, '').replace(/\\displaystyle/g, '');
         
-        if (v.includes('-inf') || v.includes('-\\infty')) return -999999; 
-        if (v.includes('+inf') || v.includes('+\\infty')) return 999999;
+        // Ưu tiên xử lý vô cực
+        if (v.includes('-inf') || v.includes('-\\infty')) return -Infinity; 
+        if (v.includes('+inf') || v.includes('+\\infty')) return Infinity;
         
         try {
-            // Xử lý phân số (ví dụ: 1/3)
+            // Xử lý phân số LaTeX: \frac{a}{b} hoặc \dfrac{a}{b}
+            if (v.includes('frac')) {
+                const match = v.match(/frac\{(-?[\d.]+)\}\{(-?[\d.]+)\}/);
+                if (match && match[1] && match[2]) {
+                    return parseFloat(match[1]) / parseFloat(match[2]);
+                }
+            }
+            // Xử lý phân số thường: 1/3
             if (v.includes('/')) {
                 const parts = v.split('/');
                 return parseFloat(parts[0]) / parseFloat(parts[1]);
             }
-            return parseFloat(v) || 0;
+            // Xử lý số thường
+            const parsed = parseFloat(v);
+            return isNaN(parsed) ? 0 : parsed;
         } catch {
             return 0;
         }
     };
 
-    // --- 3. LOGIC TÍNH TỌA ĐỘ Y (QUAN TRỌNG NHẤT) ---
-    // Quét toàn bộ bảng, xếp hạng giá trị từ nhỏ đến lớn để chia chiều cao
+    // --- 3. LOGIC TÍNH TỌA ĐỘ Y ---
     const yCoordinates = useMemo(() => {
-        let allValues: { val: string, num: number }[] = [];
+        let uniqueNumbers = new Set<number>();
         
         data.yNodes.forEach(nodeRaw => {
             if (!nodeRaw) return;
-            if (nodeRaw.includes('||')) {
-                const parts = nodeRaw.split('||');
-                parts.forEach(p => allValues.push({ val: p, num: parseValue(p) }));
-            } else {
-                allValues.push({ val: nodeRaw, num: parseValue(nodeRaw) });
-            }
+            const parts = nodeRaw.split('||'); // Tách nếu là tiệm cận
+            parts.forEach(p => {
+                const num = parseValue(p);
+                // Chỉ thêm số hữu hạn vào set để sort khoảng giữa
+                if (num !== Infinity && num !== -Infinity) {
+                    uniqueNumbers.add(num);
+                }
+            });
         });
 
-        // Lọc trùng và sắp xếp tăng dần
-        const uniqueValues = Array.from(new Set(allValues.map(v => v.num))).sort((a, b) => a - b);
+        // Sắp xếp các giá trị hữu hạn
+        const sortedFinite = Array.from(uniqueNumbers).sort((a, b) => a - b);
         
         const mapY = new Map<number, number>();
         const Y_TOP = CONFIG.rowHeight * 2 + CONFIG.paddingY;
         const Y_BOT = totalHeight - CONFIG.paddingY;
-        const drawHeight = Y_BOT - Y_TOP;
+        
+        // Tính toán vị trí
+        // Quy ước: +Infinity ở Y_TOP, -Infinity ở Y_BOT
+        // Các số hữu hạn sẽ chia đều khoảng giữa (Y_TOP + gap) đến (Y_BOT - gap)
+        
+        mapY.set(Infinity, Y_TOP);
+        mapY.set(-Infinity, Y_BOT);
 
-        if (uniqueValues.length === 0) return mapY;
-        if (uniqueValues.length === 1) {
-            mapY.set(uniqueValues[0], Y_TOP + drawHeight / 2);
-            return mapY;
+        if (sortedFinite.length > 0) {
+            const margin = 30; // Khoảng cách an toàn so với vô cực
+            const drawTop = Y_TOP + margin;
+            const drawBot = Y_BOT - margin;
+            const drawH = drawBot - drawTop;
+
+            if (sortedFinite.length === 1) {
+                // Nếu chỉ có 1 giá trị (ví dụ Tiệm cận ngang y=2), cho nằm giữa
+                mapY.set(sortedFinite[0], Y_TOP + (Y_BOT - Y_TOP) / 2);
+            } else {
+                sortedFinite.forEach((val, index) => {
+                    const ratio = index / (sortedFinite.length - 1);
+                    const yPos = drawBot - ratio * drawH; // Đảo ngược vì Y nhỏ nằm dưới
+                    mapY.set(val, yPos);
+                });
+            }
+        } else {
+             // Trường hợp đặc biệt không có số nào (chỉ có vô cực - hiếm gặp)
+             mapY.set(0, Y_TOP + (Y_BOT - Y_TOP) / 2);
         }
-
-        uniqueValues.forEach((val, index) => {
-            // Tính tỉ lệ vị trí
-            const ratio = index / (uniqueValues.length - 1); 
-            // Đảo ngược vì Y nhỏ (0) nằm trên cao trong SVG
-            const yPos = Y_BOT - ratio * drawHeight;
-            mapY.set(val, yPos);
-        });
 
         return mapY;
     }, [data.yNodes, totalHeight]);
 
-    // Hàm lấy tọa độ pixel từ chuỗi giá trị
+    // Hàm lấy tọa độ pixel
     const getY = (valStr: string) => {
         const num = parseValue(valStr);
-        // Nếu không tìm thấy (lỗi), trả về giữa
         return yCoordinates.get(num) ?? (CONFIG.rowHeight * 2 + CONFIG.graphHeight / 2);
     };
 
     return (
         <div className="w-full max-w-full overflow-x-auto border border-gray-400 rounded p-4 bg-white shadow-sm mb-6 flex justify-start pl-2">
-            <svg width={CONFIG.width} height={totalHeight} className="select-none" style={{ minWidth: CONFIG.width }}>
+            <svg width={svgWidth} height={totalHeight} className="select-none" style={{ minWidth: svgWidth }}>
                 <defs>
                     <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
                         <polygon points="0 0, 8 3, 0 6" fill="black" />
@@ -112,8 +136,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                 </defs>
 
                 {/* --- KHUNG LƯỚI --- */}
-                <line x1="0" y1={CONFIG.rowHeight} x2={CONFIG.width} y2={CONFIG.rowHeight} stroke="black" strokeWidth="1" />
-                <line x1="0" y1={CONFIG.rowHeight * 2} x2={CONFIG.width} y2={CONFIG.rowHeight * 2} stroke="black" strokeWidth="1" />
+                <line x1="0" y1={CONFIG.rowHeight} x2={svgWidth} y2={CONFIG.rowHeight} stroke="black" strokeWidth="1" />
+                <line x1="0" y1={CONFIG.rowHeight * 2} x2={svgWidth} y2={CONFIG.rowHeight * 2} stroke="black" strokeWidth="1" />
                 <line x1={CONFIG.startX} y1="0" x2={CONFIG.startX} y2={totalHeight} stroke="black" strokeWidth="1" />
 
                 {/* LABEL HEADERS */}
@@ -125,9 +149,8 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                 {data.xNodes.map((xVal, i) => {
                     const cx = CONFIG.startX + 40 + i * colWidth;
                     
-                    // Xác định tính chất Tiệm Cận Đứng
                     const isVerticalAsymptote = data.yNodes[i]?.includes('||');
-                    // Xác định tính chất Không Xác Định của đạo hàm
+                    // Nếu là tiệm cận đứng thì đạo hàm tại đó là ||, ngược lại hiển thị giá trị
                     const isDerivativeUndefined = data.yPrimeVals?.[i]?.includes('||') || isVerticalAsymptote;
 
                     // 1. VẼ X
@@ -139,13 +162,13 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         </foreignObject>
                     );
 
-                    // 2. VẼ Y'
+                    // 2. VẼ Y' (Dấu gạch || hoặc số 0)
                     let yPrimeDisplay = null;
                     if (isDerivativeUndefined) {
                         yPrimeDisplay = (
                             <g>
-                                <line x1={cx - 2} y1={CONFIG.rowHeight} x2={cx - 2} y2={CONFIG.rowHeight*2} stroke="black" strokeWidth="1" />
-                                <line x1={cx + 2} y1={CONFIG.rowHeight} x2={cx + 2} y2={CONFIG.rowHeight*2} stroke="black" strokeWidth="1" />
+                                <line x1={cx - 1.5} y1={CONFIG.rowHeight} x2={cx - 1.5} y2={CONFIG.rowHeight*2} stroke="black" strokeWidth="1" />
+                                <line x1={cx + 1.5} y1={CONFIG.rowHeight} x2={cx + 1.5} y2={CONFIG.rowHeight*2} stroke="black" strokeWidth="1" />
                             </g>
                         );
                     } else if (data.yPrimeVals?.[i]) {
@@ -158,7 +181,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
-                    // 3. VẼ DẤU Y'
+                    // 3. VẼ DẤU Y' (+ hoặc -) ở giữa các khoảng
                     let signDisplay = null;
                     if (i < data.xNodes.length - 1 && data.yPrimeSigns?.[i]) {
                         const signCx = cx + colWidth / 2;
@@ -176,11 +199,11 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                     const rawY = data.yNodes[i] || "";
 
                     if (isVerticalAsymptote) {
-                        // Vẽ 2 gạch dọc cho tiệm cận đứng ở hàng y
+                        // Vẽ 2 gạch dọc suốt chiều cao đồ thị y
                         yDisplay = (
                             <g>
-                                <line x1={cx - 2} y1={CONFIG.rowHeight*2} x2={cx - 2} y2={totalHeight} stroke="black" strokeWidth="1" />
-                                <line x1={cx + 2} y1={CONFIG.rowHeight*2} x2={cx + 2} y2={totalHeight} stroke="black" strokeWidth="1" />
+                                <line x1={cx - 1.5} y1={CONFIG.rowHeight*2} x2={cx - 1.5} y2={totalHeight} stroke="black" strokeWidth="1" />
+                                <line x1={cx + 1.5} y1={CONFIG.rowHeight*2} x2={cx + 1.5} y2={totalHeight} stroke="black" strokeWidth="1" />
                             </g>
                         );
 
@@ -191,26 +214,27 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         const leftY = getY(leftVal);
                         const rightY = getY(rightVal);
 
-                        // Giá trị bên trái ||
+                        // Tinh chỉnh vị trí text cho || để ôm sát vạch
                         if (leftVal) {
                             yDisplay = (
                                 <g>
                                     {yDisplay}
-                                    <foreignObject x={cx - 65} y={leftY - 15} width={60} height={30}>
-                                        <div className={`flex justify-end pr-1 w-full h-full font-bold text-sm ${parseValue(leftVal) > 0 ? 'items-start pt-1' : 'items-end pb-1'}`}>
+                                    {/* Bên trái: align phải, padding phải nhỏ */}
+                                    <foreignObject x={cx - 55} y={leftY - 15} width={50} height={30}>
+                                        <div className={`flex justify-end pr-1 w-full h-full font-bold text-sm`}>
                                             <LatexText text={cleanMath(leftVal)} />
                                         </div>
                                     </foreignObject>
                                 </g>
                             );
                         }
-                        // Giá trị bên phải ||
                         if (rightVal) {
                             yDisplay = (
                                 <g>
                                     {yDisplay}
-                                    <foreignObject x={cx + 5} y={rightY - 15} width={60} height={30}>
-                                        <div className={`flex justify-start pl-1 w-full h-full font-bold text-sm ${parseValue(rightVal) > 0 ? 'items-start pt-1' : 'items-end pb-1'}`}>
+                                    {/* Bên phải: align trái, padding trái nhỏ */}
+                                    <foreignObject x={cx + 5} y={rightY - 15} width={50} height={30}>
+                                        <div className={`flex justify-start pl-1 w-full h-full font-bold text-sm`}>
                                             <LatexText text={cleanMath(rightVal)} />
                                         </div>
                                     </foreignObject>
@@ -218,18 +242,18 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             );
                         }
                     } else {
-                        // Điểm thường
+                        // Điểm thường (Cực trị, biên)
                         const yPos = getY(rawY);
                         yDisplay = (
                             <foreignObject x={cx - 40} y={yPos - 15} width={80} height={30}>
-                                <div className="flex justify-center items-center w-full h-full font-bold text-sm bg-white/60">
+                                <div className="flex justify-center items-center w-full h-full font-bold text-sm bg-white/0">
                                     <LatexText text={cleanMath(rawY)} />
                                 </div>
                             </foreignObject>
                         );
                     }
 
-                    // 5. VẼ MŨI TÊN (Nối từ cột trước i-1 sang cột hiện tại i)
+                    // 5. VẼ MŨI TÊN (Từ i-1 sang i)
                     let arrowElement = null;
                     if (i > 0) {
                         const prevIndex = i - 1;
@@ -238,46 +262,48 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         
                         let x1, y1, x2, y2;
 
-                        // Tìm điểm đầu (x1, y1)
+                        // Tọa độ ĐIỂM ĐẦU (x1, y1)
                         if (prevRawY.includes('||')) {
+                            // Xuất phát từ bên phải của tiệm cận cũ
                             const val = prevRawY.split('||')[1] || "";
                             y1 = getY(val);
-                            x1 = prevCx + 15; // Bên phải tiệm cận cũ
+                            x1 = prevCx + 10; 
                         } else {
+                            // Xuất phát từ node thường
                             y1 = getY(prevRawY);
-                            x1 = prevCx + 25; // Bên phải text node cũ
+                            x1 = prevCx + 20; 
                         }
 
-                        // Tìm điểm cuối (x2, y2)
+                        // Tọa độ ĐIỂM CUỐI (x2, y2)
                         if (rawY.includes('||')) {
+                            // Kết thúc ở bên trái của tiệm cận mới
                             const val = rawY.split('||')[0] || "";
                             y2 = getY(val);
-                            x2 = cx - 15; // Bên trái tiệm cận mới
+                            x2 = cx - 10;
                         } else {
+                            // Kết thúc ở node thường
                             y2 = getY(rawY);
-                            x2 = cx - 25; // Bên trái text node mới
+                            x2 = cx - 20;
                         }
 
-                        // Tính toán để cắt ngắn mũi tên (tránh đè chữ)
-                        if (x2 > x1) {
+                        // Vẽ mũi tên nếu khoảng cách hợp lý
+                        if (x2 > x1 + 5) {
+                            // Rút ngắn mũi tên một chút để không chạm chữ
                             const dx = x2 - x1;
                             const dy = y2 - y1;
-                            const dist = Math.sqrt(dx*dx + dy*dy);
+                            const angle = Math.atan2(dy, dx);
+                            const shorten = 12; // Pixel rút ngắn
                             
-                            // Nếu khoảng cách đủ dài, cắt bớt đầu đuôi
-                            if (dist > 30) {
-                                const trim = 5; // Cắt bớt 5px mỗi đầu
-                                const ratio = trim / dist;
-                                // x1 += dx * ratio; // Không cần cắt điểm đầu nhiều
-                                // y1 += dy * ratio;
-                                x2 -= dx * ratio; // Cắt điểm cuối để mũi tên nhọn đẹp
-                                y2 -= dy * ratio;
-                            }
+                            // Chỉ rút ngắn điểm cuối
+                            const finalX2 = x2 - shorten * Math.cos(angle);
+                            const finalY2 = y2 - shorten * Math.sin(angle);
+                            const finalX1 = x1 + shorten * Math.cos(angle) * 0.5; // Rút đầu ít hơn
+                            const finalY1 = y1 + shorten * Math.sin(angle) * 0.5;
 
                             arrowElement = (
                                 <line 
-                                    x1={x1} y1={y1} 
-                                    x2={x2} y2={y2} 
+                                    x1={finalX1} y1={finalY1} 
+                                    x2={finalX2} y2={finalY2} 
                                     stroke="black" strokeWidth="1.2" markerEnd="url(#arrowhead)" 
                                 />
                             );
