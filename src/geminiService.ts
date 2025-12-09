@@ -12,7 +12,7 @@ const variationTableSchema = {
         xNodes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "Mốc x (LaTeX)" },
         yPrimeSigns: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "Dấu y'" },
         yPrimeVals: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "Giá trị tại dòng y' (0, ||)" },
-        yNodes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "Giá trị y (LaTeX)" }
+        yNodes: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, description: "Giá trị y (LaTeX). Tại tiệm cận đứng BẮT BUỘC dùng định dạng 'LeftVal||RightVal' (VD: '$+\\infty$||$-\\infty$')" }
     }
 };
 
@@ -239,11 +239,13 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       RULE 8. QUY TẮC BẢNG BIẾN THIÊN (VariationTable):
         - Nếu câu hỏi là "Cho bảng biến thiên như hình bên", BẮT BUỘC phải sinh dữ liệu 'variationTableData'.
         - Cấu trúc CHUẨN KỸ THUẬT:
-            + xNodes: ["$-\\infty$", "x1", "x2", "$+\\infty$"] (Luôn bắt đầu và kết thúc bằng vô cực nếu là hàm đa thức)
-            + yPrimeSigns: ["+", "-", "+"] (Số lượng phải ít hơn xNodes 1 đơn vị)
+            + xNodes: ["$-\\infty$", "x1", "x2", "$+\\infty$"] (Luôn bắt đầu và kết thúc bằng vô cực nếu là hàm đa thức/phân thức)
+            + yPrimeSigns: ["+", "-", "+"] (Số lượng ít hơn xNodes 1 đơn vị)
+            + yPrimeVals: Tại vị trí nghiệm ghi "0", tại vị trí không xác định ghi "||".
             + yNodes: Phải khớp logic với dấu của y'.
-              * Nếu y' là "+" -> yNodes phải tăng (ví dụ: từ $-\\infty$ lên Cực đại).
-              * Nếu y' là "-" -> yNodes phải giảm.
+              * QUAN TRỌNG VỚI TIỆM CẬN ĐỨNG: Tại vị trí x mà hàm số không xác định (có dấu || ở y' và y), giá trị yNodes BẮT BUỘC phải viết cả giới hạn trái và phải ngăn cách bởi '||'.
+              * VÍ DỤ ĐÚNG: "$+\\infty$||$-\\infty$" (Tuyệt đối KHÔNG được viết thiếu như "$+\\infty$||" hay chỉ "$+\\infty$").
+              * Nếu y' là "+" -> yNodes tăng. Nếu y' là "-" -> yNodes giảm.
         - MẸO: Hãy tự kiểm tra logic: "Dương đi lên, Âm đi xuống".
 
       RULE 9. NGUYÊN TẮC PHÂN LOẠI DỮ LIỆU (QUAN TRỌNG - SỬA ĐỔI):
