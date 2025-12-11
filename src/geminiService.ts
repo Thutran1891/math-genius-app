@@ -281,3 +281,29 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     throw error;
   }
 };
+
+// ... các import cũ
+
+// Thêm hàm sinh lý thuyết
+export const generateTheory = async (topic: string, userApiKey: string): Promise<string> => {
+  if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+  const genAI = new GoogleGenerativeAI(userApiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+  const prompt = `
+    Bạn là giáo viên Phổ thông giỏi. Hãy tóm tắt LÝ THUYẾT TRỌNG TÂM cho chủ đề: "${topic}".
+    Yêu cầu:
+    1. Ngắn gọn, súc tích, tập trung vào công thức, định nghĩa, tính chất quan trọng nhất.
+    2. Trình bày bằng Markdown.
+    3. Các công thức toán học BẮT BUỘC dùng LaTeX kẹp trong dấu $. Ví dụ: $\\int_{a}^{b} f(x) dx$.
+    4. Chia mục rõ ràng (I. Định nghĩa, II. Công thức...).
+  `;
+
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error("Lỗi lấy lý thuyết:", error);
+    return "Không thể tải lý thuyết lúc này. Vui lòng thử lại.";
+  }
+};

@@ -1,9 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { QuizConfig } from '../types';
-import { Sparkles, KeyRound, LogOut, Clock } from 'lucide-react';
+// import { Sparkles, KeyRound, LogOut, Clock } from 'lucide-react';
 import { auth } from '../firebase'; // Import auth
 import { useSubscription } from './SubscriptionGuard'; // Import Hook lấy ngày
+// --------------------------------------THÊM LÝ THUYẾT
+import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X } from 'lucide-react'; // Thêm BookOpen, X
+import { generateTheory } from '../geminiService'; // Import hàm mới
+import { LatexText } from './LatexText'; // Để hiển thị công thức toán
 
+// ----------------------------------
 interface Props {
   // Hàm callback nhận thêm apiKey
   onGenerate: (config: QuizConfig, apiKey: string) => void;
@@ -17,6 +22,12 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
   // --- STATE CHO API KEY ---
   const [apiKey, setApiKey] = useState('');
   const [saveKey, setSaveKey] = useState(true);
+  // -----------------THÊM LÝ THUYẾT
+  // ... bên trong component QuizInput
+  const [showTheoryModal, setShowTheoryModal] = useState(false);
+  const [theoryContent, setTheoryContent] = useState('');
+  const [loadingTheory, setLoadingTheory] = useState(false);
+  // -------------------------------------
 
   // Lấy thông tin ngày còn lại từ SubscriptionGuard (MỚI THÊM)
   const { daysLeft, isPremium } = useSubscription();
@@ -49,7 +60,28 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       [type]: { ...prev[type], [level]: num }
     }));
   };
+  // =====Thêm lý thuyết
+  const handleOpenTheory = async () => {
+    if (!topic) return alert("Vui lòng nhập chủ đề trước!");
+    if (!apiKey) return alert("Cần có API Key để tải lý thuyết!");
 
+    setShowTheoryModal(true);
+
+    // Nếu đã có nội dung rồi thì không load lại để tiết kiệm token
+    if (theoryContent) return;
+
+    setLoadingTheory(true);
+    try {
+        const content = await generateTheory(topic, apiKey);
+        setTheoryContent(content);
+    } catch (e) {
+        alert("Lỗi tải lý thuyết");
+        setShowTheoryModal(false);
+    } finally {
+        setLoadingTheory(false);
+    }
+  };
+  // -----------------------------
   const handleSubmit = () => {
     // Validate Key
     if (!apiKey.trim()) return alert("Vui lòng nhập API Key để tiếp tục!");
@@ -123,15 +155,28 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       {/* --------------------------- */}
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Chủ đề môn học - Lớp</label>
+    <label className="block text-sm font-medium text-gray-700 mb-1">Chủ đề môn học</label>
+    <div className="flex gap-2">
         <input 
           value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder="Ví dụ: Vectơ trong không gian - Lớp 12, Tính từ trong Tiếng Anh..." 
-          className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
+          onChange={(e) => {
+              setTopic(e.target.value);
+              setTheoryContent(''); // Reset lý thuyết khi đổi chủ đề
+          }}
+          placeholder="Ví dụ: Hàm số bậc 3, Tích phân..." 
+          className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
         />
-      </div>
 
+        {/* NÚT LÝ THUYẾT MỚI */}
+        <button 
+            onClick={handleOpenTheory}
+            className="bg-orange-500 hover:bg-orange-600 text-white p-3 rounded-lg font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 whitespace-nowrap"
+            title="Xem công thức & Lý thuyết"
+        >
+            <BookOpen size={20} /> Lý thuyết
+        </button>
+        </div>
+      </div>
       <div className="mb-6">
         <div className="flex justify-between items-end mb-2">
           <label className="block text-sm font-medium text-gray-700">Cấu trúc đề thi</label>
@@ -203,6 +248,49 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
             </div>
         )}
       </div>
+
+    {/* --- MODAL LÝ THUYẾT --- */}
+    {showTheoryModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-3xl max-h-[80vh] rounded-2xl shadow-2xl flex flex-col relative">
+
+                {/* Header Modal */}
+                <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
+                    <h3 className="text-xl font-bold text-orange-800 flex items-center gap-2">
+                        <BookOpen size={24}/> KIẾN THỨC TRỌNG TÂM: {topic}
+                    </h3>
+                    <button onClick={() => setShowTheoryModal(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+                        <X size={28} />
+                    </button>
+                </div>
+
+                {/* Content Modal */}
+                <div className="p-6 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-base">
+                    {loadingTheory ? (
+                        <div className="flex flex-col items-center justify-center h-40 space-y-4">
+                            <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p className="text-gray-500 animate-pulse">Đang tổng hợp công thức...</p>
+                        </div>
+                    ) : (
+                        // Sử dụng LatexText để hiển thị đẹp cả Markdown và Toán
+                        <div className="whitespace-pre-wrap">
+                            <LatexText text={theoryContent} />
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Modal */}
+                <div className="p-4 border-t bg-gray-50 rounded-b-2xl text-right">
+                    <button 
+                        onClick={() => setShowTheoryModal(false)}
+                        className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition-colors"
+                    >
+                        Đóng
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}      
       {/* --------------------------------------- */}
     </div>
   );
