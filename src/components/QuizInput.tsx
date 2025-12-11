@@ -5,7 +5,7 @@ import { auth } from '../firebase'; // Import auth
 import { useSubscription } from './SubscriptionGuard'; // Import Hook lấy ngày
 // --------------------------------------THÊM LÝ THUYẾT
 import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X } from 'lucide-react'; // Thêm BookOpen, X
-import { generateTheory } from '../geminiService'; // Import hàm mới
+import { generateTheoryWithDeepSeek } from '../deepseekService'; // ĐỔI TÊN: thay generateTheory bằng generateTheoryWithDeepSeek
 import { LatexText } from './LatexText'; // Để hiển thị công thức toán
 
 // ----------------------------------
@@ -32,9 +32,9 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
   // Lấy thông tin ngày còn lại từ SubscriptionGuard (MỚI THÊM)
   const { daysLeft, isPremium } = useSubscription();
 
-  // Load Key từ LocalStorage khi mở app
+  // Load Key từ LocalStorage khi mở app - ĐỔI TÊN KEY
   useEffect(() => {
-    const saved = localStorage.getItem('user_gemini_key');
+    const saved = localStorage.getItem('user_deepseek_key'); // ĐỔI: user_gemini_key -> user_deepseek_key
     if (saved) setApiKey(saved);
   }, []);
 
@@ -72,7 +72,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
 
     setLoadingTheory(true);
     try {
-        const content = await generateTheory(topic, apiKey);
+        const content = await generateTheoryWithDeepSeek(topic, apiKey); // ĐỔI: generateTheory -> generateTheoryWithDeepSeek
         setTheoryContent(content);
     } catch (e) {
         alert("Lỗi tải lý thuyết");
@@ -89,8 +89,8 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
     if (totalQuestions === 0) return alert("Vui lòng nhập số lượng câu hỏi ít nhất là 1!");
     
     // Lưu Key nếu người dùng chọn
-    if (saveKey) localStorage.setItem('user_gemini_key', apiKey);
-    else localStorage.removeItem('user_gemini_key');
+    if (saveKey) localStorage.setItem('user_deepseek_key', apiKey); // ĐỔI: user_gemini_key -> user_deepseek_key
+    else localStorage.removeItem('user_deepseek_key'); // ĐỔI: user_gemini_key -> user_deepseek_key
 
     // Gửi Key kèm config
     onGenerate({ topic, distribution: matrix, additionalPrompt: prompt }, apiKey);
@@ -127,10 +127,12 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       {/* --- KHU VỰC NHẬP API KEY --- */}
       <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
         <div className="flex justify-between items-center mb-2">
-        <label className="text-sm font-bold text-yellow-800 flex items-center gap-2">
-                <KeyRound size={18}/> Gemini API Key
+          {/* ĐỔI LABEL: Gemini API Key -> DeepSeek API Key */}
+          <label className="text-sm font-bold text-yellow-800 flex items-center gap-2">
+                <KeyRound size={18}/> DeepSeek API Key
             </label>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
+            {/* ĐỔI LINK: https://aistudio.google.com/app/apikey -> https://platform.deepseek.com/api_keys */}
+            <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
                 Dán Key tại đây
             </a>
         </div>
@@ -138,7 +140,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
           type="password"
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          placeholder="Dán mã Key bắt đầu bằng AIza..." 
+          placeholder="Dán mã Key bắt đầu bằng sk-..."  // ĐỔI: "AIza..." -> "sk-..."
           className="w-full p-3 border border-yellow-300 rounded-lg focus:ring-2 focus:ring-yellow-500 outline-none bg-white"
         />
         <div className="mt-2 flex items-center gap-2">

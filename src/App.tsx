@@ -3,7 +3,7 @@ import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
 import { History } from './components/History';
-import { generateQuiz } from './geminiService';
+import { generateQuizWithDeepSeek, generateTheoryWithDeepSeek } from './deepseekService'; // ĐỔI: generateQuiz -> generateQuizWithDeepSeek, generateTheory -> generateTheoryWithDeepSeek
 import { QuizConfig, Question } from './types';
 // import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save } from 'lucide-react';
 import { auth, db } from './firebase';
@@ -13,7 +13,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X } from 'lucide-react';
 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
-import { generateTheory } from './geminiService';
+// REMOVED: import { generateTheory } from './deepseekService'; // XÓA DÒNG NÀY VÌ ĐÃ IMPORT Ở TRÊN
 import { LatexText } from './components/LatexText';
 
 import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
@@ -48,7 +48,7 @@ function App() {
 
     setLoadingTheory(true);
     try {
-      const content = await generateTheory(config.topic, currentApiKey);
+      const content = await generateTheoryWithDeepSeek(config.topic, currentApiKey); // ĐỔI: generateTheory -> generateTheoryWithDeepSeek
       setTheoryContent(content);
     } catch (error) {
       console.error(error);
@@ -68,7 +68,7 @@ function App() {
     setQuestions([]); 
     setTheoryContent(''); // <--- THÊM DÒNG NÀY ĐỂ RESET LÝ THUYẾT CŨ
     try {
-      const result = await generateQuiz(newConfig, apiKey);
+      const result = await generateQuizWithDeepSeek(newConfig, apiKey); // ĐỔI: generateQuiz -> generateQuizWithDeepSeek
       setQuestions(result);
     } catch (error: any) {
       alert("Lỗi: " + error.message);
