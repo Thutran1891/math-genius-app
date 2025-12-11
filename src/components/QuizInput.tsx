@@ -74,10 +74,21 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
 
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">AI TẠO ĐỀ</h1>
-        {/* GIỮ NGUYÊN LỜI CHÀO CỦA BẠN */}
-        <p className="text-gray-500">Cô Thu mến chào, {auth.currentUser?.displayName}!</p>
+        {/* Lời chào cá nhân */}
+        <p className="text-gray-500 mb-2">Cô Thu mến chào, {auth.currentUser?.displayName}!</p>
+        
+        {/* --- [CODE MỚI] THÔNG TIN GIÁO VIÊN --- */}
+        <div className="inline-block bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
+            <p className="text-blue-800 font-bold text-sm">
+                Giáo viên: Trần Thị Kim Thu
+            </p>
+            <p className="text-blue-600 text-xs font-semibold">
+                Trường THPT Cây Dương
+            </p>
+        </div>
+        {/* -------------------------------------- */}
       </div>
-
+      
       {/* --- KHU VỰC NHẬP API KEY --- */}
       <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
         <div className="flex justify-between items-center mb-2">
@@ -109,11 +120,11 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       {/* --------------------------- */}
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Chủ đề môn học</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Chủ đề môn học - Lớp</label>
         <input 
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
-          placeholder="Ví dụ: Hàm số bậc 3, Tính từ trong Tiếng Anh..." 
+          placeholder="Ví dụ: Vectơ trong không gian - Lớp 12, Tính từ trong Tiếng Anh..." 
           className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-primary outline-none"
         />
       </div>
