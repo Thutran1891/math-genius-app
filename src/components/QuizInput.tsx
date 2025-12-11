@@ -72,23 +72,26 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
         <LogOut size={14}/> Thoát
       </button>
 
+      {/* ... code cũ ở trên ... */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">AI TẠO ĐỀ</h1>
-        {/* Lời chào cá nhân */}
         <p className="text-gray-500 mb-2">Cô Thu mến chào, {auth.currentUser?.displayName}!</p>
         
-        {/* --- [CODE MỚI] THÔNG TIN GIÁO VIÊN --- */}
-        <div className="inline-block bg-yellow-50 px-4 py-2 rounded-lg border border-blue-100">
-            <p className="text-violet-800 font-bold text-sm">
+        {/* --- [CODE ĐÃ SỬA MÀU] --- */}
+        {/* bg-yellow-100: Nền vàng nhạt */}
+        {/* border-yellow-300: Viền vàng đậm hơn chút cho rõ nét */}
+        <div className="inline-block bg-yellow-100 px-6 py-2 rounded-xl border border-yellow-300 shadow-sm">
+            {/* text-violet-700: Chữ màu tím Violet đậm */}
+            <p className="text-violet-700 font-bold text-base">
                 Giáo viên: Trần Thị Kim Thu
             </p>
-            <p className="text-blue-600 text-xs font-semibold">
+            {/* text-violet-600: Chữ màu tím Violet nhạt hơn chút */}
+            <p className="text-violet-600 text-xs font-bold uppercase tracking-wider mt-1">
                 Trường THPT Cây Dương
             </p>
         </div>
-        {/* -------------------------------------- */}
+        {/* ------------------------- */}
       </div>
-
       {/* --- KHU VỰC NHẬP API KEY --- */}
       <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
         <div className="flex justify-between items-center mb-2">
