@@ -78,8 +78,8 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
         <p className="text-gray-500 mb-2">Cô Thu mến chào, {auth.currentUser?.displayName}!</p>
         
         {/* --- [CODE MỚI] THÔNG TIN GIÁO VIÊN --- */}
-        <div className="inline-block bg-blue-50 px-4 py-2 rounded-lg border border-blue-100">
-            <p className="text-blue-800 font-bold text-sm">
+        <div className="inline-block bg-yellow-50 px-4 py-2 rounded-lg border border-blue-100">
+            <p className="text-violet-800 font-bold text-sm">
                 Giáo viên: Trần Thị Kim Thu
             </p>
             <p className="text-blue-600 text-xs font-semibold">
@@ -88,7 +88,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
         </div>
         {/* -------------------------------------- */}
       </div>
-      
+
       {/* --- KHU VỰC NHẬP API KEY --- */}
       <div className="mb-6 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
         <div className="flex justify-between items-center mb-2">
