@@ -249,49 +249,52 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
         )}
       </div>
 
-    {/* --- MODAL LÝ THUYẾT --- */}
-    {showTheoryModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-3xl max-h-[80vh] rounded-2xl shadow-2xl flex flex-col relative">
+      {/* --- CẬP NHẬT: MODAL DẠNG SIDEBAR (VỪA XEM VỪA LÀM) --- */}
+      {showTheoryModal && (
+              // Thay đổi:
+              // 1. Bỏ "inset-0 bg-black/50" (để không chắn màn hình)
+              // 2. Thêm "fixed top-24 right-5" (để neo vào góc phải)
+              // 3. Thêm shadow đậm để nổi bật trên nền trắng
+              <div className="fixed top-24 right-5 w-[450px] max-w-[90vw] h-[80vh] bg-white rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.15)] border border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-300">
+                  
+                  {/* Header Sidebar */}
+                  {/* Thêm cursor-move nếu bạn muốn phát triển chức năng kéo thả sau này */}
+                  <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
+                      <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
+                          <BookOpen size={20}/> LÝ THUYẾT GHI NHỚ
+                      </h3>
+                      <button 
+                          onClick={() => setShowTheoryModal(false)} 
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-100"
+                          title="Đóng lý thuyết"
+                      >
+                          <X size={18} />
+                      </button>
+                  </div>
 
-                {/* Header Modal */}
-                <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
-                    <h3 className="text-xl font-bold text-orange-800 flex items-center gap-2">
-                        <BookOpen size={24}/> KIẾN THỨC TRỌNG TÂM: {topic}
-                    </h3>
-                    <button onClick={() => setShowTheoryModal(false)} className="text-gray-400 hover:text-red-500 transition-colors">
-                        <X size={28} />
-                    </button>
-                </div>
+                  {/* Content Sidebar */}
+                  <div className="p-5 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-sm scroll-smooth">
+                      {loadingTheory ? (
+                          <div className="flex flex-col items-center justify-center h-full space-y-3">
+                              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                              <p className="text-gray-500 text-xs animate-pulse">Đang tra cứu kiến thức...</p>
+                          </div>
+                      ) : (
+                          <div className="whitespace-pre-wrap">
+                              <LatexText text={theoryContent} />
+                          </div>
+                      )}
+                  </div>
 
-                {/* Content Modal */}
-                <div className="p-6 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-base">
-                    {loadingTheory ? (
-                        <div className="flex flex-col items-center justify-center h-40 space-y-4">
-                            <div className="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                            <p className="text-gray-500 animate-pulse">Đang tổng hợp công thức...</p>
-                        </div>
-                    ) : (
-                        // Sử dụng LatexText để hiển thị đẹp cả Markdown và Toán
-                        <div className="whitespace-pre-wrap">
-                            <LatexText text={theoryContent} />
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer Modal */}
-                <div className="p-4 border-t bg-gray-50 rounded-b-2xl text-right">
-                    <button 
-                        onClick={() => setShowTheoryModal(false)}
-                        className="px-6 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition-colors"
-                    >
-                        Đóng
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}      
-      {/* --------------------------------------- */}
+                  {/* Footer Sidebar */}
+                  <div className="p-3 border-t bg-gray-50 rounded-b-2xl text-center">
+                      <p className="text-xs text-gray-400 italic">
+                          Cửa sổ này cho phép bạn vừa xem vừa thao tác
+                      </p>
+                  </div>
+              </div>
+            )}
+            {/* --------------------------------------- */}
     </div>
   );
 };

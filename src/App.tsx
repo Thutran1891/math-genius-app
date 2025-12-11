@@ -199,39 +199,40 @@ function App() {
       ))}
     </div>
 
-    {/* --- [KHUNG SIDEBAR LÝ THUYẾT] (Code giống hệt bên QuizInput) --- */}
-    {showTheory && (
-      <div className="fixed top-24 right-5 w-[450px] max-w-[90vw] h-[80vh] bg-white rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.15)] border border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-300">
-          <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
-              <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
-                  <BookOpen size={20}/> KIẾN THỨC: {config?.topic}
-              </h3>
-              <button 
-                  onClick={() => setShowTheory(false)} 
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-100"
-              >
-                  <X size={18} />
-              </button>
-          </div>
+      {/* --- [KHUNG SIDEBAR LÝ THUYẾT] (Code giống hệt bên QuizInput) --- */}
+      {showTheory && (
+        <div className="fixed top-24 right-5 w-[450px] max-w-[90vw] h-[80vh] bg-white rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.15)] border border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
+                <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
+                    <BookOpen size={20}/> KIẾN THỨC: {config?.topic}
+                </h3>
+                <button 
+                    onClick={() => setShowTheory(false)} 
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-100"
+                >
+                    <X size={18} />
+                </button>
+            </div>
 
-          <div className="p-5 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-sm scroll-smooth">
-              {loadingTheory ? (
-                  <div className="flex flex-col items-center justify-center h-full space-y-3">
-                      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-gray-500 text-xs animate-pulse">Đang tra cứu kiến thức...</p>
-                  </div>
-              ) : (
-                  <div className="whitespace-pre-wrap">
-                      <LatexText text={theoryContent} />
-                  </div>
-              )}
-          </div>
-      </div>
-    )}
-    {/* ---------------------------------------------------------------- */}
+            <div className="p-5 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-sm scroll-smooth">
+                {loadingTheory ? (
+                    <div className="flex flex-col items-center justify-center h-full space-y-3">
+                        <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-gray-500 text-xs animate-pulse">Đang tra cứu kiến thức...</p>
+                    </div>
+                ) : (
+                    <div className="whitespace-pre-wrap">
+                        <LatexText text={theoryContent} />
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
+      {/* ---------------------------------------------------------------- */}
 
-  </div>
-)}    </div>
+    </div>
+  )}    
+</div>
     </SubscriptionGuard>
   );
 }
