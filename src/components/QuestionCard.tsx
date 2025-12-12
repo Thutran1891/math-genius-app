@@ -278,23 +278,37 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
           {question.options.map((opt, i) => {
             const label = String.fromCharCode(65 + i); 
             const isSelected = userAnswer === label;
-            let css = "p-3 border rounded-lg text-left hover:bg-gray-50 flex gap-2 transition-all ";
+            
+            // --- THAY ĐỔI 1: NỀN VÀNG NHẠT CHO ĐÁP ÁN ---
+            // Sửa class mặc định: Thêm bg-yellow-50 (nền vàng nhạt), border-yellow-200 (viền vàng nhẹ)
+            // Thay hover:bg-gray-50 thành hover:bg-yellow-100 (vàng đậm hơn khi di chuột)
+            let css = "p-3 border border-yellow-200 rounded-lg text-left bg-yellow-50 hover:bg-yellow-100 flex gap-2 transition-all shadow-sm ";
             
             if (isChecked) {
                 const aiChar = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
                 const isRightOption = aiChar === label;
 
-                if (isRightOption) css = "p-3 border-2 border-green-500 bg-green-50 text-green-800 font-bold flex gap-2";
-                else if (isSelected) css = "p-3 border-2 border-red-500 bg-red-50 text-red-800 flex gap-2";
-                else css += "opacity-50";
+                // Giữ nguyên logic tô màu Xanh/Đỏ khi đã kiểm tra
+                if (isRightOption) css = "p-3 border-2 border-green-500 bg-green-50 text-green-800 font-bold flex gap-2 shadow-md";
+                else if (isSelected) css = "p-3 border-2 border-red-500 bg-red-50 text-red-800 flex gap-2 opacity-100";
+                else css += "opacity-50"; // Làm mờ các đáp án không chọn
             } else if (isSelected) {
-                css = "p-3 border-2 border-blue-500 bg-blue-50 flex gap-2";
+                // Giữ nguyên logic tô màu Xanh dương khi đang chọn
+                css = "p-3 border-2 border-blue-500 bg-blue-50 flex gap-2 shadow-md";
             }
 
             return (
               <button key={i} onClick={() => !isChecked && setUserAnswer(label)} className={css}>
-                <span className="font-bold min-w-[20px]">{label}.</span>
-                <div className="flex-1"><LatexText text={opt.replace(/^[A-D]\.\s*/, '')} /></div>
+                {/* --- THAY ĐỔI 2: FONT CHỮ VÀ MÀU SẮC TIỀN TỐ (A., B....) --- */}
+                {/* font-serif: Font có chân trông trang trọng hơn */}
+                {/* text-green-800: Màu xanh lá đậm */}
+                {/* text-lg: Cỡ chữ lớn hơn một chút */}
+                <span className="font-serif font-bold text-green-800 text-lg min-w-[25px] leading-none mt-1">
+                    {label}.
+                </span>
+                <div className="flex-1 text-gray-800">
+                    <LatexText text={opt.replace(/^[A-D]\.\s*/, '')} />
+                </div>
               </button>
             )
           })}
