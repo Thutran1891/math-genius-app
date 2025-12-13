@@ -12,7 +12,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
 // 1. Thêm BookOpen, X vào dòng import từ 'lucide-react'
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X , RotateCcw } from 'lucide-react';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X } from 'lucide-react';
 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
 // import { generateTheory } from './geminiService';
@@ -163,28 +163,7 @@ function App() {
   // -----------------------------------------
 
 
-  // --- HÀM LÀM LẠI ĐỀ (MỚI) ---
-  const handleRedo = () => {
-    const confirmRedo = window.confirm("Bạn muốn làm lại đề này? Các đáp án hiện tại sẽ bị xóa để bạn làm lại từ đầu.");
-    if (!confirmRedo) return;
 
-    // 1. Tăng số lần làm
-    setAttemptCount(prev => prev + 1);
-    
-    // 2. Reset điểm và trạng thái lưu
-    setScore(0);
-    setIsSaved(false);
-
-    // 3. Quan trọng: Xóa sạch câu trả lời cũ trong mảng questions
-    setQuestions(prevQuestions => prevQuestions.map(q => ({
-        ...q,
-        userAnswer: undefined, // Xóa đáp án người dùng
-        isCorrect: undefined   // Xóa trạng thái đúng/sai
-    })));
-
-    // 4. Cuộn màn hình lên đầu
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
   // ----------------------------
 
   const handleUpdateScore = (isCorrect: boolean) => {
@@ -305,13 +284,6 @@ function App() {
                   <BookOpen size={18}/> <span className="hidden sm:inline">Lý thuyết</span>
                 </button>
 
-                <button 
-                    onClick={handleRedo}
-                    disabled={loading}
-                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-white text-violet-600 hover:bg-violet-50 rounded-lg text-sm font-bold flex items-center gap-2 border border-violet-200 transition-colors shadow-sm"
-                >
-                    <RotateCcw size={18}/> <span className="hidden sm:inline">Làm lại</span>
-                </button>
 
                 <button onClick={() => setQuestions([])} className="flex-1 sm:flex-none justify-center px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium flex items-center gap-1 border border-transparent hover:border-gray-200">
                   <ArrowLeft size={16}/> <span className="hidden sm:inline">Thoát</span>
