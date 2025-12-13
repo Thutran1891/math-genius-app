@@ -282,8 +282,93 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
   }
 };
 
-// ... các import cũ
+  // --- BỔ SUNG: HELPER CHUYỂN FILE ẢNH SANG BASE64 ---
+  const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string, mimeType: string } }> => {
+    const base64EncodedDataPromise = new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(file);
+    });
 
+    return {
+      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+    };
+  };
+
+  // --- BỔ SUNG: HÀM TẠO ĐỀ TỪ ẢNH ---
+  export const generateQuizFromImages = async (
+      imageFiles: File[],
+      mode: 'EXACT' | 'SIMILAR', // EXACT: Giống hệt, SIMILAR: Tương tự
+      userApiKey: string,
+      additionalPrompt: string = ""
+    ): Promise<Question[]> => {
+      if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+      if (imageFiles.length === 0) throw new Error("Vui lòng chọn ít nhất 1 ảnh!");
+      if (imageFiles.length > 4) throw new Error("Tối đa chỉ được chọn 4 ảnh!");
+    
+      const genAI = new GoogleGenerativeAI(userApiKey);
+    
+      // Sử dụng model gemini-1.5-flash (hoặc pro) để hỗ trợ tốt hình ảnh
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash", // Flash nhanh và rẻ hơn cho vision
+        generationConfig: {
+          responseMimeType: "application/json",
+          // Tái sử dụng schema đã định nghĩa ở trên
+          responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
+          temperature: mode === 'EXACT' ? 0.1 : 0.4, // EXACT cần chính xác (temp thấp), SIMILAR cần sáng tạo (temp cao hơn)
+          maxOutputTokens: 20000,
+        }
+      });
+    
+      // 1. Chuẩn bị dữ liệu hình ảnh
+      const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
+    
+      // 2. Chuẩn bị Prompt (Chỉ đạo AI)
+      let taskDescription = "";
+      if (mode === 'EXACT') {
+        taskDescription = `
+          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học có trong các hình ảnh được cung cấp.
+          YÊU CẦU ĐẶC BIỆT:
+          1. GIỮ NGUYÊN văn phong, số liệu, và các phương án lựa chọn (nếu là trắc nghiệm) HỆT NHƯ trong ảnh. Không được tự ý thay đổi đề bài.
+          2. Nếu ảnh mờ hoặc cắt không hết, hãy cố gắng suy luận nội dung chính xác nhất có thể.
+          3. Cung cấp lời giải chi tiết (explanation) cho từng câu.
+        `;
+      } else {
+        taskDescription = `
+          NHIỆM VỤ: Phân tích các dạng toán và mức độ kiến thức trong các hình ảnh. Sau đó, TẠO RA các câu hỏi MỚI tương tự.
+          YÊU CẦU ĐẶC BIỆT:
+          1. KHÔNG chép lại đề bài cũ. Hãy thay đổi số liệu, ngữ cảnh, nhưng giữ nguyên dạng bài và độ khó.
+          2. Tạo ra số lượng câu hỏi tương đương với số câu hỏi phát hiện được trong ảnh.
+          3. Cung cấp lời giải chi tiết (explanation) cho các câu hỏi mới này.
+        `;
+      }
+    
+      const prompt = `
+        Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
+        ${taskDescription}
+        Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+
+        QUAN TRỌNG:
+        - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
+        - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 9 về định dạng LaTeX, đồ thị, bảng biến thiên đã được quy định trước đó trong hệ thống này.
+        - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
+        - Nếu là tự luận, hãy chuyển về dạng TLN (Điền số) nếu có thể, hoặc TN.
+      `;
+    
+      // 3. Gửi yêu cầu (Prompt text + Image parts)
+      try {
+        const result = await model.generateContent([prompt, ...imageParts]);
+        const responseText = result.response.text();
+        return JSON.parse(responseText);
+      } catch (error: any) {
+          console.error("Gemini Vision Error:", error);
+          // Bắt lỗi cụ thể liên quan đến ảnh (ví dụ: ảnh quá lớn, định dạng không hỗ trợ)
+          if (error.message?.includes("image")) {
+              throw new Error("Lỗi xử lý ảnh. Vui lòng kiểm tra lại định dạng hoặc dung lượng ảnh.");
+          }
+        throw error;
+      }
+    };
 // Thêm hàm sinh lý thuyết
 export const generateTheory = async (topic: string, userApiKey: string): Promise<string> => {
   if (!userApiKey) throw new Error("Vui lòng nhập API Key!");

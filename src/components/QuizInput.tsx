@@ -4,31 +4,55 @@ import { QuizConfig } from '../types';
 import { auth } from '../firebase'; // Import auth
 import { useSubscription } from './SubscriptionGuard'; // Import Hook lấy ngày
 // --------------------------------------THÊM LÝ THUYẾT
-import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X } from 'lucide-react'; // Thêm BookOpen, X
+// import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X } from 'lucide-react'; // Thêm BookOpen, X
 import { generateTheory } from '../geminiService'; // Import hàm mới
 import { LatexText } from './LatexText'; // Để hiển thị công thức toán
-
+// Thêm Image, Upload, Copy, Wand2 vào dòng import từ 'lucide-react'
+import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X, Image, Upload, Copy, Wand2, Trash2 } from 'lucide-react';
 // ----------------------------------
 interface Props {
-  // Hàm callback nhận thêm apiKey
+  // Callback cũ cho tạo đề theo chủ đề
   onGenerate: (config: QuizConfig, apiKey: string) => void;
+  // Callback MỚI cho tạo đề từ ảnh
+  onGenerateFromImage?: (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string) => void;
   isLoading: boolean;
 }
 
-export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
+export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, isLoading }) => {
   const [topic, setTopic] = useState('');
   const [prompt, setPrompt] = useState('');
   
   // --- STATE CHO API KEY ---
   const [apiKey, setApiKey] = useState('');
   const [saveKey, setSaveKey] = useState(true);
+  // ... các state cũ (topic, prompt, apiKey...)
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
   // -----------------THÊM LÝ THUYẾT
   // ... bên trong component QuizInput
   const [showTheoryModal, setShowTheoryModal] = useState(false);
   const [theoryContent, setTheoryContent] = useState('');
   const [loadingTheory, setLoadingTheory] = useState(false);
   // -------------------------------------
+  // Hàm xử lý khi chọn file
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      const totalFiles = selectedImages.length + filesArray.length;
+      if (totalFiles > 4) {
+        alert("Chỉ được chọn tối đa 4 ảnh!");
+        return;
+      }
+      // Lọc chỉ lấy ảnh
+      const validImages = filesArray.filter(file => file.type.startsWith('image/'));
+      setSelectedImages(prev => [...prev, ...validImages]);
+    }
+  };
 
+  // Hàm xóa ảnh đã chọn
+  const removeImage = (index: number) => {
+      setSelectedImages(prev => prev.filter((_, i) => i !== index));
+  };
+// ====================================================================================
   // Lấy thông tin ngày còn lại từ SubscriptionGuard (MỚI THÊM)
   const { daysLeft, isPremium } = useSubscription();
 
@@ -223,6 +247,83 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
         />
       </div>
 
+  {/* --- KHU VỰC TẠO ĐỀ TỪ ẢNH (MỚI) --- */}
+  <div className="mb-8 border-t pt-6">
+      <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
+          <Image size={20} className="text-blue-600"/> Tạo đề từ Hình ảnh
+      </h3>
+      <p className="text-sm text-gray-500 mb-4">Chụp ảnh đề bài (hỗ trợ toán, lý, hóa...) để AI giải hoặc tạo đề tương tự. Tối đa 4 ảnh.</p>
+
+      {/* Khu vực chọn file và hiển thị thumbnail */}
+      <div className="mb-4">
+          <div className="flex items-center gap-4 mb-3">
+              <label htmlFor="image-upload" className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors border border-gray-300">
+                  <Upload size={18}/> Chọn ảnh (PNG/JPG)
+              </label>
+              <input
+                  id="image-upload"
+                  type="file"
+                  multiple
+                  accept="image/png, image/jpeg, image/jpg"
+                  className="hidden"
+                  onChange={handleImageChange}
+                  disabled={isLoading}
+              />
+              <span className="text-sm text-gray-500">{selectedImages.length}/4 ảnh đã chọn</span>
+          </div>
+
+          {/* Thumbnails */}
+          {selectedImages.length > 0 && (
+              <div className="flex gap-3 flex-wrap mt-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                  {selectedImages.map((file, index) => (
+                      <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-300 shadow-sm group">
+                          <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover" />
+                          <button
+                              onClick={() => removeImage(index)}
+                              className="absolute top-1 right-1 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Xóa ảnh"
+                          >
+                              <Trash2 size={14} />
+                          </button>
+                      </div>
+                  ))}
+              </div>
+          )}
+      </div>
+
+      {/* Các nút chức năng ảnh */}
+      <div className="grid grid-cols-2 gap-3">
+          <button
+              onClick={() => {
+                  if(!apiKey) return alert("Vui lòng nhập API Key!");
+                  if(selectedImages.length === 0) return alert("Vui lòng chọn ảnh!");
+                  onGenerateFromImage?.(selectedImages, 'EXACT', prompt, apiKey);
+              }}
+              disabled={isLoading || selectedImages.length === 0}
+              className="py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none shadow-sm shadow-teal-200"
+          >
+              <Copy size={18}/> TẠO ĐỀ GIỐNG HỆT
+          </button>
+          <button
+              onClick={() => {
+                  if(!apiKey) return alert("Vui lòng nhập API Key!");
+                  if(selectedImages.length === 0) return alert("Vui lòng chọn ảnh!");
+                  onGenerateFromImage?.(selectedImages, 'SIMILAR', prompt, apiKey);
+              }}
+              disabled={isLoading || selectedImages.length === 0}
+              className="py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none shadow-sm shadow-indigo-200"
+          >
+              <Wand2 size={18}/> TẠO ĐỀ TƯƠNG TỰ
+          </button>
+      </div>
+    </div>
+
+    <div className="relative flex py-3 items-center mb-4">
+          <div className="flex-grow border-t border-gray-300"></div>
+          <span className="flex-shrink mx-4 text-gray-400 text-sm font-medium">HOẶC TẠO THEO CHỦ ĐỀ</span>
+          <div className="flex-grow border-t border-gray-300"></div>
+    </div>
+    {/* ------------------------------------------- */}
       <button 
         onClick={handleSubmit}
         disabled={isLoading}
@@ -230,8 +331,8 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, isLoading }) => {
       >
         {isLoading ? (
           <>Đang tạo {totalQuestions} câu hỏi...</>
-        ) : (
-          <><Sparkles /> TẠO ĐỀ NGAY ({totalQuestions} CÂU)</>
+        ) : (          
+          <><Sparkles /> TẠO ĐỀ THEO MA TRẬN ({totalQuestions} CÂU)</>
         )}
       </button>
 

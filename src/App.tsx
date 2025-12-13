@@ -3,7 +3,7 @@ import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
 import { History } from './components/History';
-import { generateQuiz } from './geminiService';
+// import { generateQuiz } from './geminiService';
 import { QuizConfig, Question } from './types';
 // import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save } from 'lucide-react';
 import { auth, db } from './firebase';
@@ -15,8 +15,11 @@ import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import m�
 import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X } from 'lucide-react';
 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
-import { generateTheory } from './geminiService';
+// import { generateTheory } from './geminiService';
 import { LatexText } from './components/LatexText';
+
+// Import thêm generateQuizFromImages
+import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -27,12 +30,49 @@ function App() {
   const [viewHistory, setViewHistory] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
+  // Hàm mới để xử lý khi người dùng bấm nút tạo đề từ ảnh
+const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string) => {
+  setLoading(true);
+  setCurrentApiKey(apiKey);
+  setScore(0);
+  setIsSaved(false);
+  setQuestions([]);
+  setTheoryContent('');
+
+  // Tạo một config giả để hiển thị trên header
+  setConfig({
+      topic: mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh",
+  // Thay dòng: distribution: { TN: {}, TLN: {}, DS: {} }, 
+  // Bằng dòng dưới đây:
+  distribution: {
+    TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+    TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+    DS: { BIET: 0, HIEU: 0, VANDUNG: 0 }
+  },      additionalPrompt: prompt
+  });
+
+  try {
+    // Gọi hàm service mới
+    const result = await generateQuizFromImages(images, mode, apiKey, prompt);
+    setQuestions(result);
+    if (result.length === 0) {
+        alert("AI không tìm thấy câu hỏi nào trong ảnh. Vui lòng thử ảnh khác rõ nét hơn.");
+    }
+  } catch (error: any) {
+    console.error("Lỗi tạo đề từ ảnh:", error);
+    alert("Lỗi: " + error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
     return () => unsubscribe();
   }, []);
+
 
   // --- [CODE MỚI] STATE QUẢN LÝ LÝ THUYẾT ---
   const [showTheory, setShowTheory] = useState(false);
@@ -145,7 +185,11 @@ function App() {
                 <HistoryIcon size={20}/> Xem Lịch sử
              </button>
           </div>
-          <QuizInput onGenerate={handleGenerate} isLoading={loading} />
+          <QuizInput 
+            onGenerate={handleGenerate} 
+            onGenerateFromImage={handleGenerateFromImage} // <--- Thêm dòng này vào
+            isLoading={loading} 
+          />
         </>
 ) : (
   <div className="max-w-3xl mx-auto animate-fade-in relative"> {/* Thêm relative */}
