@@ -332,7 +332,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
         {isLoading ? (
           <>Đang tạo {totalQuestions} câu hỏi...</>
         ) : (          
-          <><Sparkles /> TẠO ĐỀ THEO MA TRẬN ({totalQuestions} CÂU)</>
+          <><Sparkles /> TẠO THEO CHỦ ĐỀ ({totalQuestions} CÂU)</>
         )}
       </button>
 
