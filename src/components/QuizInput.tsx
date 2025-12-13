@@ -140,7 +140,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
         <div className="inline-block bg-yellow-100 px-6 py-2 rounded-xl border border-yellow-300 shadow-sm">
             {/* text-violet-700: Chữ màu tím Violet đậm */}
             <p className="text-violet-700 font-bold text-base">
-                Giáo viên: Trần Thị Kim Thu
+                Tác giả: Trần Thị Kim Thu
             </p>
             {/* text-violet-600: Chữ màu tím Violet nhạt hơn chút */}
             <p className="text-violet-600 text-xs font-bold uppercase tracking-wider mt-1">
