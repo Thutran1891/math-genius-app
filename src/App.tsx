@@ -33,27 +33,30 @@ function App() {
   const [attemptCount, setAttemptCount] = useState(1);
   // ---------------------
 
-  // Hàm mới để xử lý khi người dùng bấm nút tạo đề từ ảnh
-const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string) => {
-  setLoading(true);
-  setCurrentApiKey(apiKey);
-  setScore(0);
-  setIsSaved(false);
-  setAttemptCount(1); // <--- THÊM VÀO ĐÂY
-  setQuestions([]);
-  setTheoryContent('');
+  // Cập nhật tham số nhận vào: thêm topicName
+  const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
+    setLoading(true);
+    setCurrentApiKey(apiKey);
+    setScore(0);
+    setIsSaved(false);
+    setAttemptCount(1);
+    setQuestions([]);
+    setTheoryContent('');
 
-  // Tạo một config giả để hiển thị trên header
-  setConfig({
-      topic: mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh",
-  // Thay dòng: distribution: { TN: {}, TLN: {}, DS: {} }, 
-  // Bằng dòng dưới đây:
-  distribution: {
-    TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
-    TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
-    DS: { BIET: 0, HIEU: 0, VANDUNG: 0 }
-  },      additionalPrompt: prompt
-  });
+    // Logic đặt tên: Nếu người dùng nhập thì lấy, không thì dùng tên mặc định
+    const defaultName = mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh";
+    const finalTopic = topicName && topicName.trim() !== "" ? topicName : defaultName;
+
+    // Tạo config
+    setConfig({
+        topic: finalTopic, // <--- Dùng tên đã xử lý
+        distribution: {
+          TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+          TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+          DS: { BIET: 0, HIEU: 0, VANDUNG: 0 }
+        },
+        additionalPrompt: prompt
+    });  
 
   try {
     // Gọi hàm service mới

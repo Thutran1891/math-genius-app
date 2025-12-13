@@ -13,8 +13,8 @@ import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X, Image, Upload, Copy, Wa
 interface Props {
   // Callback cũ cho tạo đề theo chủ đề
   onGenerate: (config: QuizConfig, apiKey: string) => void;
-  // Callback MỚI cho tạo đề từ ảnh
-  onGenerateFromImage?: (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string) => void;
+  // Cập nhật dòng này: thêm tham số topicName (string) vào cuối
+  onGenerateFromImage?: (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => void;
   isLoading: boolean;
 }
 
@@ -27,6 +27,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
   const [saveKey, setSaveKey] = useState(true);
   // ... các state cũ (topic, prompt, apiKey...)
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imageTopic, setImageTopic] = useState(''); // <--- THÊM DÒNG NÀY
   // -----------------THÊM LÝ THUYẾT
   // ... bên trong component QuizInput
   const [showTheoryModal, setShowTheoryModal] = useState(false);
@@ -291,13 +292,26 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
           )}
       </div>
 
+          {/* --- THÊM Ô NHẬP TÊN ĐỀ --- */}
+      <div className="mb-3">
+          <input 
+              type="text" 
+              value={imageTopic}
+              onChange={(e) => setImageTopic(e.target.value)}
+              placeholder="Đặt tên cho đề này (VD: Đề thi giữa kỳ 1...)" 
+              className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+      </div>
+      {/* -------------------------- */}
+
       {/* Các nút chức năng ảnh */}
       <div className="grid grid-cols-2 gap-3">
           <button
               onClick={() => {
                   if(!apiKey) return alert("Vui lòng nhập API Key!");
                   if(selectedImages.length === 0) return alert("Vui lòng chọn ảnh!");
-                  onGenerateFromImage?.(selectedImages, 'EXACT', prompt, apiKey);
+                  // Truyền thêm imageTopic vào cuối hàm
+                  onGenerateFromImage?.(selectedImages, 'EXACT', prompt, apiKey, imageTopic);
               }}
               disabled={isLoading || selectedImages.length === 0}
               className="py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none shadow-sm shadow-teal-200"
@@ -308,7 +322,8 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
               onClick={() => {
                   if(!apiKey) return alert("Vui lòng nhập API Key!");
                   if(selectedImages.length === 0) return alert("Vui lòng chọn ảnh!");
-                  onGenerateFromImage?.(selectedImages, 'SIMILAR', prompt, apiKey);
+                  // Truyền thêm imageTopic vào cuối hàm
+                  onGenerateFromImage?.(selectedImages, 'SIMILAR', prompt, apiKey, imageTopic);
               }}
               disabled={isLoading || selectedImages.length === 0}
               className="py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none shadow-sm shadow-indigo-200"
