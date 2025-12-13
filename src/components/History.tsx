@@ -85,6 +85,28 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => { // Nhận 
         </div>
       );
   }
+  // --- LOGIC MỚI: Tính số thứ tự lần làm (Lần 1, 2, 3...) ---
+  // Hàm này sẽ chạy cho mỗi item để kiểm tra xem nó là lần thứ mấy
+  const getAttemptInfo = (currentItem: HistoryItem) => {
+    // 1. Lọc ra tất cả các bài thi có CÙNG TÊN CHỦ ĐỀ
+    const sameTopicExams = history.filter(h => h.topic === currentItem.topic);
+    
+    // 2. Sắp xếp chúng theo thời gian TĂNG DẦN (Cũ nhất -> Mới nhất)
+    // Lưu ý: Firestore Timestamp có dạng { seconds, nanoseconds }
+    sameTopicExams.sort((a, b) => {
+        const timeA = a.date?.seconds || 0;
+        const timeB = b.date?.seconds || 0;
+        return timeA - timeB;
+    });
+
+    // 3. Tìm vị trí (index) của bài hiện tại trong danh sách đã sắp xếp
+    const index = sameTopicExams.findIndex(h => h.id === currentItem.id);
+    
+    // 4. Trả về kết quả (index + 1 chính là số lần)
+    return index + 1; 
+  };
+// -----------------------------------------------------------
+
 
   // --- MÀN HÌNH DANH SÁCH ---
   return (
@@ -112,14 +134,17 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => { // Nhận 
               const score10 = ((item.score / item.total) * 10).toFixed(1);
               const dateObj = item.date?.toDate ? item.date.toDate() : new Date();
               
+              // --- TÍNH TOÁN LOGIC MÀU SẮC ---
               let scoreColor = "text-red-500";
               if (Number(score10) >= 8) scoreColor = "text-green-500";
               else if (Number(score10) >= 5) scoreColor = "text-yellow-600";
 
+              // --- GỌI HÀM TÍNH SỐ LẦN LÀM ---
+              const attemptCount = getAttemptInfo(item);
+
               return (
                 <div 
                     key={item.id} 
-                    // Sửa: Lưu toàn bộ item vào state
                     onClick={() => {
                         if (item.fullData) setSelectedExam(item);
                         else alert("Bài thi cũ này chưa hỗ trợ xem lại.");
@@ -128,12 +153,32 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => { // Nhận 
                 >
                   <div className="flex justify-between items-center">
                       <div className="flex-1 pr-4">
-                        <h3 className="font-bold text-gray-800 text-base mb-1 line-clamp-2 group-hover:text-blue-700 transition-colors">{item.topic}</h3>
+                        
+                        {/* --- SỬA 1: HIỂN THỊ TÊN CHỦ ĐỀ KÈM SỐ LẦN LÀM --- */}
+                        <h3 className="font-bold text-gray-800 text-base mb-1 line-clamp-2 group-hover:text-blue-700 transition-colors">
+                            {item.topic} 
+                            {/* Chỉ hiện chú thích nếu làm từ lần 2 trở đi */}
+                            {attemptCount > 1 && (
+                                <span className="ml-2 text-xs font-normal text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+                                    (Lần {attemptCount})
+                                </span>
+                            )}
+                        </h3>
+
                         <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
+                          {/* --- SỬA 2: HIỂN THỊ ĐẦY ĐỦ GIỜ:PHÚT:GIÂY --- */}
+                          <span className="flex items-center gap-1" title="Thời gian nộp bài">
                               <Calendar size={12}/> 
-                              {dateObj.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              {dateObj.toLocaleString('vi-VN', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit', 
+                                  second: '2-digit',
+                                  day: '2-digit', 
+                                  month: '2-digit', 
+                                  year: 'numeric' 
+                              })}
                           </span>
+                          
                           <span className="flex items-center gap-1"><Trophy size={12}/> {item.score}/{item.total} câu</span>
                         </div>
                       </div>
@@ -144,6 +189,7 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => { // Nhận 
                 </div>
               );
             })}
+
           </div>
         )}
       </div>
