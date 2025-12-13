@@ -308,9 +308,9 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       const genAI = new GoogleGenerativeAI(userApiKey);
     
-      // Sử dụng model gemini-1.5-flash (hoặc pro) để hỗ trợ tốt hình ảnh
+      // Sử dụng model gemini-2.5-flash (hoặc pro) để hỗ trợ tốt hình ảnh
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash", // Flash nhanh và rẻ hơn cho vision
+        model: "gemini-2.5-flash", // Flash nhanh và rẻ hơn cho vision
         generationConfig: {
           responseMimeType: "application/json",
           // Tái sử dụng schema đã định nghĩa ở trên
