@@ -12,7 +12,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
 // 1. Thêm BookOpen, X vào dòng import từ 'lucide-react'
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X } from 'lucide-react';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X , RotateCcw } from 'lucide-react';
 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
 // import { generateTheory } from './geminiService';
@@ -29,6 +29,9 @@ function App() {
   const [currentApiKey, setCurrentApiKey] = useState<string>("");
   const [viewHistory, setViewHistory] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  // --- THÊM DÒNG NÀY ---
+  const [attemptCount, setAttemptCount] = useState(1);
+  // ---------------------
 
   // Hàm mới để xử lý khi người dùng bấm nút tạo đề từ ảnh
 const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string) => {
@@ -36,6 +39,7 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
   setCurrentApiKey(apiKey);
   setScore(0);
   setIsSaved(false);
+  setAttemptCount(1); // <--- THÊM VÀO ĐÂY
   setQuestions([]);
   setTheoryContent('');
 
@@ -105,6 +109,7 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
     setCurrentApiKey(apiKey);
     setScore(0);
     setIsSaved(false);
+    setAttemptCount(1); // <--- THÊM VÀO ĐÂY
     setQuestions([]); 
     setTheoryContent(''); // <--- THÊM DÒNG NÀY ĐỂ RESET LÝ THUYẾT CŨ
     try {
@@ -120,6 +125,30 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
   const handleRegenerate = () => {
     if (config && currentApiKey) handleGenerate(config, currentApiKey);
   };
+
+  // --- HÀM LÀM LẠI ĐỀ (MỚI) ---
+  const handleRedo = () => {
+    const confirmRedo = window.confirm("Bạn muốn làm lại đề này? Các đáp án hiện tại sẽ bị xóa để bạn làm lại từ đầu.");
+    if (!confirmRedo) return;
+
+    // 1. Tăng số lần làm
+    setAttemptCount(prev => prev + 1);
+    
+    // 2. Reset điểm và trạng thái lưu
+    setScore(0);
+    setIsSaved(false);
+
+    // 3. Quan trọng: Xóa sạch câu trả lời cũ trong mảng questions
+    setQuestions(prevQuestions => prevQuestions.map(q => ({
+        ...q,
+        userAnswer: undefined, // Xóa đáp án người dùng
+        isCorrect: undefined   // Xóa trạng thái đúng/sai
+    })));
+
+    // 4. Cuộn màn hình lên đầu
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+  // ----------------------------
 
   const handleUpdateScore = (isCorrect: boolean) => {
     if (isCorrect) setScore(prev => prev + 1);
@@ -177,106 +206,119 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
 
   return (
     <SubscriptionGuard>
-    <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
-      {questions.length === 0 ? (
-        <>
-          <div className="max-w-2xl mx-auto mb-4 flex justify-end">
-             <button onClick={() => setViewHistory(true)} className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors">
-                <HistoryIcon size={20}/> Xem Lịch sử
-             </button>
-          </div>
-          <QuizInput 
-            onGenerate={handleGenerate} 
-            onGenerateFromImage={handleGenerateFromImage} // <--- Thêm dòng này vào
-            isLoading={loading} 
-          />
-        </>
-) : (
-  <div className="max-w-3xl mx-auto animate-fade-in relative"> {/* Thêm relative */}
-    
-    {/* THANH HEADER (CHỨA NÚT LÝ THUYẾT) */}
-    <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 mb-6 flex flex-col sm:flex-row justify-between items-center sticky top-2 z-10 gap-3">
-      <div className="flex-1">
-        <h2 className="font-bold text-lg text-gray-800 line-clamp-1">{config?.topic}</h2>
-        <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-          <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
-          {!isSaved ? (
-              <button onClick={handleSaveResult} className="flex items-center gap-1 text-green-600 hover:underline font-medium text-xs bg-green-50 px-2 py-1 rounded border border-green-200">
-                  <Save size={14}/> Lưu điểm
-              </button>
-          ) : (
-              <span className="text-green-600 text-xs font-bold flex items-center gap-1"><Save size={14}/> Đã lưu</span>
-          )}
-        </div>
-      </div>
-      
-      <div className="flex gap-2 w-full sm:w-auto">
-        {/* --- [NÚT LÝ THUYẾT MỚI] --- */}
-        <button 
-          onClick={handleToggleTheory}
-          className="flex-1 sm:flex-none justify-center px-3 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-sm font-bold flex items-center gap-2 border border-orange-200 transition-colors"
-        >
-          <BookOpen size={18}/> Lý thuyết
-        </button>
-        {/* --------------------------- */}
-
-        <button onClick={() => setQuestions([])} className="flex-1 sm:flex-none justify-center px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium flex items-center gap-1 border border-transparent hover:border-gray-200">
-          <ArrowLeft size={16}/> Quay lại
-        </button>
-        <button onClick={handleRegenerate} disabled={loading} className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
-          <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
-          {loading ? "Đang tạo..." : "Tạo lại"}
-        </button>
-      </div>
-    </div>
-
-    {/* DANH SÁCH CÂU HỎI (GIỮ NGUYÊN) */}
-    <div className="space-y-6 pb-20">
-      {questions.map((q, idx) => (
-        <QuestionCard 
-          key={q.id || idx} 
-          index={idx} 
-          question={q} 
-          onUpdateScore={handleUpdateScore} 
-          onDataChange={handleQuestionUpdate}
-        />
-      ))}
-    </div>
-
-      {/* --- [KHUNG SIDEBAR LÝ THUYẾT] (Code giống hệt bên QuizInput) --- */}
-      {showTheory && (
-        <div className="fixed top-24 right-5 w-[450px] max-w-[90vw] h-[80vh] bg-white rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.15)] border border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
-                <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
-                    <BookOpen size={20}/> KIẾN THỨC: {config?.topic}
-                </h3>
+      <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
+        {questions.length === 0 ? (
+          // --- TRƯỜNG HỢP 1: CHƯA CÓ CÂU HỎI (HIỆN FORM NHẬP) ---
+          <>
+            <div className="max-w-2xl mx-auto mb-4 flex justify-end">
+               <button onClick={() => setViewHistory(true)} className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors">
+                  <HistoryIcon size={20}/> Xem Lịch sử
+               </button>
+            </div>
+            <QuizInput 
+              onGenerate={handleGenerate} 
+              onGenerateFromImage={handleGenerateFromImage} 
+              isLoading={loading} 
+            />
+          </>
+        ) : (
+          // --- TRƯỜNG HỢP 2: ĐÃ CÓ CÂU HỎI (HIỆN DANH SÁCH CÂU) ---
+          <div className="max-w-3xl mx-auto animate-fade-in relative">
+            
+            {/* THANH HEADER */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 mb-6 flex flex-col sm:flex-row justify-between items-center sticky top-2 z-10 gap-3">
+              <div className="flex-1">
+                {/* Hiển thị tiêu đề + Số lần làm lại */}
+                <h2 className="font-bold text-lg text-gray-800 line-clamp-1">
+                    {config?.topic} {attemptCount > 1 && <span className="text-red-500 text-base font-normal">(Làm lại lần {attemptCount})</span>}
+                </h2>
+                <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                  <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
+                  {!isSaved ? (
+                      <button onClick={handleSaveResult} className="flex items-center gap-1 text-green-600 hover:underline font-medium text-xs bg-green-50 px-2 py-1 rounded border border-green-200">
+                          <Save size={14}/> Lưu điểm
+                      </button>
+                  ) : (
+                      <span className="text-green-600 text-xs font-bold flex items-center gap-1"><Save size={14}/> Đã lưu</span>
+                  )}
+                </div>
+              </div>
+              
+              {/* CÁC NÚT CHỨC NĂNG */}
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button 
-                    onClick={() => setShowTheory(false)} 
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-100"
+                  onClick={handleToggleTheory}
+                  className="flex-1 sm:flex-none justify-center px-3 py-2 bg-orange-100 text-orange-700 hover:bg-orange-200 rounded-lg text-sm font-bold flex items-center gap-2 border border-orange-200 transition-colors"
                 >
-                    <X size={18} />
+                  <BookOpen size={18}/> <span className="hidden sm:inline">Lý thuyết</span>
                 </button>
+
+                {/* NÚT LÀM LẠI */}
+                <button 
+                    onClick={handleRedo}
+                    disabled={loading}
+                    className="flex-1 sm:flex-none justify-center px-3 py-2 bg-white text-violet-600 hover:bg-violet-50 rounded-lg text-sm font-bold flex items-center gap-2 border border-violet-200 transition-colors shadow-sm"
+                >
+                    <RotateCcw size={18}/> <span className="hidden sm:inline">Làm lại</span>
+                </button>
+
+                <button onClick={() => setQuestions([])} className="flex-1 sm:flex-none justify-center px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium flex items-center gap-1 border border-transparent hover:border-gray-200">
+                  <ArrowLeft size={16}/> <span className="hidden sm:inline">Thoát</span>
+                </button>
+                
+                <button onClick={handleRegenerate} disabled={loading} className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
+                  <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
+                  {loading ? "Đang tạo..." : <span className="hidden sm:inline">Đổi đề</span>}
+                </button>
+              </div>
             </div>
 
-            <div className="p-5 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-sm scroll-smooth">
-                {loadingTheory ? (
-                    <div className="flex flex-col items-center justify-center h-full space-y-3">
-                        <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                        <p className="text-gray-500 text-xs animate-pulse">Đang tra cứu kiến thức...</p>
-                    </div>
-                ) : (
-                    <div className="whitespace-pre-wrap">
-                        <LatexText text={theoryContent} />
-                    </div>
-                )}
+            {/* DANH SÁCH CÂU HỎI */}
+            <div className="space-y-6 pb-20">
+              {questions.map((q, idx) => (
+                <QuestionCard 
+                  key={q.id || idx} 
+                  index={idx} 
+                  question={q} 
+                  onUpdateScore={handleUpdateScore} 
+                  onDataChange={handleQuestionUpdate}
+                />
+              ))}
             </div>
-        </div>
-      )}
-      {/* ---------------------------------------------------------------- */}
 
-    </div>
-  )}    
-</div>
+            {/* SIDEBAR LÝ THUYẾT */}
+            {showTheory && (
+              <div className="fixed top-24 right-5 w-[450px] max-w-[90vw] h-[80vh] bg-white rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.15)] border border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-300">
+                  <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
+                      <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
+                          <BookOpen size={20}/> KIẾN THỨC: {config?.topic}
+                      </h3>
+                      <button 
+                          onClick={() => setShowTheory(false)} 
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-100"
+                      >
+                          <X size={18} />
+                      </button>
+                  </div>
+
+                  <div className="p-5 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-sm scroll-smooth">
+                      {loadingTheory ? (
+                          <div className="flex flex-col items-center justify-center h-full space-y-3">
+                              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                              <p className="text-gray-500 text-xs animate-pulse">Đang tra cứu kiến thức...</p>
+                          </div>
+                      ) : (
+                          <div className="whitespace-pre-wrap">
+                              <LatexText text={theoryContent} />
+                          </div>
+                      )}
+                  </div>
+              </div>
+            )}
+
+          </div>
+        )}    
+      </div>
     </SubscriptionGuard>
   );
 }
