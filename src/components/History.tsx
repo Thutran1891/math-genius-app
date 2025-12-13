@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { Clock, Calendar, Trophy, ChevronLeft } from 'lucide-react';
+// --- SỬA 1: Thêm RotateCcw vào dòng import ---
+import { Clock, Calendar, Trophy, ChevronLeft, RotateCcw } from 'lucide-react';
 import { Question } from '../types';
 import { QuestionCard } from './QuestionCard';
 
@@ -11,17 +12,20 @@ interface HistoryItem {
   score: number;
   total: number;
   date: any; 
-  fullData?: string; // Dữ liệu bài thi đã lưu
+  fullData?: string; 
 }
 
 interface Props {
   onBack: () => void;
+  // --- SỬA 2: Đảm bảo interface có dòng này ---
+  onLoadExam: (questions: Question[], topic: string) => void;
 }
 
-export const History: React.FC<Props> = ({ onBack }) => {
+// --- SỬA 3: Thêm onLoadExam vào danh sách nhận props ---
+export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedExam, setSelectedExam] = useState<Question[] | null>(null);
+  const [selectedExam, setSelectedExam] = useState<HistoryItem | null>(null);
 
   // Tìm đến đoạn useEffect fetchHistory:
   useEffect(() => {
@@ -56,27 +60,39 @@ export const History: React.FC<Props> = ({ onBack }) => {
   }, []);
 
   // --- MÀN HÌNH CHI TIẾT BÀI THI ---
-  if (selectedExam) {
+    if (selectedExam && selectedExam.fullData) {
+      const questions: Question[] = JSON.parse(selectedExam.fullData); // Parse ở đây
+
       return (
         <div className="max-w-3xl mx-auto bg-slate-50 min-h-screen">
-            <div className="sticky top-0 bg-white shadow-sm p-4 z-10 flex items-center gap-3 border-b">
-                <button onClick={() => setSelectedExam(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                    <ChevronLeft className="text-gray-600" />
-                </button>
-                <div>
-                    <h2 className="font-bold text-lg text-gray-800">Chi tiết bài làm</h2>
-                    <p className="text-xs text-gray-500">Xem lại đáp án và lời giải</p>
+            <div className="sticky top-0 bg-white shadow-sm p-4 z-10 flex flex-col sm:flex-row justify-between items-center gap-3 border-b">
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <button onClick={() => setSelectedExam(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                        <ChevronLeft className="text-gray-600" />
+                    </button>
+                    <div>
+                        <h2 className="font-bold text-lg text-gray-800 line-clamp-1">{selectedExam.topic}</h2>
+                        <p className="text-xs text-gray-500">Chi tiết bài làm ngày {selectedExam.date?.toDate ? selectedExam.date.toDate().toLocaleDateString('vi-VN') : ''}</p>
+                    </div>
                 </div>
+
+                {/* NÚT LÀM LẠI HOẠT ĐỘNG TỐT */}
+                <button 
+                    onClick={() => onLoadExam(questions, selectedExam.topic)}
+                    className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm active:scale-95 transition-all"
+                >
+                    <RotateCcw size={18}/> Làm lại đề này
+                </button>
             </div>
+
             <div className="p-4 space-y-6 pb-20">
-                {selectedExam.map((q, idx) => (
-                    // QuestionCard tự động chuyển sang chế độ "Xem lại" vì q.userAnswer đã có dữ liệu
+                {questions.map((q, idx) => (
                     <QuestionCard key={idx} index={idx} question={q} />
                 ))}
             </div>
         </div>
       );
-  }
+  }  
 
   // --- MÀN HÌNH DANH SÁCH ---
   return (
@@ -115,6 +131,7 @@ export const History: React.FC<Props> = ({ onBack }) => {
                         if (item.fullData) {
                             try {
                                 setSelectedExam(JSON.parse(item.fullData));
+                                setSelectedExam(item); // <--- LƯU CẢ ITEM
                             } catch (e) { alert("Dữ liệu bài thi bị lỗi."); }
                         } else {
                             alert("Bài thi cũ này chưa hỗ trợ xem lại chi tiết.");

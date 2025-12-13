@@ -126,6 +126,40 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
     if (config && currentApiKey) handleGenerate(config, currentApiKey);
   };
 
+  // --- HÀM LOAD ĐỀ TỪ LỊCH SỬ ĐỂ LÀM LẠI ---
+  const handleLoadExamFromHistory = (oldQuestions: Question[], topic: string) => {
+    // 1. Reset các trạng thái điểm số
+    setScore(0);
+    setIsSaved(false);
+    setAttemptCount(1); // Coi như làm mới hoàn toàn
+    setLoading(false);
+
+    // 2. Tạo config giả để hiển thị tiêu đề
+    setConfig({
+      topic: topic,
+      distribution: { 
+        TN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
+        TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
+        DS: { BIET: 0, HIEU: 0, VANDUNG: 0 } 
+      },
+      additionalPrompt: "" // <--- DÒNG QUAN TRỌNG CẦN THÊM
+    });
+
+    // 3. Quan trọng: Xóa sạch đáp án cũ trong dữ liệu lấy từ lịch sử
+    const cleanQuestions = oldQuestions.map(q => ({
+      ...q,
+      userAnswer: undefined, // Xóa câu trả lời cũ
+      isCorrect: undefined   // Xóa trạng thái đúng/sai
+    }));
+
+    setQuestions(cleanQuestions);
+
+    // 4. Đóng màn hình lịch sử để quay về giao diện làm bài
+    setViewHistory(false);
+  };
+  // -----------------------------------------
+
+
   // --- HÀM LÀM LẠI ĐỀ (MỚI) ---
   const handleRedo = () => {
     const confirmRedo = window.confirm("Bạn muốn làm lại đề này? Các đáp án hiện tại sẽ bị xóa để bạn làm lại từ đầu.");
@@ -201,9 +235,14 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
   if (!user) return <Login />;
 
   if (viewHistory) {
-    return <History onBack={() => setViewHistory(false)} />;
+    return (
+      <History 
+          onBack={() => setViewHistory(false)} 
+          onLoadExam={handleLoadExamFromHistory} 
+      />
+    );
   }
-
+  
   return (
     <SubscriptionGuard>
       <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
@@ -228,7 +267,6 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
             {/* THANH HEADER */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 mb-6 flex flex-col sm:flex-row justify-between items-center sticky top-2 z-10 gap-3">
               <div className="flex-1">
-                {/* Hiển thị tiêu đề + Số lần làm lại */}
                 <h2 className="font-bold text-lg text-gray-800 line-clamp-1">
                     {config?.topic} {attemptCount > 1 && <span className="text-red-500 text-base font-normal">(Làm lại lần {attemptCount})</span>}
                 </h2>
@@ -244,7 +282,6 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
                 </div>
               </div>
               
-              {/* CÁC NÚT CHỨC NĂNG */}
               <div className="flex gap-2 w-full sm:w-auto">
                 <button 
                   onClick={handleToggleTheory}
@@ -253,7 +290,6 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
                   <BookOpen size={18}/> <span className="hidden sm:inline">Lý thuyết</span>
                 </button>
 
-                {/* NÚT LÀM LẠI */}
                 <button 
                     onClick={handleRedo}
                     disabled={loading}
@@ -315,7 +351,6 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
                   </div>
               </div>
             )}
-
           </div>
         )}    
       </div>
