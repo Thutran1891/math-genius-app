@@ -327,7 +327,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       let taskDescription = "";
       if (mode === 'EXACT') {
         taskDescription = `
-          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học có trong các hình ảnh được cung cấp.
+          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học (hay môn học bất kỳ) có trong các hình ảnh được cung cấp.
           YÊU CẦU ĐẶC BIỆT:
           1. GIỮ NGUYÊN văn phong, số liệu, và các phương án lựa chọn (nếu là trắc nghiệm) HỆT NHƯ trong ảnh. Không được tự ý thay đổi đề bài.
           2. Nếu ảnh mờ hoặc cắt không hết, hãy cố gắng suy luận nội dung chính xác nhất có thể.
