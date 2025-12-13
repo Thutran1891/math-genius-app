@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-// --- SỬA 1: Thêm RotateCcw vào dòng import ---
-import { Clock, Calendar, Trophy, ChevronLeft, RotateCcw } from 'lucide-react';
+// Thêm RotateCcw vào đây
+import { Clock, Calendar, Trophy, ChevronLeft, RotateCcw } from 'lucide-react'; 
 import { Question } from '../types';
 import { QuestionCard } from './QuestionCard';
 
@@ -17,34 +17,24 @@ interface HistoryItem {
 
 interface Props {
   onBack: () => void;
-  // --- SỬA 2: Đảm bảo interface có dòng này ---
-  onLoadExam: (questions: Question[], topic: string) => void;
+  // Khai báo nhận hàm onLoadExam từ App
+  onLoadExam: (questions: Question[], topic: string) => void; 
 }
 
-// --- SỬA 3: Thêm onLoadExam vào danh sách nhận props ---
-export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
+export const History: React.FC<Props> = ({ onBack, onLoadExam }) => { // Nhận prop ở đây
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Sửa: Lưu cả object bài thi để lấy được tên Topic
   const [selectedExam, setSelectedExam] = useState<HistoryItem | null>(null);
 
-  // Tìm đến đoạn useEffect fetchHistory:
   useEffect(() => {
     const fetchHistory = async () => {
       if (!auth.currentUser) return;
       try {
-        // --- [CODE MỚI - SỬA LẠI ĐOẠN NÀY] ---
-        // 1. Trỏ vào đúng sub-collection của user đang đăng nhập
         const historyRef = collection(db, "users", auth.currentUser.uid, "examHistory");
-
-        // 2. Query đơn giản hơn (không cần where userId nữa)
-        const q = query(
-          historyRef,
-          orderBy("date", "desc")
-        );
-        // -------------------------------------
-
+        const q = query(historyRef, orderBy("date", "desc"));
         const querySnapshot = await getDocs(q);
-        // ... (phần xử lý data bên dưới giữ nguyên)
         const data: HistoryItem[] = [];
         querySnapshot.forEach((doc) => {
           data.push({ id: doc.id, ...doc.data() } as HistoryItem);
@@ -60,31 +50,33 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
   }, []);
 
   // --- MÀN HÌNH CHI TIẾT BÀI THI ---
-    if (selectedExam && selectedExam.fullData) {
-      const questions: Question[] = JSON.parse(selectedExam.fullData); // Parse ở đây
+  if (selectedExam && selectedExam.fullData) {
+      // Parse dữ liệu câu hỏi từ chuỗi JSON
+      const questions: Question[] = JSON.parse(selectedExam.fullData);
 
       return (
         <div className="max-w-3xl mx-auto bg-slate-50 min-h-screen">
-            <div className="sticky top-0 bg-white shadow-sm p-4 z-10 flex flex-col sm:flex-row justify-between items-center gap-3 border-b">
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="sticky top-0 bg-white shadow-sm p-4 z-10 flex flex-col sm:flex-row items-center gap-3 border-b">
+                <div className="flex items-center gap-3 flex-1 w-full">
                     <button onClick={() => setSelectedExam(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                         <ChevronLeft className="text-gray-600" />
                     </button>
                     <div>
                         <h2 className="font-bold text-lg text-gray-800 line-clamp-1">{selectedExam.topic}</h2>
-                        <p className="text-xs text-gray-500">Chi tiết bài làm ngày {selectedExam.date?.toDate ? selectedExam.date.toDate().toLocaleDateString('vi-VN') : ''}</p>
+                        <p className="text-xs text-gray-500">Xem lại bài làm cũ</p>
                     </div>
                 </div>
 
-                {/* NÚT LÀM LẠI HOẠT ĐỘNG TỐT */}
+                {/* --- NÚT LÀM LẠI ĐỀ NÀY --- */}
                 <button 
                     onClick={() => onLoadExam(questions, selectedExam.topic)}
                     className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm active:scale-95 transition-all"
                 >
                     <RotateCcw size={18}/> Làm lại đề này
                 </button>
+                {/* --------------------------- */}
             </div>
-
+            
             <div className="p-4 space-y-6 pb-20">
                 {questions.map((q, idx) => (
                     <QuestionCard key={idx} index={idx} question={q} />
@@ -92,7 +84,7 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
             </div>
         </div>
       );
-  }  
+  }
 
   // --- MÀN HÌNH DANH SÁCH ---
   return (
@@ -127,15 +119,10 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
               return (
                 <div 
                     key={item.id} 
+                    // Sửa: Lưu toàn bộ item vào state
                     onClick={() => {
-                        if (item.fullData) {
-                            try {
-                                setSelectedExam(JSON.parse(item.fullData));
-                                setSelectedExam(item); // <--- LƯU CẢ ITEM
-                            } catch (e) { alert("Dữ liệu bài thi bị lỗi."); }
-                        } else {
-                            alert("Bài thi cũ này chưa hỗ trợ xem lại chi tiết.");
-                        }
+                        if (item.fullData) setSelectedExam(item);
+                        else alert("Bài thi cũ này chưa hỗ trợ xem lại.");
                     }}
                     className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer hover:border-blue-300 group"
                 >
@@ -145,16 +132,13 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <span className="flex items-center gap-1">
                               <Calendar size={12}/> 
-                              {dateObj.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                              {dateObj.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
                           </span>
-                          <span className="flex items-center gap-1"><Trophy size={12}/> {item.score}/{item.total} câu đúng</span>
-
+                          <span className="flex items-center gap-1"><Trophy size={12}/> {item.score}/{item.total} câu</span>
                         </div>
                       </div>
-                      
                       <div className="text-right pl-4 border-l border-gray-100 min-w-[60px]">
                         <div className={`text-2xl font-black ${scoreColor}`}>{score10}</div>
-                        <div className="text-[10px] text-gray-400 uppercase font-bold">Điểm</div>
                       </div>
                   </div>
                 </div>

@@ -242,12 +242,22 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
       />
     );
   }
-  
+
   return (
     <SubscriptionGuard>
       <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
-        {questions.length === 0 ? (
-          // --- TRƯỜNG HỢP 1: CHƯA CÓ CÂU HỎI (HIỆN FORM NHẬP) ---
+        
+        {/* --- LOGIC HIỂN THỊ GIAO DIỆN --- */}
+        
+        {/* TRƯỜNG HỢP 1: ĐANG XEM LỊCH SỬ */}
+        {viewHistory ? (
+           <History 
+              onBack={() => setViewHistory(false)} 
+              onLoadExam={handleLoadExamFromHistory} // <-- QUAN TRỌNG: Truyền hàm vào đây
+           />
+        ) : questions.length === 0 ? (
+          
+          // TRƯỜNG HỢP 2: CHƯA CÓ CÂU HỎI (HIỆN FORM NHẬP)
           <>
             <div className="max-w-2xl mx-auto mb-4 flex justify-end">
                <button onClick={() => setViewHistory(true)} className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors">
@@ -260,11 +270,13 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
               isLoading={loading} 
             />
           </>
+
         ) : (
-          // --- TRƯỜNG HỢP 2: ĐÃ CÓ CÂU HỎI (HIỆN DANH SÁCH CÂU) ---
+          
+          // TRƯỜNG HỢP 3: ĐANG LÀM BÀI / XEM KẾT QUẢ
           <div className="max-w-3xl mx-auto animate-fade-in relative">
             
-            {/* THANH HEADER */}
+            {/* Header */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 mb-6 flex flex-col sm:flex-row justify-between items-center sticky top-2 z-10 gap-3">
               <div className="flex-1">
                 <h2 className="font-bold text-lg text-gray-800 line-clamp-1">
@@ -309,7 +321,7 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
               </div>
             </div>
 
-            {/* DANH SÁCH CÂU HỎI */}
+            {/* Questions List */}
             <div className="space-y-6 pb-20">
               {questions.map((q, idx) => (
                 <QuestionCard 
@@ -322,7 +334,7 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
               ))}
             </div>
 
-            {/* SIDEBAR LÝ THUYẾT */}
+            {/* Theory Modal */}
             {showTheory && (
               <div className="fixed top-24 right-5 w-[450px] max-w-[90vw] h-[80vh] bg-white rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.15)] border border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-300">
                   <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
@@ -351,11 +363,12 @@ const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR'
                   </div>
               </div>
             )}
+
           </div>
         )}    
       </div>
     </SubscriptionGuard>
-  );
+  );  
 }
 
 export default App;
