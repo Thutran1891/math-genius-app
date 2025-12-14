@@ -253,7 +253,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
       <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2">
           <Image size={20} className="text-blue-600"/> Tạo đề từ Hình ảnh
       </h3>
-      <p className="text-sm text-gray-500 mb-4">Chụp ảnh đề bài (hỗ trợ toán, lý, hóa...) để AI giải hoặc tạo đề tương tự. Tối đa 4 ảnh.</p>
+      <p className="text-sm text-gray-500 mb-4">Load tối đa 4 ảnh (Nếu dễ/ngắn và không hình vẽ thì được 15 câu, ngược lại thì 2-6 câu).</p>
 
       {/* Khu vực chọn file và hiển thị thumbnail */}
       <div className="mb-4">
