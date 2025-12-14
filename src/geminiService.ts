@@ -125,7 +125,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
         temperature: 0.3,
         // TĂNG LÊN MỨC CAO ĐỂ TRÁNH BỊ CẮT CỤT JSON
-        maxOutputTokens: 20000,
+        maxOutputTokens: 30000,
       }
     });
 
@@ -316,7 +316,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           // Tái sử dụng schema đã định nghĩa ở trên
           responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
           temperature: mode === 'EXACT' ? 0.1 : 0.4, // EXACT cần chính xác (temp thấp), SIMILAR cần sáng tạo (temp cao hơn)
-          maxOutputTokens: 20000,
+          maxOutputTokens: 30000,
         }
       });
     
