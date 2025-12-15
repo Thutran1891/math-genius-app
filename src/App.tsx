@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef  } from 'react';
 import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
@@ -17,7 +17,7 @@ import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
 // import { generateTheory } from './geminiService';
 import { LatexText } from './components/LatexText';
-
+// Dòng số 1 của file App.tsx
 // Import thêm generateQuizFromImages
 import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
 function App() {
@@ -34,7 +34,8 @@ function App() {
   // --- [THÊM MỚI] BIẾN ĐẾM SỐ LẦN RỜI TAB ---
   const [violationCount, setViolationCount] = useState(0);
   // ---------------------
-
+  // --- [THÊM MỚI] BIẾN CHỐNG ĐẾM ĐÔI (Debounce) ---
+  const lastViolationTime = useRef<number>(0);
   // Cập nhật tham số nhận vào: thêm topicName
   const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
     setLoading(true);
@@ -83,27 +84,33 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- [THÊM MỚI] LOGIC BẮT SỰ KIỆN RỜI TAB ---
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      // Chỉ bắt lỗi khi: Đang có câu hỏi (đang làm bài), Chưa lưu, Không phải đang xem lịch sử
-      if (document.hidden && questions.length > 0 && !isSaved && !viewHistory) {
-        setViolationCount(prev => {
-          const newCount = prev + 1;
-          // Tùy chọn: Phát âm thanh cảnh báo hoặc alert
-          // alert(`CẢNH BÁO: Bạn đã rời khỏi màn hình thi! (Lần ${newCount})`);
-          return newCount;
-        });
-      }
-    };
+// --- [SỬA LẠI] LOGIC BẮT SỰ KIỆN RỜI TAB (Đã Fix lỗi đếm đôi) ---
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    const now = Date.now(); // Lấy thời gian hiện tại
+    
+    // Điều kiện:
+    // 1. Tab đang ẩn (document.hidden)
+    // 2. Đang làm bài (questions.length > 0)
+    // 3. Chưa lưu điểm (!isSaved)
+    // 4. Không xem lịch sử (!viewHistory)
+    // 5. [QUAN TRỌNG] Cách lần vi phạm trước ít nhất 2 giây (2000ms)
+    if (
+      document.hidden && 
+      questions.length > 0 && 
+      !isSaved && 
+      !viewHistory && 
+      (now - lastViolationTime.current > 2000) // <--- Fix lỗi đếm đôi tại đây
+    ) {
+      setViolationCount(prev => prev + 1);
+      lastViolationTime.current = now; // Cập nhật thời gian
+    }
+  };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-    }, [questions.length, isSaved, viewHistory]);
-    // ---------------------------------------------
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+}, [questions.length, isSaved, viewHistory]);
+// ---------------------------------------------
 
   // --- [CODE MỚI] STATE QUẢN LÝ LÝ THUYẾT ---
   const [showTheory, setShowTheory] = useState(false);
