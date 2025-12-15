@@ -83,6 +83,27 @@ function App() {
     return () => unsubscribe();
   }, []);
 
+  // --- [THÊM MỚI] LOGIC BẮT SỰ KIỆN RỜI TAB ---
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Chỉ bắt lỗi khi: Đang có câu hỏi (đang làm bài), Chưa lưu, Không phải đang xem lịch sử
+      if (document.hidden && questions.length > 0 && !isSaved && !viewHistory) {
+        setViolationCount(prev => {
+          const newCount = prev + 1;
+          // Tùy chọn: Phát âm thanh cảnh báo hoặc alert
+          // alert(`CẢNH BÁO: Bạn đã rời khỏi màn hình thi! (Lần ${newCount})`);
+          return newCount;
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+    }, [questions.length, isSaved, viewHistory]);
+    // ---------------------------------------------
 
   // --- [CODE MỚI] STATE QUẢN LÝ LÝ THUYẾT ---
   const [showTheory, setShowTheory] = useState(false);
@@ -230,27 +251,6 @@ function App() {
       />
     );
   }
-  // --- [THÊM MỚI] LOGIC BẮT SỰ KIỆN RỜI TAB ---
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      // Chỉ bắt lỗi khi: Đang có câu hỏi (đang làm bài), Chưa lưu, Không phải đang xem lịch sử
-      if (document.hidden && questions.length > 0 && !isSaved && !viewHistory) {
-        setViolationCount(prev => {
-          const newCount = prev + 1;
-          // Tùy chọn: Phát âm thanh cảnh báo hoặc alert
-          // alert(`CẢNH BÁO: Bạn đã rời khỏi màn hình thi! (Lần ${newCount})`);
-          return newCount;
-        });
-      }
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [questions.length, isSaved, viewHistory]);
-  // ---------------------------------------------
 
   return (
     <SubscriptionGuard>
