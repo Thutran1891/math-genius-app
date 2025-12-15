@@ -12,7 +12,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
 // 1. Thêm BookOpen, X vào dòng import từ 'lucide-react'
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X } from 'lucide-react';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle } from 'lucide-react';
 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
 // import { generateTheory } from './geminiService';
@@ -31,6 +31,8 @@ function App() {
   const [isSaved, setIsSaved] = useState(false);
   // --- THÊM DÒNG NÀY ---
   const [attemptCount, setAttemptCount] = useState(1);
+  // --- [THÊM MỚI] BIẾN ĐẾM SỐ LẦN RỜI TAB ---
+  const [violationCount, setViolationCount] = useState(0);
   // ---------------------
 
   // Cập nhật tham số nhận vào: thêm topicName
@@ -40,6 +42,7 @@ function App() {
     setScore(0);
     setIsSaved(false);
     setAttemptCount(1);
+    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setQuestions([]);
     setTheoryContent('');
 
@@ -113,6 +116,7 @@ function App() {
     setScore(0);
     setIsSaved(false);
     setAttemptCount(1); // <--- THÊM VÀO ĐÂY
+    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setQuestions([]); 
     setTheoryContent(''); // <--- THÊM DÒNG NÀY ĐỂ RESET LÝ THUYẾT CŨ
     try {
@@ -135,6 +139,7 @@ function App() {
     setScore(0);
     setIsSaved(false);
     setAttemptCount(1); // Coi như làm mới hoàn toàn
+    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setLoading(false);
 
     // 2. Tạo config giả để hiển thị tiêu đề
@@ -202,7 +207,8 @@ function App() {
         score: score,
         total: questions.length,
         date: serverTimestamp(),
-        fullData: JSON.stringify(questions) 
+        fullData: JSON.stringify(questions) ,
+        violationCount: violationCount // <--- THÊM DÒNG NÀY ĐỂ LƯU SỐ LẦN VI PHẠM
       });
       // ----------------------------------------
       
@@ -224,6 +230,27 @@ function App() {
       />
     );
   }
+  // --- [THÊM MỚI] LOGIC BẮT SỰ KIỆN RỜI TAB ---
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      // Chỉ bắt lỗi khi: Đang có câu hỏi (đang làm bài), Chưa lưu, Không phải đang xem lịch sử
+      if (document.hidden && questions.length > 0 && !isSaved && !viewHistory) {
+        setViolationCount(prev => {
+          const newCount = prev + 1;
+          // Tùy chọn: Phát âm thanh cảnh báo hoặc alert
+          // alert(`CẢNH BÁO: Bạn đã rời khỏi màn hình thi! (Lần ${newCount})`);
+          return newCount;
+        });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [questions.length, isSaved, viewHistory]);
+  // ---------------------------------------------
 
   return (
     <SubscriptionGuard>
@@ -266,6 +293,13 @@ function App() {
                 </h2>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                   <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
+                  {/* --- [THÊM MỚI] HIỂN THỊ VI PHẠM --- */}
+                  {violationCount > 0 && (
+                      <span className="flex items-center gap-1 text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-200 animate-pulse">
+                          <AlertTriangle size={14} /> Rời tab: {violationCount} lần
+                      </span>
+                  )}
+                  {/* ----------------------------------- */}
                   {!isSaved ? (
                       <button onClick={handleSaveResult} className="flex items-center gap-1 text-green-600 hover:underline font-medium text-xs bg-green-50 px-2 py-1 rounded border border-green-200">
                           <Save size={14}/> Lưu điểm
