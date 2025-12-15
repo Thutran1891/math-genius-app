@@ -3,6 +3,33 @@ import { QuizConfig, Question } from "./types";
 
 // const apiKey = import.meta.env.VITE_API_KEY as string;
 // const genAI = new GoogleGenerativeAI(apiKey || "");
+// Thêm đoạn này vào đầu file geminiService.ts, sau các dòng import
+
+// Hàm thử lại (Retry) khi gặp lỗi quá tải
+async function retryOperation<T>(
+  operation: () => Promise<T>, 
+  retries: number = 3, 
+  delay: number = 2000
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error: any) {
+    // Nếu hết lượt thử hoặc lỗi không phải do server (như sai Key, sai cú pháp) thì ném lỗi luôn
+    // Mã 503 là Overloaded, 500 là Internal Server Error
+    const isServerBusy = error.message?.includes('503') || error.message?.includes('Overloaded');
+    
+    if (retries <= 0 || !isServerBusy) {
+      throw error;
+    }
+    
+    console.warn(`Server quá tải, đang thử lại... (Còn ${retries} lần)`);
+    
+    // Chờ một chút trước khi thử lại (Exponential backoff: chờ lâu hơn sau mỗi lần lỗi)
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    return retryOperation(operation, retries - 1, delay * 2);
+  }
+}
 
 // --- SCHEMA CHUẨN ---
 
@@ -125,7 +152,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
         temperature: 0.3,
         // TĂNG LÊN MỨC CAO ĐỂ TRÁNH BỊ CẮT CỤT JSON
-        maxOutputTokens: 30000,
+        maxOutputTokens: 20000,
       }
     });
 
@@ -274,7 +301,10 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
          Trả về JSON mảng ${totalQuestions} câu.
     `;
 
-    const result = await model.generateContent(prompt);
+    // Mới: Bọc trong retryOperation
+    const result = await retryOperation(async () => {
+      return await model.generateContent(prompt);
+    });
     return JSON.parse(result.response.text());
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -316,7 +346,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           // Tái sử dụng schema đã định nghĩa ở trên
           responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
           temperature: mode === 'EXACT' ? 0.1 : 0.4, // EXACT cần chính xác (temp thấp), SIMILAR cần sáng tạo (temp cao hơn)
-          maxOutputTokens: 30000,
+          maxOutputTokens: 20000,
         }
       });
     
@@ -357,7 +387,10 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {
-        const result = await model.generateContent([prompt, ...imageParts]);
+        // Mới:
+        const result = await retryOperation(async () => {
+          return await model.generateContent([prompt, ...imageParts]);
+        });
         const responseText = result.response.text();
         return JSON.parse(responseText);
       } catch (error: any) {
