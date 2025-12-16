@@ -203,6 +203,13 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + TUYỆT ĐỐI KHÔNG đưa khoảng đúng còn lại (là $(-\\infty; -1)$) vào các phương án B, C, D.
             + Các phương án nhiễu phải là các khoảng nghịch biến hoặc khoảng sai hẳn.
 
+        - Xử lý lỗi thường gặp về đẳng thức vectơ:
+            + Nếu $\\vec{MA} + \\vec{MB} = \\vec{0}$ là đúng 
+            + THÌ:  $\\vec{AM} + \\vec{BM} = \\vec{0}$ cũng đúng.
+            + TUYỆT ĐỐI KHÔNG đưa cả hai đẳng thức đều đúng vào câu hỏi tìm đáp án đúng.
+            + Các phương án nhiễu phải là các phương án sai hẳn.
+            + Tương tự cho các tình huống khác.
+            
       RULE 3. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
       - Mỗi phát biểu có 'content' và 'isCorrect' (true/false).
