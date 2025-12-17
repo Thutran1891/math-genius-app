@@ -1,50 +1,37 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { QuizConfig, Question } from "./types";
 
-// --- CẤU HÌNH MODEL ---
-// Cập nhật theo yêu cầu thực tế của bạn: Sử dụng bản 2.5
-const MODEL_NAME = "gemini-2.5-flash"; 
+// const apiKey = import.meta.env.VITE_API_KEY as string;
+// const genAI = new GoogleGenerativeAI(apiKey || "");
+// Thêm đoạn này vào đầu file geminiService.ts, sau các dòng import
 
-// Hàm thử lại (Retry) với chiến thuật chờ đợi theo lũy thừa (Exponential Backoff)
+// Hàm thử lại (Retry) khi gặp lỗi quá tải
 async function retryOperation<T>(
   operation: () => Promise<T>, 
-  retries: number = 5,    // Tăng lên 5 lần thử
-  delay: number = 4000    // Tăng thời gian chờ khởi điểm lên 4 giây
+  retries: number = 3, 
+  delay: number = 2000
 ): Promise<T> {
   try {
     return await operation();
   } catch (error: any) {
-    const errMsg = error.message || JSON.stringify(error);
+    // Nếu hết lượt thử hoặc lỗi không phải do server (như sai Key, sai cú pháp) thì ném lỗi luôn
+    // Mã 503 là Overloaded, 500 là Internal Server Error
+    const isServerBusy = error.message?.includes('503') || error.message?.includes('Overloaded');
     
-    // Bắt các lỗi Server bận hoặc lỗi mạng tạm thời
-    const isRecoverableError = 
-        errMsg.includes('503') || 
-        errMsg.includes('500') || 
-        errMsg.includes('502') || 
-        errMsg.includes('Overloaded') || 
-        errMsg.includes('fetch failed');
-    
-    // Nếu không phải lỗi hệ thống (ví dụ sai API Key, sai cú pháp) hoặc đã hết lượt thử
-    if (retries <= 0 || !isRecoverableError) {
-      // Nếu là lỗi 429 (Too Many Requests - Hết Quota) -> Báo lỗi riêng
-      if (errMsg.includes('429')) {
-         throw new Error("API Key của bạn đang bị Google giới hạn tốc độ (Quota). Hãy chờ khoảng 1-2 phút rồi thử lại.");
-      }
+    if (retries <= 0 || !isServerBusy) {
       throw error;
     }
     
-    console.warn(`⚠️ Model ${MODEL_NAME} đang quá tải (Lỗi 503/Overloaded). Đang chờ ${delay/1000}s để thử lại lần thứ ${6 - retries}...`);
+    console.warn(`Server quá tải, đang thử lại... (Còn ${retries} lần)`);
     
-    // Chờ một chút trước khi thử lại
+    // Chờ một chút trước khi thử lại (Exponential backoff: chờ lâu hơn sau mỗi lần lỗi)
     await new Promise(resolve => setTimeout(resolve, delay));
     
-    // Gọi lại đệ quy: Giảm số lần retry, Tăng gấp đôi thời gian chờ (4s -> 8s -> 16s...)
     return retryOperation(operation, retries - 1, delay * 2);
   }
 }
 
 // --- SCHEMA CHUẨN ---
-// (Giữ nguyên cấu trúc Schema không đổi)
 
 const variationTableSchema = {
     type: SchemaType.OBJECT,
@@ -88,6 +75,7 @@ const geometryGraphSchema = {
     }
 };
 
+// Schema rỗng giả để tránh lỗi 400
 const plotlyDataSchema = {
     type: SchemaType.OBJECT,
     properties: {
@@ -101,14 +89,18 @@ const questionSchema: any = {
   properties: {
     id: { type: SchemaType.STRING },
     type: { type: SchemaType.STRING, enum: ['TN', 'TLN', 'DS'] },
+    // --- THÊM DÒNG NÀY VÀO ---
     difficulty: { type: SchemaType.STRING, enum: ["BIET", "HIEU", "VANDUNG"], description: "Mức độ câu hỏi" },
+    // -------------------------
     questionText: { 
       type: SchemaType.STRING, 
-      description: "Nội dung câu hỏi (LaTeX $). KHÔNG trả về HTML. Đối với câu hỏi về hàm số thì chỉ cho duy nhất một trong các dạng thức: công thức, đồ thị, bảng biến thiên, đạo hàm."
+      description: "Nội dung câu hỏi (LaTeX $). KHÔNG trả về HTML (như <table>). Nếu cần vẽ bảng thống kê, hãy dùng LaTeX Array. Đối với câu hỏi về hàm số thì chỉ cho duy nhất một trong các dạng thức: công thức, đồ thị, bảng biến thiên, đạo hàm, đồ thị đạo hàm."
   },
     options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
     correctAnswer: { type: SchemaType.STRING, description: "TN: Chỉ trả về 'A', 'B', 'C' hoặc 'D'. TLN: Số." },
-    explanation: { type: SchemaType.STRING, description: "Lời giải chi tiết. Dùng ký tự '\\n' để xuống dòng." },
+    explanation: { type: SchemaType.STRING, description: "Lời giải chi tiết. Dùng ký tự '\\n' để xuống dòng giữa các bước giải. Trình bày thoáng, dễ đọc." },
+
+    // Cấu trúc bắt buộc cho câu Đúng/Sai
     statements: {
       type: SchemaType.ARRAY,
       items: {
@@ -121,22 +113,28 @@ const questionSchema: any = {
         required: ["id", "content", "isCorrect"]
       }
   },
+  // ----------------------------------------------------
+    
     variationTableData: { ...variationTableSchema, nullable: true },
     graphFunction: { type: SchemaType.STRING },
+    // --- THÊM DÒNG NÀY ---
     asymptotes: { 
       type: SchemaType.ARRAY, 
       items: { type: SchemaType.STRING }, 
       description: "Mảng chứa các đường tiệm cận. Ví dụ: ['x=2', 'y=1', 'y = 2*x + 1]" 
   },
+  // ---------------------
     geometryGraph: { ...geometryGraphSchema, nullable: true },
     plotlyData: { ...plotlyDataSchema, nullable: true }
   },
   required: ['id', 'type', 'questionText', 'explanation']
 };
 
+// Thêm tham số userApiKey
 export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
   if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
 
+  // Khởi tạo GenAI với key người dùng nhập (thay vì key mặc định)
   const genAI = new GoogleGenerativeAI(userApiKey);
 
   const tnCount = (config.distribution.TN.BIET || 0) + (config.distribution.TN.HIEU || 0) + (config.distribution.TN.VANDUNG || 0);
@@ -147,17 +145,16 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
   if (totalQuestions === 0) throw new Error("Nhập số lượng câu hỏi!");
 
   try {
-    // SỬ DỤNG MODEL 2.5
     const model = genAI.getGenerativeModel({
-      model: MODEL_NAME,
+      model: "gemini-2.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
         temperature: 0.3,
+        // TĂNG LÊN MỨC CAO ĐỂ TRÁNH BỊ CẮT CỤT JSON
         maxOutputTokens: 20000,
       }
     });
-
 
     const prompt = `
       Bạn là Chuyên Gia Giáo Dục. Tạo ${totalQuestions} câu hỏi:
@@ -311,99 +308,127 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
          Trả về JSON mảng ${totalQuestions} câu.
     `;
 
-// Gọi qua Retry
-const result = await retryOperation(async () => {
-  return await model.generateContent(prompt);
-});
-return JSON.parse(result.response.text());
-} catch (error) {
-console.error("Gemini Error:", error);
-throw error;
-}
-};
-
-const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string, mimeType: string } }> => {
-const base64EncodedDataPromise = new Promise<string>((resolve) => {
-  const reader = new FileReader();
-  reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-  reader.readAsDataURL(file);
-});
-return {
-  inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
-};
-};
-
-export const generateQuizFromImages = async (
-  imageFiles: File[],
-  mode: 'EXACT' | 'SIMILAR',
-  userApiKey: string,
-  additionalPrompt: string = ""
-): Promise<Question[]> => {
-  if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
-  if (imageFiles.length === 0) throw new Error("Vui lòng chọn ít nhất 1 ảnh!");
-  if (imageFiles.length > 4) throw new Error("Tối đa chỉ được chọn 4 ảnh!");
-
-  const genAI = new GoogleGenerativeAI(userApiKey);
-  const model = genAI.getGenerativeModel({
-    model: MODEL_NAME, // Dùng model 2.5
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
-      temperature: mode === 'EXACT' ? 0.1 : 0.4,
-      maxOutputTokens: 20000,
-    }
-  });
-
-  const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
-
-  let taskDescription = "";
-  if (mode === 'EXACT') {
-    taskDescription = `NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học trong ảnh. GIỮ NGUYÊN số liệu.`;
-  } else {
-    taskDescription = `NHIỆM VỤ: TẠO RA các câu hỏi MỚI tương tự về dạng và độ khó với câu trong ảnh.`;
-  }
-
-  const prompt = `
-    Bạn là một trợ lý AI chuyên về Toán học và OCR.
-    ${taskDescription}
-    Bổ sung: "${additionalPrompt}"
-    Output BẮT BUỘC JSON Array theo schema đã định nghĩa.
-  `;
-
-  try {
+    // Mới: Bọc trong retryOperation
     const result = await retryOperation(async () => {
-      return await model.generateContent([prompt, ...imageParts]);
+      return await model.generateContent(prompt);
     });
-    const responseText = result.response.text();
-    return JSON.parse(responseText);
-  } catch (error: any) {
-      console.error("Gemini Vision Error:", error);
-      if (error.message?.includes("image")) {
-          throw new Error("Lỗi xử lý ảnh. Vui lòng kiểm tra lại định dạng hoặc dung lượng ảnh.");
-      }
+    return JSON.parse(result.response.text());
+  } catch (error) {
+    console.error("Gemini Error:", error);
     throw error;
   }
 };
 
+  // --- BỔ SUNG: HELPER CHUYỂN FILE ẢNH SANG BASE64 ---
+  const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string, mimeType: string } }> => {
+    const base64EncodedDataPromise = new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+
+    return {
+      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+    };
+  };
+
+  // --- BỔ SUNG: HÀM TẠO ĐỀ TỪ ẢNH ---
+  export const generateQuizFromImages = async (
+      imageFiles: File[],
+      mode: 'EXACT' | 'SIMILAR', // EXACT: Giống hệt, SIMILAR: Tương tự
+      userApiKey: string,
+      additionalPrompt: string = ""
+    ): Promise<Question[]> => {
+      if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+      if (imageFiles.length === 0) throw new Error("Vui lòng chọn ít nhất 1 ảnh!");
+      if (imageFiles.length > 4) throw new Error("Tối đa chỉ được chọn 4 ảnh!");
+    
+      const genAI = new GoogleGenerativeAI(userApiKey);
+    
+      // Sử dụng model gemini-2.5-flash (hoặc pro) để hỗ trợ tốt hình ảnh
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash", // Flash nhanh và rẻ hơn cho vision
+        generationConfig: {
+          responseMimeType: "application/json",
+          // Tái sử dụng schema đã định nghĩa ở trên
+          responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
+          temperature: mode === 'EXACT' ? 0.1 : 0.4, // EXACT cần chính xác (temp thấp), SIMILAR cần sáng tạo (temp cao hơn)
+          maxOutputTokens: 20000,
+        }
+      });
+    
+      // 1. Chuẩn bị dữ liệu hình ảnh
+      const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
+    
+      // 2. Chuẩn bị Prompt (Chỉ đạo AI)
+      let taskDescription = "";
+      if (mode === 'EXACT') {
+        taskDescription = `
+          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học (hay môn học bất kỳ) có trong các hình ảnh được cung cấp.
+          YÊU CẦU ĐẶC BIỆT:
+          1. GIỮ NGUYÊN văn phong, số liệu, và các phương án lựa chọn (nếu là trắc nghiệm) HỆT NHƯ trong ảnh. Không được tự ý thay đổi đề bài.
+          2. Nếu ảnh mờ hoặc cắt không hết, hãy cố gắng suy luận nội dung chính xác nhất có thể.
+          3. Cung cấp lời giải chi tiết (explanation) cho từng câu.
+        `;
+      } else {
+        taskDescription = `
+          NHIỆM VỤ: Phân tích các dạng toán và mức độ kiến thức trong các hình ảnh. Sau đó, TẠO RA các câu hỏi MỚI tương tự.
+          YÊU CẦU ĐẶC BIỆT:
+          1. KHÔNG chép lại đề bài cũ. Hãy thay đổi số liệu, ngữ cảnh, nhưng giữ nguyên dạng bài và độ khó.
+          2. Tạo ra số lượng câu hỏi tương đương với số câu hỏi phát hiện được trong ảnh.
+          3. Cung cấp lời giải chi tiết (explanation) cho các câu hỏi mới này.
+        `;
+      }
+    
+      const prompt = `
+        Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
+        ${taskDescription}
+        Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+
+        QUAN TRỌNG:
+        - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
+        - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 9 về định dạng LaTeX, đồ thị, bảng biến thiên đã được quy định trước đó trong hệ thống này.
+        - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
+        - Nếu là tự luận, hãy chuyển về dạng TLN (Điền số) nếu có thể, hoặc TN.
+      `;
+    
+      // 3. Gửi yêu cầu (Prompt text + Image parts)
+      try {
+        // Mới:
+        const result = await retryOperation(async () => {
+          return await model.generateContent([prompt, ...imageParts]);
+        });
+        const responseText = result.response.text();
+        return JSON.parse(responseText);
+      } catch (error: any) {
+          console.error("Gemini Vision Error:", error);
+          // Bắt lỗi cụ thể liên quan đến ảnh (ví dụ: ảnh quá lớn, định dạng không hỗ trợ)
+          if (error.message?.includes("image")) {
+              throw new Error("Lỗi xử lý ảnh. Vui lòng kiểm tra lại định dạng hoặc dung lượng ảnh.");
+          }
+        throw error;
+      }
+    };
+// Thêm hàm sinh lý thuyết
 export const generateTheory = async (topic: string, userApiKey: string): Promise<string> => {
-if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
-const genAI = new GoogleGenerativeAI(userApiKey);
+  if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+  const genAI = new GoogleGenerativeAI(userApiKey);
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-// Lý thuyết dùng chung model 2.5
-const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+  const prompt = `
+    Bạn là giáo viên Phổ thông giỏi. Hãy tóm tắt LÝ THUYẾT TRỌNG TÂM cho chủ đề: "${topic}".
+    Yêu cầu:
+    1. Ngắn gọn, súc tích, tập trung vào công thức, định nghĩa, tính chất quan trọng nhất.
+    2. Trình bày bằng Markdown.
+    3. Các công thức toán học BẮT BUỘC dùng LaTeX kẹp trong dấu $. Ví dụ: $\\int_{a}^{b} f(x) dx$.
+    4. Chia mục rõ ràng (I. Định nghĩa, II. Công thức...).
+  `;
 
-const prompt = `
-Bạn là giáo viên. Tóm tắt LÝ THUYẾT TRỌNG TÂM cho: "${topic}".
-Yêu cầu: Markdown, Công thức LaTeX trong dấu $.
-`;
-
-try {
-const result = await retryOperation(async () => {
-    return await model.generateContent(prompt);
-});
-return result.response.text();
-} catch (error) {
-console.error("Lỗi lấy lý thuyết:", error);
-throw new Error("Không thể tải lý thuyết do server quá tải.");
-}
+  try {
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  } catch (error) {
+    console.error("Lỗi lấy lý thuyết:", error);
+    return "Không thể tải lý thuyết lúc này. Vui lòng thử lại.";
+  }
 };
