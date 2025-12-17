@@ -84,32 +84,54 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-// --- [SỬA LẠI] LOGIC BẮT SỰ KIỆN RỜI TAB (Đã Fix lỗi đếm đôi) ---
+// --- [SỬA LẠI] LOGIC BẮT VI PHẠM (Bao gồm cả Split View & Bong bóng chat) ---
 useEffect(() => {
-  const handleVisibilityChange = () => {
+  const handleViolation = () => {
     const now = Date.now(); // Lấy thời gian hiện tại
     
-    // Điều kiện:
-    // 1. Tab đang ẩn (document.hidden)
-    // 2. Đang làm bài (questions.length > 0)
-    // 3. Chưa lưu điểm (!isSaved)
-    // 4. Không xem lịch sử (!viewHistory)
-    // 5. [QUAN TRỌNG] Cách lần vi phạm trước ít nhất 2 giây (2000ms)
+    // Điều kiện chặn đếm lỗi:
+    // 1. Chưa có câu hỏi (chưa vào thi)
+    // 2. Đã nộp bài (isSaved)
+    // 3. Đang xem lịch sử
+    // 4. Vừa mới bắt lỗi cách đây dưới 2 giây (Debounce)
     if (
-      document.hidden && 
-      questions.length > 0 && 
-      !isSaved && 
-      !viewHistory && 
-      (now - lastViolationTime.current > 2000) // <--- Fix lỗi đếm đôi tại đây
+      questions.length === 0 || 
+      isSaved || 
+      viewHistory || 
+      (now - lastViolationTime.current < 2000)
     ) {
-      setViolationCount(prev => prev + 1);
-      lastViolationTime.current = now; // Cập nhật thời gian
+      return; 
     }
+
+    // Ghi nhận lỗi
+    setViolationCount(prev => prev + 1);
+    lastViolationTime.current = now;
+    
+    // (Tùy chọn) Có thể Alert cảnh cáo ngay lập tức để học sinh sợ
+    // alert("Cảnh báo: Bạn vừa rời khỏi màn hình làm bài!");
   };
 
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  // 1. Sự kiện khi ẩn Tab hoặc thu nhỏ trình duyệt
+  const onVisibilityChange = () => {
+    if (document.hidden) handleViolation();
+  };
+
+  // 2. Sự kiện quan trọng: Khi mất tiêu điểm (Click sang cửa sổ khác/Split View)
+  const onBlur = () => {
+    handleViolation();
+  };
+
+  // Đăng ký sự kiện
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("blur", onBlur); // <--- THÊM DÒNG NÀY
+
+  // Hủy đăng ký khi thoát
+  return () => {
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("blur", onBlur);
+  };
 }, [questions.length, isSaved, viewHistory]);
+// -------------------------------------------------------------
 // ---------------------------------------------
 
   // --- [CODE MỚI] STATE QUẢN LÝ LÝ THUYẾT ---
