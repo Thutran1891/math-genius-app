@@ -393,17 +393,28 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         `;
       }
 
-      const prompt = `
-        Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
-        ${taskDescription}
-        Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+    // Trong file geminiService.ts -> hàm generateQuizFromImages
 
-        QUAN TRỌNG:
-        - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
-        - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 9 về định dạng LaTeX, đồ thị, bảng biến thiên đã được quy định trước đó trong hệ thống này.
-        - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
-        - Nếu là tự luận, hãy chuyển về dạng TLN (Điền số) nếu có thể, hoặc TN.
-      `;
+    const prompt = `
+    Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
+    ${taskDescription}
+    Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+
+    QUAN TRỌNG VỀ OCR (TUYỆT ĐỐI TUÂN THỦ):
+    1. CHÍNH XÁC TUYỆT ĐỐI: Giữ nguyên 100% ký hiệu toán học, hướng vector ($\vec{AB}$ khác $\vec{BA}$), chỉ số dưới/trên. KHÔNG được tự ý "sửa lỗi" đề bài kể cả khi bạn nghĩ đề sai.
+    2. Với các câu hỏi Vector/Hình học Oxyz: Hãy trích xuất cực kỳ cẩn thận từng ký tự. Ví dụ: $\vec{IA}$ phải giữ là $\vec{IA}$, không đổi thành $\vec{AI}$.
+
+    QUAN TRỌNG VỀ TÍNH TOÁN (CHO DẠNG BÀI ĐIỀN SỐ):
+    1. KHÔNG LÀM TRÒN SỚM: Hãy giữ nguyên các biểu thức chính xác (căn thức, phân số, $\pi$, $e$) trong các bước tính trung gian.
+    2. CHỈ LÀM TRÒN Ở BƯỚC CUỐI CÙNG: Chỉ thực hiện làm tròn số khi ra kết quả cuối cùng theo yêu cầu của đề bài (ví dụ: làm tròn đến hàng phần chục).
+    3. Kiểm tra lại kết quả 2 lần để đảm bảo khớp với phép tính chính xác.
+
+    QUAN TRỌNG VỀ OUTPUT:
+    - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
+    - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 10.
+    - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
+    - Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm có 4 options A, B, C, D ).
+    `;      
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {

@@ -174,48 +174,66 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   }, [question.graphFunction, question.asymptotes, question.id]); 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
-  // Logic kiểm tra kết quả
-  const handleCheckResult = () => {
-      if (!userAnswer) return;
-      
-      let correct = false;
-      if (question.type === 'TN') {
-          const userClean = (userAnswer as string).trim().toUpperCase();
-          // Lấy ký tự đầu tiên của đáp án AI (A, B, C, D)
-          const correctClean = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
-          correct = userClean === correctClean;
-      } else if (question.type === 'TLN') {
-          const userVal = parseFloat((userAnswer as string).replace(',', '.'));
-          const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
-          const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
-          
-          if (!isNaN(userVal) && !isNaN(aiVal)) {
-              correct = Math.abs(userVal - aiVal) < 0.05;
-          } else {
-              correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
-          }
-      } else if (question.type === 'DS') {
-          const allCorrect = question.statements?.every(stmt => 
-             userAnswer[stmt.id] === stmt.isCorrect
-          );
-          correct = !!allCorrect;
-      }
+    // Logic kiểm tra kết quả
+    const handleCheckResult = () => {
+        if (!userAnswer) return;
+        
+        let correct = false;
+        if (question.type === 'TN') {
+            // --- FIX LỖI CHẤM TRẮC NGHIỆM (REGEX) ---
+            const userClean = (userAnswer as string).trim().toUpperCase();
+            const aiRaw = (question.correctAnswer || '').trim();
+            
+            // Regex tìm đáp án A, B, C, D chính xác
+            const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
+            
+            let correctClean = "";
+            if (match) {
+                correctClean = match[1].toUpperCase(); 
+            } else {
+                correctClean = aiRaw.toUpperCase().charAt(0);
+            }
 
-      setIsChecked(true);
-      setIsCorrect(correct);
-      playSound(correct);
-      
-      if (onUpdateScore) onUpdateScore(correct);
+            correct = userClean === correctClean;
+        } else if (question.type === 'TLN') {
+            // --- FIX LỖI SAI SỐ LÀM TRÒN ---
+            // Thay dấu phẩy thành chấm để parse số
+            const userVal = parseFloat((userAnswer as string).replace(',', '.'));
+            
+            // Lấy số từ đáp án AI (loại bỏ text thừa nếu có)
+            const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
+            const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
+            
+            if (!isNaN(userVal) && !isNaN(aiVal)) {
+                // TĂNG SAI SỐ CHẤP NHẬN ĐƯỢC LÊN 0.15 (để bao quát trường hợp làm tròn lệch 0.1)
+                // Ví dụ: Đáp án 10.7, học sinh nhập 10.6 hoặc 10.8 vẫn có thể châm chước được nếu cần
+                // Hoặc giữ 0.1 nếu muốn chặt chẽ hơn nhưng vẫn an toàn hơn 0.05
+                correct = Math.abs(userVal - aiVal) <= 0.15; 
+            } else {
+                // So sánh chuỗi nếu không phải là số
+                correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
+            }
+        } else if (question.type === 'DS') {
+            const allCorrect = question.statements?.every(stmt => 
+            userAnswer[stmt.id] === stmt.isCorrect
+            );
+            correct = !!allCorrect;
+        }
 
-      // Gửi dữ liệu về App để lưu
-      if (onDataChange) {
-          onDataChange({
-              ...question,
-              userAnswer: userAnswer,
-              isCorrect: correct
-          });
-      }
-  };
+        setIsChecked(true);
+        setIsCorrect(correct);
+        playSound(correct);
+        
+        if (onUpdateScore) onUpdateScore(correct);
+
+        if (onDataChange) {
+            onDataChange({
+                ...question,
+                userAnswer: userAnswer,
+                isCorrect: correct
+            });
+        }
+    };
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
@@ -285,10 +303,14 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
             let css = "p-3 border border-yellow-200 rounded-lg text-left bg-yellow-50 hover:bg-yellow-100 flex gap-2 transition-all shadow-sm ";
             
             if (isChecked) {
-                const aiChar = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
-                const isRightOption = aiChar === label;
+                // [SỬA LẠI LOGIC HIỂN THỊ KẾT QUẢ]
+                // Tính toán lại correctClean tại đây để tô màu cho đúng (đồng bộ với logic chấm điểm)
+                const aiRaw = (question.correctAnswer || '').trim();
+                const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
+                const correctClean = match ? match[1].toUpperCase() : aiRaw.toUpperCase().charAt(0);
 
-                // Giữ nguyên logic tô màu Xanh/Đỏ khi đã kiểm tra
+                const isRightOption = correctClean === label;
+
                 if (isRightOption) css = "p-3 border-2 border-green-500 bg-green-50 text-green-800 font-bold flex gap-2 shadow-md";
                 else if (isSelected) css = "p-3 border-2 border-red-500 bg-red-50 text-red-800 flex gap-2 opacity-100";
                 else css += "opacity-50"; // Làm mờ các đáp án không chọn
@@ -377,7 +399,11 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                 <Send className="w-4 h-4" /> Kiểm tra
               </button>
           ) : (
-              <div className="flex-1"></div>
+              <div className="flex-1 text-sm">
+                  {/* [THÊM MỚI] HIỂN THỊ ĐÁP ÁN ĐÚNG CỦA AI ĐỂ ĐỐI CHIẾU */}
+                  <span className="font-bold text-gray-500">Đáp án gốc: </span> 
+                  <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">{question.correctAnswer || "Không có"}</span>
+              </div>
           )}
 
           {isChecked && (
