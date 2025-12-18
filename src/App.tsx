@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react'; // Thêm useCallback
 import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
@@ -26,51 +26,52 @@ function App() {
   const [violationCount, setViolationCount] = useState(0);
   const [showToast, setShowToast] = useState(false);
 
-  // --- REFS QUAN TRỌNG CHO THUẬT TOÁN CHỐNG GIAN LẬN ---
-  // Dùng Ref để lưu trạng thái thực mà không gây re-render
+  // --- HỆ THỐNG REFS CHỐNG GIAN LẬN "BẤT TỬ" ---
   const isTestingRef = useRef(false); 
   const isSavedRef = useRef(false);
   const lastViolationTime = useRef<number>(0);
+  // [MỚI] Dùng Ref để đếm số lần vi phạm (Chính xác tuyệt đối)
+  const violationCountRef = useRef(0);
 
   // --- STATE QUẢN LÝ LÝ THUYẾT ---
   const [showTheory, setShowTheory] = useState(false);
   const [theoryContent, setTheoryContent] = useState('');
   const [loadingTheory, setLoadingTheory] = useState(false);
 
-  // Đồng bộ State React sang Ref để Event Listener đọc được giá trị mới nhất
+  // Đồng bộ State React sang Ref liên tục
   useEffect(() => {
-    // Đang thi = Có câu hỏi VÀ Chưa bấm lưu VÀ Không xem lịch sử
     isTestingRef.current = questions.length > 0 && !isSaved && !viewHistory;
-    // Đồng bộ trạng thái đã lưu
     isSavedRef.current = isSaved;
   }, [questions.length, isSaved, viewHistory]);
 
-  // --- [THUẬT TOÁN CHỐNG GIAN LẬN "XỊN XÒ" - PHIÊN BẢN ỔN ĐỊNH] ---
+  // --- THUẬT TOÁN CHỐNG GIAN LẬN (PHIÊN BẢN FIX LỖI ĐẾM 1 LẦN) ---
   useEffect(() => {
     const handleViolation = () => {
-      // 1. Kiểm tra "công tắc" Ref: Nếu không phải đang thi hoặc đã lưu thì bỏ qua ngay
+      // 1. Kiểm tra điều kiện: Phải đang thi và chưa lưu
       if (!isTestingRef.current || isSavedRef.current) return;
 
       const now = Date.now();
-      // Debounce 1 giây: Tránh đếm trùng nếu sự kiện bắn liên tục
-      if (now - lastViolationTime.current < 1000) return;
+      // Giảm Debounce xuống 500ms để nhạy hơn nhưng vẫn tránh đếm trùng
+      if (now - lastViolationTime.current < 500) return;
 
-      setViolationCount(prev => prev + 1);
+      // 2. Tăng biến đếm trong Ref trước (Đảm bảo luôn tăng)
+      violationCountRef.current += 1;
+      
+      // 3. Cập nhật ra giao diện (Lấy giá trị từ Ref ném ra State)
+      setViolationCount(violationCountRef.current);
+      
       lastViolationTime.current = now;
     };
 
-    // Sự kiện 1: Rời tab/Minimze trình duyệt
     const onVisibilityChange = () => {
       if (document.hidden) handleViolation();
     };
 
-    // Sự kiện 2: Mất tiêu điểm (Click sang màn hình khác khi Split View)
     const onBlur = () => {
       handleViolation();
     };
 
-    // Gắn sự kiện 1 lần duy nhất khi App khởi chạy (nhờ dependency rỗng [])
-    // Cách này giúp sự kiện luôn "sống", không bị gỡ ra gắn lại gây hụt lổ hổng
+    // Gắn sự kiện 1 lần duy nhất - Bất chấp chia đôi màn hình
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("blur", onBlur);
 
@@ -78,18 +79,28 @@ function App() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("blur", onBlur);
     };
-  }, []); // <--- Dependency rỗng: Chỉ chạy 1 lần duy nhất
+  }, []); // Dependency rỗng -> Sự kiện luôn sống
+
+  // Hàm reset thông số khi tạo đề mới
+  const resetQuizState = () => {
+    setScore(0);
+    setIsSaved(false);
+    isSavedRef.current = false;
+    setAttemptCount(1);
+    
+    // [QUAN TRỌNG] Reset bộ đếm vi phạm về 0
+    setViolationCount(0);
+    violationCountRef.current = 0; 
+    lastViolationTime.current = 0;
+    
+    setQuestions([]);
+    setTheoryContent('');
+  };
 
   const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
     setLoading(true);
     setCurrentApiKey(apiKey);
-    setScore(0);
-    setIsSaved(false);
-    isSavedRef.current = false; // Reset Ref ngay lập tức
-    setAttemptCount(1);
-    setViolationCount(0);
-    setQuestions([]);
-    setTheoryContent('');
+    resetQuizState(); // Gọi hàm reset
 
     const defaultName = mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh";
     const finalTopic = topicName && topicName.trim() !== "" ? topicName : defaultName;
@@ -145,13 +156,7 @@ function App() {
     setLoading(true);
     setConfig(newConfig);
     setCurrentApiKey(apiKey);
-    setScore(0);
-    setIsSaved(false);
-    isSavedRef.current = false;
-    setAttemptCount(1);
-    setViolationCount(0);
-    setQuestions([]); 
-    setTheoryContent('');
+    resetQuizState(); // Gọi hàm reset
     try {
       const result = await generateQuiz(newConfig, apiKey);
       setQuestions(result);
@@ -167,11 +172,7 @@ function App() {
   };
 
   const handleLoadExamFromHistory = (oldQuestions: Question[], topic: string) => {
-    setScore(0);
-    setIsSaved(false);
-    isSavedRef.current = false;
-    setAttemptCount(1);
-    setViolationCount(0);
+    resetQuizState(); // Gọi hàm reset
     setLoading(false);
 
     setConfig({
@@ -205,7 +206,7 @@ function App() {
   const handleSaveResult = async () => {
     if (!user || !config || isSavedRef.current) return;
     
-    // Chặn tức thì bằng Ref để ngắt sự kiện Blur ngay lập tức
+    // Chặn tức thì bằng Ref
     isSavedRef.current = true;
     setIsSaved(true); 
 
@@ -217,10 +218,10 @@ function App() {
         total: questions.length,
         date: serverTimestamp(),
         fullData: JSON.stringify(questions),
-        violationCount: violationCount
+        // Lưu giá trị từ Ref để đảm bảo chính xác nhất
+        violationCount: violationCountRef.current 
       });
       
-      // Hiện Toast thông báo
       setShowToast(true); 
       setTimeout(() => setShowToast(false), 3000); 
 
@@ -280,6 +281,7 @@ function App() {
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                   <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
                   
+                  {/* Hiển thị số lỗi vi phạm */}
                   {violationCount > 0 && (
                       <span className="flex items-center gap-1 text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-200 animate-pulse">
                           <AlertTriangle size={14} /> Rời tab: {violationCount} lần
