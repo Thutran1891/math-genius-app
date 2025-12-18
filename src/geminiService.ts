@@ -376,7 +376,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           YÊU CẦU ĐẶC BIỆT:
           1. GIỮ NGUYÊN nội dung đề bài và số liệu.
           2. CHUYỂN ĐỔI ĐỊNH DẠNG:
-            - Nếu câu hỏi gốc là Tự luận nhưng kết quả là Tọa độ điểm (x;y;z), Vectơ, Phương trình mặt phẳng/đường thẳng: BẮT BUỘC chuyển về dạng 'TN' (Trắc nghiệm 4 lựa chọn). Hãy tự tạo ra 3 phương án nhiễu logic.
+            - Nếu câu hỏi gốc là Tự luận nhưng kết quả là Tọa độ điểm (x;y;z), Vectơ, Phương trình mặt phẳng/đường thẳng: BẮT BUỘC chuyển về dạng 'TN' (Trắc nghiệm 4 lựa chọn). Hãy tự tạo ra 3 phương án nhiễu logic và hoán vị 4 phương án này.
             - Chỉ dùng dạng 'TLN' (Điền số) khi kết quả là MỘT SỐ thực/số nguyên duy nhất (VD: tính diện tích, thể tích, giá trị biểu thức).
           3. Cung cấp lời giải chi tiết (explanation).
           `;
@@ -386,7 +386,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           YÊU CẦU ĐẶC BIỆT:
           1. Thay đổi số liệu và tên gọi, giữ nguyên độ khó và dạng bài.
           2. CHUYỂN ĐỔI ĐỊNH DẠNG:
-            - Các bài toán về Tọa độ, Vectơ, Hình học Oxyz: BẮT BUỘC dùng dạng 'TN' (Trắc nghiệm).
+            - Các bài toán về Tọa độ, Vectơ, Hình học Oxyz: BẮT BUỘC dùng dạng 'TN' (Trắc nghiệm) và hoán vị 4 phương án này.
             - Dạng 'TLN' chỉ dùng cho các bài toán ra kết quả là số đơn lẻ.
           3. Tạo số lượng câu tương ứng với số câu trong ảnh.
         `;
