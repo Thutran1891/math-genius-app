@@ -26,7 +26,9 @@ function App() {
   const [violationCount, setViolationCount] = useState(0);
   const [showToast, setShowToast] = useState(false);
 
-  // Ref để chặn violation ngay lập tức (quan trọng hơn state)
+  // --- REFS QUAN TRỌNG CHO THUẬT TOÁN CHỐNG GIAN LẬN ---
+  // Dùng Ref để lưu trạng thái thực mà không gây re-render
+  const isTestingRef = useRef(false); 
   const isSavedRef = useRef(false);
   const lastViolationTime = useRef<number>(0);
 
@@ -35,12 +37,55 @@ function App() {
   const [theoryContent, setTheoryContent] = useState('');
   const [loadingTheory, setLoadingTheory] = useState(false);
 
+  // Đồng bộ State React sang Ref để Event Listener đọc được giá trị mới nhất
+  useEffect(() => {
+    // Đang thi = Có câu hỏi VÀ Chưa bấm lưu VÀ Không xem lịch sử
+    isTestingRef.current = questions.length > 0 && !isSaved && !viewHistory;
+    // Đồng bộ trạng thái đã lưu
+    isSavedRef.current = isSaved;
+  }, [questions.length, isSaved, viewHistory]);
+
+  // --- [THUẬT TOÁN CHỐNG GIAN LẬN "XỊN XÒ" - PHIÊN BẢN ỔN ĐỊNH] ---
+  useEffect(() => {
+    const handleViolation = () => {
+      // 1. Kiểm tra "công tắc" Ref: Nếu không phải đang thi hoặc đã lưu thì bỏ qua ngay
+      if (!isTestingRef.current || isSavedRef.current) return;
+
+      const now = Date.now();
+      // Debounce 1 giây: Tránh đếm trùng nếu sự kiện bắn liên tục
+      if (now - lastViolationTime.current < 1000) return;
+
+      setViolationCount(prev => prev + 1);
+      lastViolationTime.current = now;
+    };
+
+    // Sự kiện 1: Rời tab/Minimze trình duyệt
+    const onVisibilityChange = () => {
+      if (document.hidden) handleViolation();
+    };
+
+    // Sự kiện 2: Mất tiêu điểm (Click sang màn hình khác khi Split View)
+    const onBlur = () => {
+      handleViolation();
+    };
+
+    // Gắn sự kiện 1 lần duy nhất khi App khởi chạy (nhờ dependency rỗng [])
+    // Cách này giúp sự kiện luôn "sống", không bị gỡ ra gắn lại gây hụt lổ hổng
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("blur", onBlur);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []); // <--- Dependency rỗng: Chỉ chạy 1 lần duy nhất
+
   const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
     setLoading(true);
     setCurrentApiKey(apiKey);
     setScore(0);
     setIsSaved(false);
-    isSavedRef.current = false; // Reset Ref
+    isSavedRef.current = false; // Reset Ref ngay lập tức
     setAttemptCount(1);
     setViolationCount(0);
     setQuestions([]);
@@ -79,42 +124,6 @@ function App() {
     });
     return () => unsubscribe();
   }, []);
-
-  // --- LOGIC BẮT VI PHẠM ---
-  useEffect(() => {
-    const handleViolation = () => {
-      const now = Date.now();
-      
-      // Nếu đã lưu (check bằng Ref để đảm bảo tức thì) thì KHÔNG bắt lỗi nữa
-      if (
-        questions.length === 0 || 
-        isSavedRef.current || // <--- QUAN TRỌNG: Chặn ngay nếu đã lưu
-        viewHistory || 
-        (now - lastViolationTime.current < 2000)
-      ) {
-        return; 
-      }
-
-      setViolationCount(prev => prev + 1);
-      lastViolationTime.current = now;
-    };
-
-    const onVisibilityChange = () => {
-      if (document.hidden) handleViolation();
-    };
-
-    const onBlur = () => {
-      handleViolation();
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("blur", onBlur);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("blur", onBlur);
-    };
-  }, [questions.length, viewHistory]); // Bỏ isSaved ra khỏi dependency vì đã dùng Ref
 
   const handleToggleTheory = async () => {
     setShowTheory(true);
@@ -193,13 +202,12 @@ function App() {
     setQuestions(prev => prev.map(q => q.id === updatedQ.id ? updatedQ : q));
   };
 
-  // --- HÀM LƯU ĐIỂM ĐÃ SỬA LỖI ---
   const handleSaveResult = async () => {
-    if (!user || !config || isSavedRef.current) return; // Chặn nếu đã lưu
+    if (!user || !config || isSavedRef.current) return;
     
-    // 1. Cập nhật REF ngay lập tức (Sync) để chặn sự kiện Blur/VisibilityChange
+    // Chặn tức thì bằng Ref để ngắt sự kiện Blur ngay lập tức
     isSavedRef.current = true;
-    setIsSaved(true); // Cập nhật UI
+    setIsSaved(true); 
 
     try {
       const historyRef = collection(db, "users", user.uid, "examHistory");
@@ -212,15 +220,14 @@ function App() {
         violationCount: violationCount
       });
       
-      // 2. Hiện thông báo Toast (KHÔNG DÙNG ALERT)
+      // Hiện Toast thông báo
       setShowToast(true); 
       setTimeout(() => setShowToast(false), 3000); 
 
     } catch (e) {
       console.error("Lỗi lưu:", e);
-      // Nếu lỗi, cho phép lưu lại
       isSavedRef.current = false; 
-      setIsSaved(false);
+      setIsSaved(false); 
       alert("Không thể lưu kết quả. Vui lòng thử lại.");
     }
   };
@@ -240,14 +247,13 @@ function App() {
     <SubscriptionGuard>
       <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
         
-        {/* --- TOAST NOTIFICATION (Đã đưa ra ngoài cùng để luôn hiển thị) --- */}
+        {/* --- TOAST NOTIFICATION --- */}
         {showToast && (
             <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-300">
                 <CheckCircle className="w-6 h-6 text-white" />
                 <span className="font-bold text-sm">Đã lưu kết quả vào Lịch sử!</span>
             </div>
         )}
-        {/* ------------------------------------------------------------------ */}
 
         {questions.length === 0 ? (
           <>
