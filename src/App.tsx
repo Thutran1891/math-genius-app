@@ -1,25 +1,17 @@
-import { useState, useEffect, useRef  } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
 import { History } from './components/History';
-// import { generateQuiz } from './geminiService';
 import { QuizConfig, Question } from './types';
-// import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save } from 'lucide-react';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-
-import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
-// 1. Thêm BookOpen, X vào dòng import từ 'lucide-react'
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle } from 'lucide-react';
-
-// 2. Import hàm sinh lý thuyết và component hiển thị Latex
-// import { generateTheory } from './geminiService';
+import { SubscriptionGuard } from './components/SubscriptionGuard';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import { LatexText } from './components/LatexText';
-// Dòng số 1 của file App.tsx
-// Import thêm generateQuizFromImages
 import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
+
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -29,31 +21,36 @@ function App() {
   const [currentApiKey, setCurrentApiKey] = useState<string>("");
   const [viewHistory, setViewHistory] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  // --- THÊM DÒNG NÀY ---
+  
   const [attemptCount, setAttemptCount] = useState(1);
-  // --- [THÊM MỚI] BIẾN ĐẾM SỐ LẦN RỜI TAB ---
   const [violationCount, setViolationCount] = useState(0);
-  // ---------------------
-  // --- [THÊM MỚI] BIẾN CHỐNG ĐẾM ĐÔI (Debounce) ---
+  const [showToast, setShowToast] = useState(false);
+
+  // Ref để chặn violation ngay lập tức (quan trọng hơn state)
+  const isSavedRef = useRef(false);
   const lastViolationTime = useRef<number>(0);
-  // Cập nhật tham số nhận vào: thêm topicName
+
+  // --- STATE QUẢN LÝ LÝ THUYẾT ---
+  const [showTheory, setShowTheory] = useState(false);
+  const [theoryContent, setTheoryContent] = useState('');
+  const [loadingTheory, setLoadingTheory] = useState(false);
+
   const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
     setLoading(true);
     setCurrentApiKey(apiKey);
     setScore(0);
     setIsSaved(false);
+    isSavedRef.current = false; // Reset Ref
     setAttemptCount(1);
-    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
+    setViolationCount(0);
     setQuestions([]);
     setTheoryContent('');
 
-    // Logic đặt tên: Nếu người dùng nhập thì lấy, không thì dùng tên mặc định
     const defaultName = mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh";
     const finalTopic = topicName && topicName.trim() !== "" ? topicName : defaultName;
 
-    // Tạo config
     setConfig({
-        topic: finalTopic, // <--- Dùng tên đã xử lý
+        topic: finalTopic,
         distribution: {
           TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
           TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
@@ -62,20 +59,19 @@ function App() {
         additionalPrompt: prompt
     });  
 
-  try {
-    // Gọi hàm service mới
-    const result = await generateQuizFromImages(images, mode, apiKey, prompt);
-    setQuestions(result);
-    if (result.length === 0) {
-        alert("AI không tìm thấy câu hỏi nào trong ảnh. Vui lòng thử ảnh khác rõ nét hơn.");
+    try {
+      const result = await generateQuizFromImages(images, mode, apiKey, prompt);
+      setQuestions(result);
+      if (result.length === 0) {
+          alert("AI không tìm thấy câu hỏi nào trong ảnh. Vui lòng thử ảnh khác rõ nét hơn.");
+      }
+    } catch (error: any) {
+      console.error("Lỗi tạo đề từ ảnh:", error);
+      alert("Lỗi: " + error.message);
+    } finally {
+      setLoading(false);
     }
-  } catch (error: any) {
-    console.error("Lỗi tạo đề từ ảnh:", error);
-    alert("Lỗi: " + error.message);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -84,66 +80,44 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-// --- [SỬA LẠI] LOGIC BẮT VI PHẠM (Bao gồm cả Split View & Bong bóng chat) ---
-useEffect(() => {
-  const handleViolation = () => {
-    const now = Date.now(); // Lấy thời gian hiện tại
-    
-    // Điều kiện chặn đếm lỗi:
-    // 1. Chưa có câu hỏi (chưa vào thi)
-    // 2. Đã nộp bài (isSaved)
-    // 3. Đang xem lịch sử
-    // 4. Vừa mới bắt lỗi cách đây dưới 2 giây (Debounce)
-    if (
-      questions.length === 0 || 
-      isSaved || 
-      viewHistory || 
-      (now - lastViolationTime.current < 2000)
-    ) {
-      return; 
-    }
+  // --- LOGIC BẮT VI PHẠM ---
+  useEffect(() => {
+    const handleViolation = () => {
+      const now = Date.now();
+      
+      // Nếu đã lưu (check bằng Ref để đảm bảo tức thì) thì KHÔNG bắt lỗi nữa
+      if (
+        questions.length === 0 || 
+        isSavedRef.current || // <--- QUAN TRỌNG: Chặn ngay nếu đã lưu
+        viewHistory || 
+        (now - lastViolationTime.current < 2000)
+      ) {
+        return; 
+      }
 
-    // Ghi nhận lỗi
-    setViolationCount(prev => prev + 1);
-    lastViolationTime.current = now;
-    
-    // (Tùy chọn) Có thể Alert cảnh cáo ngay lập tức để học sinh sợ
-    // alert("Cảnh báo: Bạn vừa rời khỏi màn hình làm bài!");
-  };
+      setViolationCount(prev => prev + 1);
+      lastViolationTime.current = now;
+    };
 
-  // 1. Sự kiện khi ẩn Tab hoặc thu nhỏ trình duyệt
-  const onVisibilityChange = () => {
-    if (document.hidden) handleViolation();
-  };
+    const onVisibilityChange = () => {
+      if (document.hidden) handleViolation();
+    };
 
-  // 2. Sự kiện quan trọng: Khi mất tiêu điểm (Click sang cửa sổ khác/Split View)
-  const onBlur = () => {
-    handleViolation();
-  };
+    const onBlur = () => {
+      handleViolation();
+    };
 
-  // Đăng ký sự kiện
-  document.addEventListener("visibilitychange", onVisibilityChange);
-  window.addEventListener("blur", onBlur); // <--- THÊM DÒNG NÀY
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("blur", onBlur);
 
-  // Hủy đăng ký khi thoát
-  return () => {
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    window.removeEventListener("blur", onBlur);
-  };
-}, [questions.length, isSaved, viewHistory]);
-// -------------------------------------------------------------
-// ---------------------------------------------
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [questions.length, viewHistory]); // Bỏ isSaved ra khỏi dependency vì đã dùng Ref
 
-  // --- [CODE MỚI] STATE QUẢN LÝ LÝ THUYẾT ---
-  const [showTheory, setShowTheory] = useState(false);
-  const [theoryContent, setTheoryContent] = useState('');
-  const [loadingTheory, setLoadingTheory] = useState(false);
-
-  // Hàm mở lý thuyết (chỉ tải nếu chưa có nội dung)
   const handleToggleTheory = async () => {
-    setShowTheory(true); // Mở khung ngay
-
-    // Nếu đã có nội dung hoặc thiếu thông tin thì dừng
+    setShowTheory(true);
     if (theoryContent || !config?.topic || !currentApiKey) return;
 
     setLoadingTheory(true);
@@ -157,7 +131,6 @@ useEffect(() => {
       setLoadingTheory(false);
     }
   };
-  // ------------------------------------------
 
   const handleGenerate = async (newConfig: QuizConfig, apiKey: string) => {
     setLoading(true);
@@ -165,10 +138,11 @@ useEffect(() => {
     setCurrentApiKey(apiKey);
     setScore(0);
     setIsSaved(false);
-    setAttemptCount(1); // <--- THÊM VÀO ĐÂY
-    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
+    isSavedRef.current = false;
+    setAttemptCount(1);
+    setViolationCount(0);
     setQuestions([]); 
-    setTheoryContent(''); // <--- THÊM DÒNG NÀY ĐỂ RESET LÝ THUYẾT CŨ
+    setTheoryContent('');
     try {
       const result = await generateQuiz(newConfig, apiKey);
       setQuestions(result);
@@ -183,16 +157,14 @@ useEffect(() => {
     if (config && currentApiKey) handleGenerate(config, currentApiKey);
   };
 
-  // --- HÀM LOAD ĐỀ TỪ LỊCH SỬ ĐỂ LÀM LẠI ---
   const handleLoadExamFromHistory = (oldQuestions: Question[], topic: string) => {
-    // 1. Reset các trạng thái điểm số
     setScore(0);
     setIsSaved(false);
-    setAttemptCount(1); // Coi như làm mới hoàn toàn
-    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
+    isSavedRef.current = false;
+    setAttemptCount(1);
+    setViolationCount(0);
     setLoading(false);
 
-    // 2. Tạo config giả để hiển thị tiêu đề
     setConfig({
       topic: topic,
       distribution: { 
@@ -200,73 +172,56 @@ useEffect(() => {
         TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
         DS: { BIET: 0, HIEU: 0, VANDUNG: 0 } 
       },
-      additionalPrompt: "" // <--- DÒNG QUAN TRỌNG CẦN THÊM
+      additionalPrompt: ""
     });
 
-    // 3. Quan trọng: Xóa sạch đáp án cũ trong dữ liệu lấy từ lịch sử
     const cleanQuestions = oldQuestions.map(q => ({
       ...q,
-      userAnswer: undefined, // Xóa câu trả lời cũ
-      isCorrect: undefined   // Xóa trạng thái đúng/sai
+      userAnswer: undefined,
+      isCorrect: undefined
     }));
 
     setQuestions(cleanQuestions);
-
-    // 4. Đóng màn hình lịch sử để quay về giao diện làm bài
     setViewHistory(false);
   };
-  // -----------------------------------------
-
-
-
-  // ----------------------------
 
   const handleUpdateScore = (isCorrect: boolean) => {
     if (isCorrect) setScore(prev => prev + 1);
   };
 
-  // --- THÊM HÀM QUAN TRỌNG NÀY ---
-  // Hàm này giúp lưu đáp án người dùng chọn vào bộ nhớ, để khi bấm "Lưu điểm", nó sẽ lưu cả đáp án này lên Server
   const handleQuestionUpdate = (updatedQ: Question) => {
     setQuestions(prev => prev.map(q => q.id === updatedQ.id ? updatedQ : q));
   };
-  // ------------------------------
 
-  // Tìm đến hàm này:
+  // --- HÀM LƯU ĐIỂM ĐÃ SỬA LỖI ---
   const handleSaveResult = async () => {
-    if (!user || !config || isSaved) return;
-    try {
-      // --- [ĐOẠN CŨ - XÓA HOẶC COMMENT LẠI] ---
-      /* await addDoc(collection(db, "results"), {
-        userId: user.uid,
-        topic: config.topic,
-        score: score,
-        total: questions.length,
-        date: serverTimestamp(),
-        fullData: JSON.stringify(questions) 
-      });
-      */
+    if (!user || !config || isSavedRef.current) return; // Chặn nếu đã lưu
+    
+    // 1. Cập nhật REF ngay lập tức (Sync) để chặn sự kiện Blur/VisibilityChange
+    isSavedRef.current = true;
+    setIsSaved(true); // Cập nhật UI
 
-      // --- [ĐOẠN MỚI - THAY THẾ VÀO ĐÂY] ---
-      // Lưu vào: users -> [ID của user] -> examHistory -> [Bài thi]
+    try {
       const historyRef = collection(db, "users", user.uid, "examHistory");
-      
       await addDoc(historyRef, {
-        // Không cần lưu userId nữa vì đã nằm trong folder của họ rồi
         topic: config.topic,
         score: score,
         total: questions.length,
         date: serverTimestamp(),
-        fullData: JSON.stringify(questions) ,
-        violationCount: violationCount // <--- THÊM DÒNG NÀY ĐỂ LƯU SỐ LẦN VI PHẠM
+        fullData: JSON.stringify(questions),
+        violationCount: violationCount
       });
-      // ----------------------------------------
       
-      setIsSaved(true);
-      alert("Đã lưu kết quả thành công!");
+      // 2. Hiện thông báo Toast (KHÔNG DÙNG ALERT)
+      setShowToast(true); 
+      setTimeout(() => setShowToast(false), 3000); 
+
     } catch (e) {
       console.error("Lỗi lưu:", e);
-      alert("Không thể lưu kết quả.");
+      // Nếu lỗi, cho phép lưu lại
+      isSavedRef.current = false; 
+      setIsSaved(false);
+      alert("Không thể lưu kết quả. Vui lòng thử lại.");
     }
   };
 
@@ -285,17 +240,16 @@ useEffect(() => {
     <SubscriptionGuard>
       <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
         
-        {/* --- LOGIC HIỂN THỊ GIAO DIỆN --- */}
-        
-        {/* TRƯỜNG HỢP 1: ĐANG XEM LỊCH SỬ */}
-        {viewHistory ? (
-           <History 
-              onBack={() => setViewHistory(false)} 
-              onLoadExam={handleLoadExamFromHistory} // <-- QUAN TRỌNG: Truyền hàm vào đây
-           />
-        ) : questions.length === 0 ? (
-          
-          // TRƯỜNG HỢP 2: CHƯA CÓ CÂU HỎI (HIỆN FORM NHẬP)
+        {/* --- TOAST NOTIFICATION (Đã đưa ra ngoài cùng để luôn hiển thị) --- */}
+        {showToast && (
+            <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-300">
+                <CheckCircle className="w-6 h-6 text-white" />
+                <span className="font-bold text-sm">Đã lưu kết quả vào Lịch sử!</span>
+            </div>
+        )}
+        {/* ------------------------------------------------------------------ */}
+
+        {questions.length === 0 ? (
           <>
             <div className="max-w-2xl mx-auto mb-4 flex justify-end">
                <button onClick={() => setViewHistory(true)} className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors">
@@ -308,10 +262,7 @@ useEffect(() => {
               isLoading={loading} 
             />
           </>
-
         ) : (
-          
-          // TRƯỜNG HỢP 3: ĐANG LÀM BÀI / XEM KẾT QUẢ
           <div className="max-w-3xl mx-auto animate-fade-in relative">
             
             {/* Header */}
@@ -322,13 +273,13 @@ useEffect(() => {
                 </h2>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                   <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
-                  {/* --- [THÊM MỚI] HIỂN THỊ VI PHẠM --- */}
+                  
                   {violationCount > 0 && (
                       <span className="flex items-center gap-1 text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-200 animate-pulse">
                           <AlertTriangle size={14} /> Rời tab: {violationCount} lần
                       </span>
                   )}
-                  {/* ----------------------------------- */}
+                  
                   {!isSaved ? (
                       <button onClick={handleSaveResult} className="flex items-center gap-1 text-green-600 hover:underline font-medium text-xs bg-green-50 px-2 py-1 rounded border border-green-200">
                           <Save size={14}/> Lưu điểm
@@ -346,7 +297,6 @@ useEffect(() => {
                 >
                   <BookOpen size={18}/> <span className="hidden sm:inline">Lý thuyết</span>
                 </button>
-
 
                 <button onClick={() => setQuestions([])} className="flex-1 sm:flex-none justify-center px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium flex items-center gap-1 border border-transparent hover:border-gray-200">
                   <ArrowLeft size={16}/> <span className="hidden sm:inline">Thoát</span>
@@ -398,7 +348,7 @@ useEffect(() => {
                               <LatexText text={theoryContent} />
                           </div>
                       )}
-                  </div>
+                  </div>                  
               </div>
             )}
 
