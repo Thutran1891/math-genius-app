@@ -146,7 +146,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
@@ -305,7 +305,13 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
              - Để null các trường: 'graphFunction', 'geometryGraph'.
              - Trong 'questionText' phải ghi: "Cho bảng biến thiên như hình bên."
 
-         Trả về JSON mảng ${totalQuestions} câu.
+      // Thêm vào cuối danh sách các RULE trong prompt
+      RULE 10. QUY TẮC ĐÁP ÁN TỌA ĐỘ/VECTƠ:
+        - Tuyệt đối KHÔNG đưa tọa độ (x;y;z) hoặc biểu thức chứa biến vào trường 'correctAnswer' của loại 'TLN'.
+        - Nếu đáp án là tọa độ hoặc biểu thức, BẮT BUỘC phải dùng loại 'TN'.
+        - Các phương án trắc nghiệm (options) chứa tọa độ phải đặt trong LaTeX: "$\vec{a} = (1; 2; 3)$" hoặc "$M(1; -2; 0)$".
+
+              Trả về JSON mảng ${totalQuestions} câu.
     `;
 
     // Mới: Bọc trong retryOperation
@@ -347,7 +353,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       // Sử dụng model gemini-2.5-flash (hoặc pro) để hỗ trợ tốt hình ảnh
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash", // Flash nhanh và rẻ hơn cho vision
+        model: "gemini-3-flash-preview", // Flash nhanh và rẻ hơn cho vision
         generationConfig: {
           responseMimeType: "application/json",
           // Tái sử dụng schema đã định nghĩa ở trên
@@ -361,26 +367,31 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
     
       // 2. Chuẩn bị Prompt (Chỉ đạo AI)
+      // --- TRONG HÀM generateQuizFromImages ---
+
       let taskDescription = "";
       if (mode === 'EXACT') {
         taskDescription = `
-          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học (hay môn học bất kỳ) có trong các hình ảnh được cung cấp.
+          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi có trong hình ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. GIỮ NGUYÊN văn phong, số liệu, và các phương án lựa chọn (nếu là trắc nghiệm) HỆT NHƯ trong ảnh. Không được tự ý thay đổi đề bài.
-          2. Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm chọn 1 trong 4 đáp án), hoặc TLN (Điền số) nếu kết quả là 1 số thực duy nhất.
-          3. Nếu ảnh mờ hoặc cắt không hết, hãy cố gắng suy luận nội dung chính xác nhất có thể.
-          4. Cung cấp lời giải chi tiết (explanation) cho từng câu.
+          1. GIỮ NGUYÊN nội dung đề bài và số liệu.
+          2. CHUYỂN ĐỔI ĐỊNH DẠNG:
+            - Nếu câu hỏi gốc là Tự luận nhưng kết quả là Tọa độ điểm (x;y;z), Vectơ, Phương trình mặt phẳng/đường thẳng: BẮT BUỘC chuyển về dạng 'TN' (Trắc nghiệm 4 lựa chọn). Hãy tự tạo ra 3 phương án nhiễu logic.
+            - Chỉ dùng dạng 'TLN' (Điền số) khi kết quả là MỘT SỐ thực/số nguyên duy nhất (VD: tính diện tích, thể tích, giá trị biểu thức).
+          3. Cung cấp lời giải chi tiết (explanation).
           `;
       } else {
         taskDescription = `
-          NHIỆM VỤ: Phân tích các dạng toán và mức độ kiến thức trong các hình ảnh. Sau đó, TẠO RA các câu hỏi MỚI tương tự.
+          NHIỆM VỤ: Tạo câu hỏi MỚI tương tự như các dạng toán trong ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. KHÔNG chép lại đề bài cũ. Hãy thay đổi số liệu, ngữ cảnh, nhưng giữ nguyên dạng bài và độ khó.
-          2. Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm chọn 1 trong 4 đáp án), hoặc TLN (Điền số) nếu kết quả là 1 số thực duy nhất.
-          3. Tạo ra số lượng câu hỏi tương đương với số câu hỏi phát hiện được trong ảnh.
-          4. Cung cấp lời giải chi tiết (explanation) cho các câu hỏi mới này.
+          1. Thay đổi số liệu và tên gọi, giữ nguyên độ khó và dạng bài.
+          2. CHUYỂN ĐỔI ĐỊNH DẠNG:
+            - Các bài toán về Tọa độ, Vectơ, Hình học Oxyz: BẮT BUỘC dùng dạng 'TN' (Trắc nghiệm).
+            - Dạng 'TLN' chỉ dùng cho các bài toán ra kết quả là số đơn lẻ.
+          3. Tạo số lượng câu tương ứng với số câu trong ảnh.
         `;
       }
+
     
       const prompt = `
         Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
@@ -414,7 +425,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 export const generateTheory = async (topic: string, userApiKey: string): Promise<string> => {
   if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
   const genAI = new GoogleGenerativeAI(userApiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
   const prompt = `
     Bạn là giáo viên Phổ thông giỏi. Hãy tóm tắt LÝ THUYẾT TRỌNG TÂM cho chủ đề: "${topic}".
