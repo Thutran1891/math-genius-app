@@ -180,11 +180,24 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         
         let correct = false;
         if (question.type === 'TN') {
-            // --- FIX LỖI CHẤM TRẮC NGHIỆM (REGEX) ---
             const userClean = (userAnswer as string).trim().toUpperCase();
-            const aiRaw = (question.correctAnswer || '').trim();
+            let aiRaw = (question.correctAnswer || '').trim();
+
+            // --- [NEW] CƠ CHẾ BACKUP THÔNG MINH ---
+            // Nếu AI quên trả về correctAnswer (Đáp án gốc: Không có),
+            // Ta sẽ tự động "đào" đáp án từ trong Lời giải chi tiết.
+            if (!aiRaw || aiRaw.length === 0) {
+                // Tìm các cụm từ: "chọn A", "đáp án B", "phương án C"... ở cuối lời giải
+                // Regex giải thích: Tìm từ khóa -> lấy ký tự A-D tiếp theo
+                const explanationMatch = question.explanation.match(/(?:chọn|đáp án|phương án|kết quả|đúng là).*?([A-D])(?:$|\.| )/i);
+                if (explanationMatch) {
+                    aiRaw = explanationMatch[1];
+                    console.log("Auto-recovered answer from explanation:", aiRaw);
+                }
+            }
+            // ---------------------------------------
             
-            // Regex tìm đáp án A, B, C, D chính xác
+            // Regex tìm đáp án A, B, C, D chính xác từ chuỗi aiRaw đã xử lý
             const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
             
             let correctClean = "";
@@ -196,21 +209,15 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
 
             correct = userClean === correctClean;
         } else if (question.type === 'TLN') {
-            // --- FIX LỖI SAI SỐ LÀM TRÒN ---
-            // Thay dấu phẩy thành chấm để parse số
+            // ... (Giữ nguyên logic TLN như cũ)
             const userVal = parseFloat((userAnswer as string).replace(',', '.'));
-            
-            // Lấy số từ đáp án AI (loại bỏ text thừa nếu có)
             const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
             const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
             
             if (!isNaN(userVal) && !isNaN(aiVal)) {
-                // TĂNG SAI SỐ CHẤP NHẬN ĐƯỢC LÊN 0.15 (để bao quát trường hợp làm tròn lệch 0.1)
-                // Ví dụ: Đáp án 10.7, học sinh nhập 10.6 hoặc 10.8 vẫn có thể châm chước được nếu cần
-                // Hoặc giữ 0.1 nếu muốn chặt chẽ hơn nhưng vẫn an toàn hơn 0.05
+                // Giữ độ lệch 0.15 cho an toàn
                 correct = Math.abs(userVal - aiVal) <= 0.15; 
             } else {
-                // So sánh chuỗi nếu không phải là số
                 correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
             }
         } else if (question.type === 'DS') {
