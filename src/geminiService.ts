@@ -9,7 +9,7 @@ import { QuizConfig, Question } from "./types";
 async function retryOperation<T>(
   operation: () => Promise<T>, 
   retries: number = 3, 
-  delay: number = 2000
+  delay: number = 5000
 ): Promise<T> {
   try {
     return await operation();
@@ -205,7 +205,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
         - Xử lý lỗi thường gặp về đẳng thức vectơ:
             + Nếu $\\vec{MA} + \\vec{MB} = \\vec{0}$ là đúng 
-            + THÌ:  $\\vec{AM} + \\vec{BM} = \\vec{0}$ cũng đúng.
+            + THÌ:  $\\vec{AM} + \\vec{BM} = \\vec{0}$ hay $\\vec{AM} = \\vec{MB}$ cũng đúng.
             + TUYỆT ĐỐI KHÔNG đưa cả hai đẳng thức đều đúng vào câu hỏi tìm đáp án đúng.
             + Các phương án nhiễu phải là các phương án sai hẳn.
             + Tương tự cho các tình huống khác.
@@ -389,7 +389,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
         - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 9 về định dạng LaTeX, đồ thị, bảng biến thiên đã được quy định trước đó trong hệ thống này.
         - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
-        - Nếu là tự luận, hãy chuyển về dạng TLN (Điền số) nếu có thể, hoặc TN.
+        - Nếu là tự luận, hãy chuyển về dạng TN (Chọn 1 trong 4 đáp án) nếu có thể, hoặc TLN (Điền số) nếu đáp án là 1 số thực duy nhất.
       `;
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
