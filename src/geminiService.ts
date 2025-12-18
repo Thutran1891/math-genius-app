@@ -367,16 +367,18 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học (hay môn học bất kỳ) có trong các hình ảnh được cung cấp.
           YÊU CẦU ĐẶC BIỆT:
           1. GIỮ NGUYÊN văn phong, số liệu, và các phương án lựa chọn (nếu là trắc nghiệm) HỆT NHƯ trong ảnh. Không được tự ý thay đổi đề bài.
-          2. Nếu ảnh mờ hoặc cắt không hết, hãy cố gắng suy luận nội dung chính xác nhất có thể.
-          3. Cung cấp lời giải chi tiết (explanation) cho từng câu.
-        `;
+          2. Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm chọn 1 trong 4 đáp án), hoặc TLN (Điền số) nếu kết quả là 1 số thực duy nhất.
+          3. Nếu ảnh mờ hoặc cắt không hết, hãy cố gắng suy luận nội dung chính xác nhất có thể.
+          4. Cung cấp lời giải chi tiết (explanation) cho từng câu.
+          `;
       } else {
         taskDescription = `
           NHIỆM VỤ: Phân tích các dạng toán và mức độ kiến thức trong các hình ảnh. Sau đó, TẠO RA các câu hỏi MỚI tương tự.
           YÊU CẦU ĐẶC BIỆT:
           1. KHÔNG chép lại đề bài cũ. Hãy thay đổi số liệu, ngữ cảnh, nhưng giữ nguyên dạng bài và độ khó.
-          2. Tạo ra số lượng câu hỏi tương đương với số câu hỏi phát hiện được trong ảnh.
-          3. Cung cấp lời giải chi tiết (explanation) cho các câu hỏi mới này.
+          2. Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm chọn 1 trong 4 đáp án), hoặc TLN (Điền số) nếu kết quả là 1 số thực duy nhất.
+          3. Tạo ra số lượng câu hỏi tương đương với số câu hỏi phát hiện được trong ảnh.
+          4. Cung cấp lời giải chi tiết (explanation) cho các câu hỏi mới này.
         `;
       }
     
@@ -389,7 +391,6 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
         - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 9 về định dạng LaTeX, đồ thị, bảng biến thiên đã được quy định trước đó trong hệ thống này.
         - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
-        - Nếu là tự luận, hãy chuyển về dạng TN (Chọn 1 trong 4 đáp án) nếu có thể, hoặc TLN (Điền số) nếu đáp án là 1 số thực duy nhất.
       `;
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
