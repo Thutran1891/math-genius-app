@@ -209,6 +209,10 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + TUYỆT ĐỐI KHÔNG đưa cả hai đẳng thức đều đúng vào câu hỏi tìm đáp án đúng.
             + Các phương án nhiễu phải là các phương án sai hẳn.
             + Tương tự cho các tình huống khác.
+
+        - ĐẶC BIỆT VỚI CÂU HỎI PHỦ ĐỊNH (Tìm câu SAI, khẳng định KHÔNG ĐÚNG): 
+    + 'correctAnswer' PHẢI là chữ cái của phương án chứa nội dung sai đó.
+    + Ví dụ: Nếu đề hỏi "Mệnh đề nào sai?" và mệnh đề ở phương án C sai về toán học, thì 'correctAnswer' BẮT BUỘC phải là "C".
             
       RULE 3. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
