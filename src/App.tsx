@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef  } from 'react';
+import { useState, useEffect } from 'react';
 import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
@@ -12,12 +12,12 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
 // 1. Thêm BookOpen, X vào dòng import từ 'lucide-react'
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle } from 'lucide-react';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X } from 'lucide-react';
 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
 // import { generateTheory } from './geminiService';
 import { LatexText } from './components/LatexText';
-// Dòng số 1 của file App.tsx
+
 // Import thêm generateQuizFromImages
 import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
 function App() {
@@ -31,11 +31,8 @@ function App() {
   const [isSaved, setIsSaved] = useState(false);
   // --- THÊM DÒNG NÀY ---
   const [attemptCount, setAttemptCount] = useState(1);
-  // --- [THÊM MỚI] BIẾN ĐẾM SỐ LẦN RỜI TAB ---
-  const [violationCount, setViolationCount] = useState(0);
   // ---------------------
-  // --- [THÊM MỚI] BIẾN CHỐNG ĐẾM ĐÔI (Debounce) ---
-  const lastViolationTime = useRef<number>(0);
+
   // Cập nhật tham số nhận vào: thêm topicName
   const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
     setLoading(true);
@@ -43,7 +40,6 @@ function App() {
     setScore(0);
     setIsSaved(false);
     setAttemptCount(1);
-    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setQuestions([]);
     setTheoryContent('');
 
@@ -84,33 +80,6 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-// --- [SỬA LẠI] LOGIC BẮT SỰ KIỆN RỜI TAB (Đã Fix lỗi đếm đôi) ---
-useEffect(() => {
-  const handleVisibilityChange = () => {
-    const now = Date.now(); // Lấy thời gian hiện tại
-    
-    // Điều kiện:
-    // 1. Tab đang ẩn (document.hidden)
-    // 2. Đang làm bài (questions.length > 0)
-    // 3. Chưa lưu điểm (!isSaved)
-    // 4. Không xem lịch sử (!viewHistory)
-    // 5. [QUAN TRỌNG] Cách lần vi phạm trước ít nhất 2 giây (2000ms)
-    if (
-      document.hidden && 
-      questions.length > 0 && 
-      !isSaved && 
-      !viewHistory && 
-      (now - lastViolationTime.current > 2000) // <--- Fix lỗi đếm đôi tại đây
-    ) {
-      setViolationCount(prev => prev + 1);
-      lastViolationTime.current = now; // Cập nhật thời gian
-    }
-  };
-
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-}, [questions.length, isSaved, viewHistory]);
-// ---------------------------------------------
 
   // --- [CODE MỚI] STATE QUẢN LÝ LÝ THUYẾT ---
   const [showTheory, setShowTheory] = useState(false);
@@ -144,7 +113,6 @@ useEffect(() => {
     setScore(0);
     setIsSaved(false);
     setAttemptCount(1); // <--- THÊM VÀO ĐÂY
-    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setQuestions([]); 
     setTheoryContent(''); // <--- THÊM DÒNG NÀY ĐỂ RESET LÝ THUYẾT CŨ
     try {
@@ -167,7 +135,6 @@ useEffect(() => {
     setScore(0);
     setIsSaved(false);
     setAttemptCount(1); // Coi như làm mới hoàn toàn
-    setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setLoading(false);
 
     // 2. Tạo config giả để hiển thị tiêu đề
@@ -235,8 +202,7 @@ useEffect(() => {
         score: score,
         total: questions.length,
         date: serverTimestamp(),
-        fullData: JSON.stringify(questions) ,
-        violationCount: violationCount // <--- THÊM DÒNG NÀY ĐỂ LƯU SỐ LẦN VI PHẠM
+        fullData: JSON.stringify(questions) 
       });
       // ----------------------------------------
       
@@ -300,13 +266,6 @@ useEffect(() => {
                 </h2>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                   <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
-                  {/* --- [THÊM MỚI] HIỂN THỊ VI PHẠM --- */}
-                  {violationCount > 0 && (
-                      <span className="flex items-center gap-1 text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-200 animate-pulse">
-                          <AlertTriangle size={14} /> Rời tab: {violationCount} lần
-                      </span>
-                  )}
-                  {/* ----------------------------------- */}
                   {!isSaved ? (
                       <button onClick={handleSaveResult} className="flex items-center gap-1 text-green-600 hover:underline font-medium text-xs bg-green-50 px-2 py-1 rounded border border-green-200">
                           <Save size={14}/> Lưu điểm

@@ -3,33 +3,6 @@ import { QuizConfig, Question } from "./types";
 
 // const apiKey = import.meta.env.VITE_API_KEY as string;
 // const genAI = new GoogleGenerativeAI(apiKey || "");
-// Thêm đoạn này vào đầu file geminiService.ts, sau các dòng import
-
-// Hàm thử lại (Retry) khi gặp lỗi quá tải
-async function retryOperation<T>(
-  operation: () => Promise<T>, 
-  retries: number = 3, 
-  delay: number = 2000
-): Promise<T> {
-  try {
-    return await operation();
-  } catch (error: any) {
-    // Nếu hết lượt thử hoặc lỗi không phải do server (như sai Key, sai cú pháp) thì ném lỗi luôn
-    // Mã 503 là Overloaded, 500 là Internal Server Error
-    const isServerBusy = error.message?.includes('503') || error.message?.includes('Overloaded');
-    
-    if (retries <= 0 || !isServerBusy) {
-      throw error;
-    }
-    
-    console.warn(`Server quá tải, đang thử lại... (Còn ${retries} lần)`);
-    
-    // Chờ một chút trước khi thử lại (Exponential backoff: chờ lâu hơn sau mỗi lần lỗi)
-    await new Promise(resolve => setTimeout(resolve, delay));
-    
-    return retryOperation(operation, retries - 1, delay * 2);
-  }
-}
 
 // --- SCHEMA CHUẨN ---
 
@@ -203,13 +176,6 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + TUYỆT ĐỐI KHÔNG đưa khoảng đúng còn lại (là $(-\\infty; -1)$) vào các phương án B, C, D.
             + Các phương án nhiễu phải là các khoảng nghịch biến hoặc khoảng sai hẳn.
 
-        - Xử lý lỗi thường gặp về đẳng thức vectơ:
-            + Nếu $\\vec{MA} + \\vec{MB} = \\vec{0}$ là đúng 
-            + THÌ:  $\\vec{AM} + \\vec{BM} = \\vec{0}$ cũng đúng.
-            + TUYỆT ĐỐI KHÔNG đưa cả hai đẳng thức đều đúng vào câu hỏi tìm đáp án đúng.
-            + Các phương án nhiễu phải là các phương án sai hẳn.
-            + Tương tự cho các tình huống khác.
-            
       RULE 3. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
       - Mỗi phát biểu có 'content' và 'isCorrect' (true/false).
@@ -308,10 +274,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
          Trả về JSON mảng ${totalQuestions} câu.
     `;
 
-    // Mới: Bọc trong retryOperation
-    const result = await retryOperation(async () => {
-      return await model.generateContent(prompt);
-    });
+    const result = await model.generateContent(prompt);
     return JSON.parse(result.response.text());
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -394,10 +357,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {
-        // Mới:
-        const result = await retryOperation(async () => {
-          return await model.generateContent([prompt, ...imageParts]);
-        });
+        const result = await model.generateContent([prompt, ...imageParts]);
         const responseText = result.response.text();
         return JSON.parse(responseText);
       } catch (error: any) {

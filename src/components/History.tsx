@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 // Thêm RotateCcw vào đây
-import { Clock, Calendar, Trophy, ChevronLeft, RotateCcw, AlertTriangle } from 'lucide-react'; 
+import { Clock, Calendar, Trophy, ChevronLeft, RotateCcw } from 'lucide-react'; 
 import { Question } from '../types';
 import { QuestionCard } from './QuestionCard';
 
@@ -13,7 +13,6 @@ interface HistoryItem {
   total: number;
   date: any; 
   fullData?: string; 
-  violationCount?: number; // Thêm trường này (dấu ? vì dữ liệu cũ có thể không có)
 }
 
 interface Props {
@@ -167,15 +166,6 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => { // Nhận 
                         </h3>
 
                         <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span className="flex items-center gap-1">...</span> {/* Ngày tháng */}
-                            <span className="flex items-center gap-1">...</span> {/* Điểm số */}
-                            
-                            {/* HIỂN THỊ TRONG LỊCH SỬ */}
-                            {item.violationCount && item.violationCount > 0 && (
-                                <span className="flex items-center gap-1 text-red-500 font-bold">
-                                    <AlertTriangle size={12}/> {item.violationCount} lỗi
-                                </span>
-                            )}
                           {/* --- SỬA 2: HIỂN THỊ ĐẦY ĐỦ GIỜ:PHÚT:GIÂY --- */}
                           <span className="flex items-center gap-1" title="Thời gian nộp bài">
                               <Calendar size={12}/> 
