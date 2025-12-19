@@ -12,7 +12,7 @@ import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 import { SubscriptionGuard } from './components/SubscriptionGuard'; // Import mới
 // 1. Thêm BookOpen, X vào dòng import từ 'lucide-react'
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle , CheckCircle } from 'lucide-react';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle } from 'lucide-react';
 
 // 2. Import hàm sinh lý thuyết và component hiển thị Latex
 // import { generateTheory } from './geminiService';
@@ -33,11 +33,6 @@ function App() {
   const [attemptCount, setAttemptCount] = useState(1);
   // --- [THÊM MỚI] BIẾN ĐẾM SỐ LẦN RỜI TAB ---
   const [violationCount, setViolationCount] = useState(0);
-  // 1. THÊM STATE ĐỂ HIỂN THỊ THÔNG BÁO ĐẸP (THAY VÌ ALERT)
-  const [showToast, setShowToast] = useState(false);
-
-  // 2. THÊM REF ĐỂ THEO DÕI TRẠNG THÁI LƯU TỨC THÌ (Fix lỗi bấm OK bị tính điểm)
-  const isSavedRef = useRef(false);
   // ---------------------
   // --- [THÊM MỚI] BIẾN CHỐNG ĐẾM ĐÔI (Debounce) ---
   const lastViolationTime = useRef<number>(0);
@@ -47,7 +42,6 @@ function App() {
     setCurrentApiKey(apiKey);
     setScore(0);
     setIsSaved(false);
-    isSavedRef.current = false; // <--- RESET REF
     setAttemptCount(1);
     setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setQuestions([]);
@@ -90,55 +84,32 @@ function App() {
     return () => unsubscribe();
   }, []);
 
-// --- [SỬA LẠI] LOGIC BẮT VI PHẠM (Bao gồm cả Split View & Bong bóng chat) ---
+// --- [SỬA LẠI] LOGIC BẮT SỰ KIỆN RỜI TAB (Đã Fix lỗi đếm đôi) ---
 useEffect(() => {
-  const handleViolation = () => {
+  const handleVisibilityChange = () => {
     const now = Date.now(); // Lấy thời gian hiện tại
     
-    // Điều kiện chặn đếm lỗi:
-    // 1. Chưa có câu hỏi (chưa vào thi)
-    // 2. Đã nộp bài (isSaved)
-    // 3. Đang xem lịch sử
-    // 4. Vừa mới bắt lỗi cách đây dưới 2 giây (Debounce)
+    // Điều kiện:
+    // 1. Tab đang ẩn (document.hidden)
+    // 2. Đang làm bài (questions.length > 0)
+    // 3. Chưa lưu điểm (!isSaved)
+    // 4. Không xem lịch sử (!viewHistory)
+    // 5. [QUAN TRỌNG] Cách lần vi phạm trước ít nhất 2 giây (2000ms)
     if (
-      questions.length === 0 || 
-      isSaved || 
-      isSavedRef.current || // <--- QUAN TRỌNG: Chặn ngay nếu đã lưu (kể cả khi state chưa kịp cập nhật)
-      viewHistory || 
-      (now - lastViolationTime.current < 2000)
+      document.hidden && 
+      questions.length > 0 && 
+      !isSaved && 
+      !viewHistory && 
+      (now - lastViolationTime.current > 2000) // <--- Fix lỗi đếm đôi tại đây
     ) {
-      return; 
+      setViolationCount(prev => prev + 1);
+      lastViolationTime.current = now; // Cập nhật thời gian
     }
-
-    // Ghi nhận lỗi
-    setViolationCount(prev => prev + 1);
-    lastViolationTime.current = now;
-    
-    // (Tùy chọn) Có thể Alert cảnh cáo ngay lập tức để học sinh sợ
-    // alert("Cảnh báo: Bạn vừa rời khỏi màn hình làm bài!");
   };
 
-  // 1. Sự kiện khi ẩn Tab hoặc thu nhỏ trình duyệt
-  const onVisibilityChange = () => {
-    if (document.hidden) handleViolation();
-  };
-
-  // 2. Sự kiện quan trọng: Khi mất tiêu điểm (Click sang cửa sổ khác/Split View)
-  const onBlur = () => {
-    handleViolation();
-  };
-
-  // Đăng ký sự kiện
-  document.addEventListener("visibilitychange", onVisibilityChange);
-  window.addEventListener("blur", onBlur); // <--- THÊM DÒNG NÀY
-
-  // Hủy đăng ký khi thoát
-  return () => {
-    document.removeEventListener("visibilitychange", onVisibilityChange);
-    window.removeEventListener("blur", onBlur);
-  };
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
 }, [questions.length, isSaved, viewHistory]);
-// -------------------------------------------------------------
 // ---------------------------------------------
 
   // --- [CODE MỚI] STATE QUẢN LÝ LÝ THUYẾT ---
@@ -172,7 +143,6 @@ useEffect(() => {
     setCurrentApiKey(apiKey);
     setScore(0);
     setIsSaved(false);
-    isSavedRef.current = false; // <--- RESET REF
     setAttemptCount(1); // <--- THÊM VÀO ĐÂY
     setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setQuestions([]); 
@@ -196,7 +166,6 @@ useEffect(() => {
     // 1. Reset các trạng thái điểm số
     setScore(0);
     setIsSaved(false);
-    isSavedRef.current = false; // <--- RESET REF
     setAttemptCount(1); // Coi như làm mới hoàn toàn
     setViolationCount(0); // <--- THÊM DÒNG NÀY (Reset vi phạm)
     setLoading(false);
@@ -245,8 +214,17 @@ useEffect(() => {
   const handleSaveResult = async () => {
     if (!user || !config || isSaved) return;
     try {
-      // Cập nhật REF ngay lập tức để chặn Violation
-      isSavedRef.current = true;
+      // --- [ĐOẠN CŨ - XÓA HOẶC COMMENT LẠI] ---
+      /* await addDoc(collection(db, "results"), {
+        userId: user.uid,
+        topic: config.topic,
+        score: score,
+        total: questions.length,
+        date: serverTimestamp(),
+        fullData: JSON.stringify(questions) 
+      });
+      */
+
       // --- [ĐOẠN MỚI - THAY THẾ VÀO ĐÂY] ---
       // Lưu vào: users -> [ID của user] -> examHistory -> [Bài thi]
       const historyRef = collection(db, "users", user.uid, "examHistory");
@@ -263,14 +241,10 @@ useEffect(() => {
       // ----------------------------------------
       
       setIsSaved(true);
-      // THAY ALERT BẰNG TOAST
-      // alert("Đã lưu kết quả thành công!"); -> BỎ DÒNG NÀY
-      setShowToast(true); // Hiện thông báo đẹp
-      setTimeout(() => setShowToast(false), 3000); // Tự tắt sau 3s
+      alert("Đã lưu kết quả thành công!");
     } catch (e) {
       console.error("Lỗi lưu:", e);
-      alert("Không thể lưu kết quả."); // Lỗi thì alert cũng được
-      isSavedRef.current = false; // Nếu lỗi thì cho phép bắt lỗi lại
+      alert("Không thể lưu kết quả.");
     }
   };
 
@@ -402,15 +376,7 @@ useEffect(() => {
                               <LatexText text={theoryContent} />
                           </div>
                       )}
-                      {/* --- THÊM MỚI: TOAST THÔNG BÁO LƯU THÀNH CÔNG --- */}
-                        {showToast && (
-                            <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-300">
-                                <CheckCircle className="w-6 h-6 text-white" />
-                                <span className="font-bold text-sm">Đã lưu kết quả vào Lịch sử!</span>
-                            </div>
-                        )}
-                        {/* ------------------------------------------------ */}
-                  </div>                  
+                  </div>
               </div>
             )}
 
