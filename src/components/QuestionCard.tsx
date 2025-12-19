@@ -174,48 +174,73 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   }, [question.graphFunction, question.asymptotes, question.id]); 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
-  // Logic kiểm tra kết quả
-  const handleCheckResult = () => {
-      if (!userAnswer) return;
-      
-      let correct = false;
-      if (question.type === 'TN') {
-          const userClean = (userAnswer as string).trim().toUpperCase();
-          // Lấy ký tự đầu tiên của đáp án AI (A, B, C, D)
-          const correctClean = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
-          correct = userClean === correctClean;
-      } else if (question.type === 'TLN') {
-          const userVal = parseFloat((userAnswer as string).replace(',', '.'));
-          const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
-          const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
-          
-          if (!isNaN(userVal) && !isNaN(aiVal)) {
-              correct = Math.abs(userVal - aiVal) < 0.05;
-          } else {
-              correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
-          }
-      } else if (question.type === 'DS') {
-          const allCorrect = question.statements?.every(stmt => 
-             userAnswer[stmt.id] === stmt.isCorrect
-          );
-          correct = !!allCorrect;
-      }
+    // Logic kiểm tra kết quả
+    const handleCheckResult = () => {
+        if (!userAnswer) return;
+        
+        let correct = false;
+        if (question.type === 'TN') {
+            const userClean = (userAnswer as string).trim().toUpperCase();
+            let aiRaw = (question.correctAnswer || '').trim();
 
-      setIsChecked(true);
-      setIsCorrect(correct);
-      playSound(correct);
-      
-      if (onUpdateScore) onUpdateScore(correct);
+            // --- [NEW] CƠ CHẾ BACKUP THÔNG MINH ---
+            // Nếu AI quên trả về correctAnswer (Đáp án gốc: Không có),
+            // Ta sẽ tự động "đào" đáp án từ trong Lời giải chi tiết.
+            if (!aiRaw || aiRaw.length === 0) {
+                // Tìm các cụm từ: "chọn A", "đáp án B", "phương án C"... ở cuối lời giải
+                // Regex giải thích: Tìm từ khóa -> lấy ký tự A-D tiếp theo
+                const explanationMatch = question.explanation.match(/(?:chọn|đáp án|phương án|kết quả|đúng là).*?([A-D])(?:$|\.| )/i);
+                if (explanationMatch) {
+                    aiRaw = explanationMatch[1];
+                    console.log("Auto-recovered answer from explanation:", aiRaw);
+                }
+            }
+            // ---------------------------------------
+            
+            // Regex tìm đáp án A, B, C, D chính xác từ chuỗi aiRaw đã xử lý
+            const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
+            
+            let correctClean = "";
+            if (match) {
+                correctClean = match[1].toUpperCase(); 
+            } else {
+                correctClean = aiRaw.toUpperCase().charAt(0);
+            }
 
-      // Gửi dữ liệu về App để lưu
-      if (onDataChange) {
-          onDataChange({
-              ...question,
-              userAnswer: userAnswer,
-              isCorrect: correct
-          });
-      }
-  };
+            correct = userClean === correctClean;
+        } else if (question.type === 'TLN') {
+            // ... (Giữ nguyên logic TLN như cũ)
+            const userVal = parseFloat((userAnswer as string).replace(',', '.'));
+            const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
+            const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
+            
+            if (!isNaN(userVal) && !isNaN(aiVal)) {
+                // Giữ độ lệch 0.15 cho an toàn
+                correct = Math.abs(userVal - aiVal) <= 0.15; 
+            } else {
+                correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
+            }
+        } else if (question.type === 'DS') {
+            const allCorrect = question.statements?.every(stmt => 
+            userAnswer[stmt.id] === stmt.isCorrect
+            );
+            correct = !!allCorrect;
+        }
+
+        setIsChecked(true);
+        setIsCorrect(correct);
+        playSound(correct);
+        
+        if (onUpdateScore) onUpdateScore(correct);
+
+        if (onDataChange) {
+            onDataChange({
+                ...question,
+                userAnswer: userAnswer,
+                isCorrect: correct
+            });
+        }
+    };
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
@@ -285,10 +310,14 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
             let css = "p-3 border border-yellow-200 rounded-lg text-left bg-yellow-50 hover:bg-yellow-100 flex gap-2 transition-all shadow-sm ";
             
             if (isChecked) {
-                const aiChar = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
-                const isRightOption = aiChar === label;
+                // [SỬA LẠI LOGIC HIỂN THỊ KẾT QUẢ]
+                // Tính toán lại correctClean tại đây để tô màu cho đúng (đồng bộ với logic chấm điểm)
+                const aiRaw = (question.correctAnswer || '').trim();
+                const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
+                const correctClean = match ? match[1].toUpperCase() : aiRaw.toUpperCase().charAt(0);
 
-                // Giữ nguyên logic tô màu Xanh/Đỏ khi đã kiểm tra
+                const isRightOption = correctClean === label;
+
                 if (isRightOption) css = "p-3 border-2 border-green-500 bg-green-50 text-green-800 font-bold flex gap-2 shadow-md";
                 else if (isSelected) css = "p-3 border-2 border-red-500 bg-red-50 text-red-800 flex gap-2 opacity-100";
                 else css += "opacity-50"; // Làm mờ các đáp án không chọn
@@ -377,7 +406,11 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                 <Send className="w-4 h-4" /> Kiểm tra
               </button>
           ) : (
-              <div className="flex-1"></div>
+              <div className="flex-1 text-sm">
+                  {/* [THÊM MỚI] HIỂN THỊ ĐÁP ÁN ĐÚNG CỦA AI ĐỂ ĐỐI CHIẾU */}
+                  <span className="font-bold text-gray-500">Đáp án gốc: </span> 
+                  <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">{question.correctAnswer || "Không có"}</span>
+              </div>
           )}
 
           {isChecked && (

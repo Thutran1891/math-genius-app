@@ -3,6 +3,33 @@ import { QuizConfig, Question } from "./types";
 
 // const apiKey = import.meta.env.VITE_API_KEY as string;
 // const genAI = new GoogleGenerativeAI(apiKey || "");
+// Thêm đoạn này vào đầu file geminiService.ts, sau các dòng import
+
+// Hàm thử lại (Retry) khi gặp lỗi quá tải
+async function retryOperation<T>(
+  operation: () => Promise<T>, 
+  retries: number = 3, 
+  delay: number = 2000
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error: any) {
+    // Nếu hết lượt thử hoặc lỗi không phải do server (như sai Key, sai cú pháp) thì ném lỗi luôn
+    // Mã 503 là Overloaded, 500 là Internal Server Error
+    const isServerBusy = error.message?.includes('503') || error.message?.includes('Overloaded');
+    
+    if (retries <= 0 || !isServerBusy) {
+      throw error;
+    }
+    
+    console.warn(`Server quá tải, đang thử lại... (Còn ${retries} lần)`);
+    
+    // Chờ một chút trước khi thử lại (Exponential backoff: chờ lâu hơn sau mỗi lần lỗi)
+    await new Promise(resolve => setTimeout(resolve, delay));
+    
+    return retryOperation(operation, retries - 1, delay * 2);
+  }
+}
 
 // --- SCHEMA CHUẨN ---
 
@@ -176,6 +203,17 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
             + TUYỆT ĐỐI KHÔNG đưa khoảng đúng còn lại (là $(-\\infty; -1)$) vào các phương án B, C, D.
             + Các phương án nhiễu phải là các khoảng nghịch biến hoặc khoảng sai hẳn.
 
+        - Xử lý lỗi thường gặp về đẳng thức vectơ:
+            + Nếu $\\vec{MA} + \\vec{MB} = \\vec{0}$ là đúng 
+            + THÌ:  $\\vec{AM} + \\vec{BM} = \\vec{0}$ cũng đúng.
+            + TUYỆT ĐỐI KHÔNG đưa cả hai đẳng thức đều đúng vào câu hỏi tìm đáp án đúng.
+            + Các phương án nhiễu phải là các phương án sai hẳn.
+            + Tương tự cho các tình huống khác.
+
+        - ĐẶC BIỆT VỚI CÂU HỎI PHỦ ĐỊNH (Tìm câu SAI, khẳng định KHÔNG ĐÚNG): 
+            + 'correctAnswer' PHẢI là chữ cái của phương án chứa nội dung sai đó.
+            + Ví dụ: Nếu đề hỏi "Mệnh đề nào sai?" và mệnh đề ở phương án C sai về toán học, thì 'correctAnswer' BẮT BUỘC phải là "C".
+            
       RULE 3. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
       - Mỗi phát biểu có 'content' và 'isCorrect' (true/false).
@@ -271,10 +309,18 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
              - Để null các trường: 'graphFunction', 'geometryGraph'.
              - Trong 'questionText' phải ghi: "Cho bảng biến thiên như hình bên."
 
+        RULE 10. QUY TẮC ĐÁP ÁN TỌA ĐỘ/VECTƠ:
+          - Tuyệt đối KHÔNG đưa tọa độ (x;y;z) hoặc biểu thức chứa biến vào trường 'correctAnswer' của loại 'TLN'.
+          - Nếu đáp án là tọa độ hoặc biểu thức, BẮT BUỘC phải dùng loại 'TN'.
+          - Các phương án trắc nghiệm (options) chứa tọa độ phải đặt trong LaTeX: "$\vec{a} = (1; 2; 3)$" hoặc "$M(1; -2; 0)$".
+
          Trả về JSON mảng ${totalQuestions} câu.
     `;
 
-    const result = await model.generateContent(prompt);
+    // Mới: Bọc trong retryOperation
+    const result = await retryOperation(async () => {
+      return await model.generateContent(prompt);
+    });
     return JSON.parse(result.response.text());
   } catch (error) {
     console.error("Gemini Error:", error);
@@ -308,7 +354,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       const genAI = new GoogleGenerativeAI(userApiKey);
     
-      // Sử dụng model gemini-3-flash-preview (hoặc pro) để hỗ trợ tốt hình ảnh
+      // Sử dụng model gemini-3-flash (hoặc pro) để hỗ trợ tốt hình ảnh
       const model = genAI.getGenerativeModel({
         model: "gemini-3-flash-preview", // Flash nhanh và rẻ hơn cho vision
         generationConfig: {
@@ -327,37 +373,55 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       let taskDescription = "";
       if (mode === 'EXACT') {
         taskDescription = `
-          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi toán học (hay môn học bất kỳ) có trong các hình ảnh được cung cấp.
+          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi có trong hình ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. GIỮ NGUYÊN văn phong, số liệu, và các phương án lựa chọn (nếu là trắc nghiệm) HỆT NHƯ trong ảnh. Không được tự ý thay đổi đề bài.
-          2. Nếu ảnh mờ hoặc cắt không hết, hãy cố gắng suy luận nội dung chính xác nhất có thể.
-          3. Cung cấp lời giải chi tiết (explanation) cho từng câu.
-        `;
+          1. GIỮ NGUYÊN nội dung đề bài và số liệu.
+          2. CHUYỂN ĐỔI ĐỊNH DẠNG:
+            - Nếu câu hỏi gốc là Tự luận nhưng kết quả là Tọa độ điểm (x;y;z), Vectơ, Phương trình mặt phẳng/đường thẳng: BẮT BUỘC chuyển về dạng 'TN' (Trắc nghiệm 4 lựa chọn). Hãy tự tạo ra 3 phương án nhiễu logic. Đồng thời hoán vị các phương án đúng và sai.
+            - Chỉ dùng dạng 'TLN' (Điền số) khi kết quả là MỘT SỐ thực/số nguyên duy nhất (VD: tính diện tích, thể tích, giá trị biểu thức).
+          3. Cung cấp lời giải chi tiết (explanation).
+          `;
       } else {
         taskDescription = `
-          NHIỆM VỤ: Phân tích các dạng toán và mức độ kiến thức trong các hình ảnh. Sau đó, TẠO RA các câu hỏi MỚI tương tự.
+          NHIỆM VỤ: Tạo câu hỏi MỚI tương tự như các dạng toán trong ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. KHÔNG chép lại đề bài cũ. Hãy thay đổi số liệu, ngữ cảnh, nhưng giữ nguyên dạng bài và độ khó.
-          2. Tạo ra số lượng câu hỏi tương đương với số câu hỏi phát hiện được trong ảnh.
-          3. Cung cấp lời giải chi tiết (explanation) cho các câu hỏi mới này.
+          1. Thay đổi số liệu, giữ nguyên độ khó và dạng bài.
+          2. CHUYỂN ĐỔI ĐỊNH DẠNG:
+            - Các bài toán về Tọa độ, Vectơ, Hình học Oxyz: BẮT BUỘC dùng dạng 'TN' (Trắc nghiệm). Đồng thời hoán vị các phương án đúng và sai.
+            - Dạng 'TLN' chỉ dùng cho các bài toán ra kết quả là số đơn lẻ.
+          3. Tạo số lượng câu tương ứng với số câu trong ảnh.
         `;
       }
-    
-      const prompt = `
-        Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
-        ${taskDescription}
-        Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
 
-        QUAN TRỌNG:
-        - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
-        - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 9 về định dạng LaTeX, đồ thị, bảng biến thiên đã được quy định trước đó trong hệ thống này.
-        - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
-        - Nếu là tự luận, hãy chuyển về dạng TLN (Điền số) nếu có thể, hoặc TN.
-      `;
+    // Trong file geminiService.ts -> hàm generateQuizFromImages
+
+    const prompt = `
+    Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
+    ${taskDescription}
+    Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+
+    QUAN TRỌNG VỀ OCR (TUYỆT ĐỐI TUÂN THỦ):
+    1. CHÍNH XÁC TUYỆT ĐỐI: Giữ nguyên 100% ký hiệu toán học, hướng vector ($\vec{AB}$ khác $\vec{BA}$), chỉ số dưới/trên. KHÔNG được tự ý "sửa lỗi" đề bài kể cả khi bạn nghĩ đề sai.
+    2. Với các câu hỏi Vector/Hình học Oxyz: Hãy trích xuất cực kỳ cẩn thận từng ký tự. Ví dụ: $\vec{IA}$ phải giữ là $\vec{IA}$, không đổi thành $\vec{AI}$.
+
+    QUAN TRỌNG VỀ TÍNH TOÁN (CHO DẠNG BÀI ĐIỀN SỐ):
+    1. KHÔNG LÀM TRÒN SỚM: Hãy giữ nguyên các biểu thức chính xác (căn thức, phân số, $\pi$, $e$) trong các bước tính trung gian.
+    2. CHỈ LÀM TRÒN Ở BƯỚC CUỐI CÙNG: Chỉ thực hiện làm tròn số khi ra kết quả cuối cùng theo yêu cầu của đề bài (ví dụ: làm tròn đến hàng phần chục).
+    3. Kiểm tra lại kết quả 2 lần để đảm bảo khớp với phép tính chính xác.
+
+    QUAN TRỌNG VỀ OUTPUT:
+    - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
+    - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 10.
+    - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
+    - Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm có 4 options A, B, C, D ).
+    `;      
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {
-        const result = await model.generateContent([prompt, ...imageParts]);
+        // Mới:
+        const result = await retryOperation(async () => {
+          return await model.generateContent([prompt, ...imageParts]);
+        });
         const responseText = result.response.text();
         return JSON.parse(responseText);
       } catch (error: any) {

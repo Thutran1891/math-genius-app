@@ -8,7 +8,7 @@ import { useSubscription } from './SubscriptionGuard'; // Import Hook lấy ngà
 import { generateTheory } from '../geminiService'; // Import hàm mới
 import { LatexText } from './LatexText'; // Để hiển thị công thức toán
 // Thêm Image, Upload, Copy, Wand2 vào dòng import từ 'lucide-react'
-import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X, Image, Upload, Copy, Wand2, Trash2 } from 'lucide-react';
+import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X, Image, Upload, Copy, Wand2, Trash2, RefreshCcw } from 'lucide-react';
 // ----------------------------------
 interface Props {
   // Callback cũ cho tạo đề theo chủ đề
@@ -338,19 +338,24 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
           <span className="flex-shrink mx-4 text-gray-400 text-sm font-medium">HOẶC TẠO THEO CHỦ ĐỀ</span>
           <div className="flex-grow border-t border-gray-300"></div>
     </div>
-    {/* ------------------------------------------- */}
+      {/* ------------------------------------------- */}
       <button 
         onClick={handleSubmit}
         disabled={isLoading}
-        className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-70"
+        className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
       >
         {isLoading ? (
-          <>Đang tạo {totalQuestions} câu hỏi...</>
+          // HIỂN THỊ KHI ĐANG TẢI
+          <div className="flex items-center gap-3">
+              {/* Icon xoay tròn nhờ class animate-spin */}
+              <RefreshCcw className="animate-spin" size={24} /> 
+              <span>AI đang suy nghĩ ({totalQuestions} câu)...</span>
+          </div>
         ) : (          
+          // HIỂN THỊ BÌNH THƯỜNG
           <><Sparkles /> TẠO THEO CHỦ ĐỀ ({totalQuestions} CÂU)</>
         )}
       </button>
-
       {/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (MỚI THÊM) --- */}
       <div className="mt-6 text-center border-t pt-4">
         {isPremium ? (
