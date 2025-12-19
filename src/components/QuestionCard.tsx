@@ -43,17 +43,18 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
 
   // Hàm phát âm thanh (Đã tối ưu Cleanup)
   const playSound = (correct: boolean) => {
-    if (onUpdateScore) {
-        let audio: HTMLAudioElement | null = new Audio(correct ? '/correct.mp3' : '/wrong.mp3'); // Đổi thành let
+    if (onUpdateScore) { // Chỉ phát khi đang làm bài
+        const audio = new Audio(correct ? '/correct.mp3' : '/wrong.mp3');
         audio.volume = 1.0; 
         
+        // Giúp Garbage Collector thu hồi bộ nhớ nhanh hơn
         audio.onended = () => {
-            audio = null; // Bây giờ có thể gán null an toàn
+            (audio as any) = null;
         };
 
         audio.play().catch(() => {});
     }
-    };
+  };
 
   // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ TỐI ƯU CLEANUP) ---
   useEffect(() => {
@@ -174,99 +175,47 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
   // Logic kiểm tra kết quả
-// --- CẬP NHẬT HÀM LỌC ĐÁP ÁN AN TOÀN HƠN ---
-    const getCleanAIAnswer = (raw: string): string => {
-        if (!raw) return "";
-        const trimmed = raw.trim().toUpperCase();
-        
-        // Ưu tiên 1: Nếu chỉ là 1 chữ cái A, B, C, D duy nhất
-        if (/^[A-D]$/.test(trimmed)) return trimmed;
-        
-        // Ưu tiên 2: Định dạng "A.", "Đáp án A", "A)"
-        const match = trimmed.match(/^(?:ĐÁP ÁN|CÂU|CHỌN)?\s*([A-D])(?:\.|\)|:|\s|$)/i);
-        if (match) return match[1].toUpperCase();
+  const handleCheckResult = () => {
+      if (!userAnswer) return;
+      
+      let correct = false;
+      if (question.type === 'TN') {
+          const userClean = (userAnswer as string).trim().toUpperCase();
+          // Lấy ký tự đầu tiên của đáp án AI (A, B, C, D)
+          const correctClean = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
+          correct = userClean === correctClean;
+      } else if (question.type === 'TLN') {
+          const userVal = parseFloat((userAnswer as string).replace(',', '.'));
+          const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
+          const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
+          
+          if (!isNaN(userVal) && !isNaN(aiVal)) {
+              correct = Math.abs(userVal - aiVal) < 0.05;
+          } else {
+              correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
+          }
+      } else if (question.type === 'DS') {
+          const allCorrect = question.statements?.every(stmt => 
+             userAnswer[stmt.id] === stmt.isCorrect
+          );
+          correct = !!allCorrect;
+      }
 
-        return ""; // Nếu không tìm thấy nhãn rõ ràng, trả về rỗng để chuyển sang so sánh nội dung
-    };
+      setIsChecked(true);
+      setIsCorrect(correct);
+      playSound(correct);
+      
+      if (onUpdateScore) onUpdateScore(correct);
 
-// --- HÀM CHẤM ĐIỂM CHÍNH ---
-const handleCheckResult = () => {
-    if (!userAnswer) return;
-    
-    let correct = false;
-
-    // 1. Xử lý Trắc nghiệm (TN)
-    if (question.type === 'TN') {
-        const userLabel = (userAnswer as string).trim().toUpperCase(); // "A", "B"...
-        const rawCorrect = (question.correctAnswer || '').trim();
-        
-        // Lớp 1: So sánh nhãn (A vs A)
-        const aiLabel = getCleanAIAnswer(rawCorrect);
-        if (aiLabel !== "" && userLabel === aiLabel) {
-            correct = true;
-        } else {
-            // Lớp 2: So sánh nội dung (Dành cho trường hợp AI trả về giá trị như "25" thay vì "A")
-            // Chuẩn hóa: bỏ $, bỏ khoảng trắng, viết thường
-            const normalize = (s: string) => s.replace(/[\$\s\.]/g, '').toLowerCase();
-            const normalizedCorrect = normalize(rawCorrect);
-            
-            // Lấy nội dung của option mà người dùng vừa chọn
-            const selectedOptIdx = userLabel.charCodeAt(0) - 65;
-            const selectedOptContent = question.options?.[selectedOptIdx] || "";
-            const normalizedUserOpt = normalize(selectedOptContent);
-
-            // Kiểm tra xem nội dung có khớp nhau không
-            if (normalizedUserOpt === normalizedCorrect || 
-                normalizedUserOpt.includes(normalizedCorrect) ||
-                normalizedCorrect.includes(normalizedUserOpt)) {
-                correct = true;
-            }
-        }
-        }    
-    // 2. Xử lý Điền số (TLN)
-    else if (question.type === 'TLN') {
-        // Chuẩn hóa dấu phẩy thành dấu chấm để parseFloat không lỗi
-        const userVal = parseFloat((userAnswer as string).replace(',', '.'));
-        const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
-        const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
-        
-        if (!isNaN(userVal) && !isNaN(aiVal)) {
-            // Cho phép sai số nhỏ 0.05 để tránh lỗi làm tròn của AI
-            correct = Math.abs(userVal - aiVal) < 0.05;
-        } else {
-            // Nếu không phải số, so sánh chuỗi văn bản thuần
-            correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
-        }
-    } 
-    
-    // 3. Xử lý Đúng/Sai (DS)
-    else if (question.type === 'DS') {
-        // Kiểm tra xem tất cả các phát biểu có khớp với đáp án của AI không
-        const allCorrect = question.statements?.every(stmt => 
-           userAnswer[stmt.id] === stmt.isCorrect
-        );
-        correct = !!allCorrect;
-    }
-
-    // Cập nhật trạng thái hiển thị
-    setIsChecked(true);
-    setIsCorrect(correct);
-    
-    // Phát âm thanh phản hồi (Đảm bảo đã sửa let audio ở hàm playSound)
-    playSound(correct); 
-    
-    // Cập nhật điểm số lên App.tsx
-    if (onUpdateScore) onUpdateScore(correct);
-
-    // Đồng bộ dữ liệu câu hỏi (lưu câu trả lời của người dùng)
-    if (onDataChange) {
-        onDataChange({
-            ...question,
-            userAnswer: userAnswer,
-            isCorrect: correct
-        });
-    }
-    };
+      // Gửi dữ liệu về App để lưu
+      if (onDataChange) {
+          onDataChange({
+              ...question,
+              userAnswer: userAnswer,
+              isCorrect: correct
+          });
+      }
+  };
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">

@@ -9,7 +9,7 @@ import { QuizConfig, Question } from "./types";
 async function retryOperation<T>(
   operation: () => Promise<T>, 
   retries: number = 3, 
-  delay: number = 2000
+  delay: number = 5000
 ): Promise<T> {
   try {
     return await operation();
@@ -197,7 +197,6 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       RULE 2: NGUYÊN TẮC ĐÁP ÁN ĐÚNG DUY NHẤT (QUAN TRỌNG NHẤT)
         - Với câu hỏi Trắc nghiệm (TN), trong 4 phương án A, B, C, D:
         - CHỈ ĐƯỢC PHÉP CÓ 1 PHƯƠNG ÁN ĐÚNG. 3 phương án còn lại PHẢI LÀ SAI (Phương án nhiễu).
-        - Trường correctAnswer của câu hỏi Trắc nghiệm (TN) BẮT BUỘC chỉ được chứa duy nhất 1 ký tự: "A", "B", "C" hoặc "D". Tuyệt đối không thêm dấu chấm, dấu cách hay văn bản giải thích vào trường này.
         - Xử lý lỗi thường gặp về tính Đơn điệu (Đồng biến/Nghịch biến):
             + Nếu hàm số đồng biến trên cả 2 khoảng $(-\\infty; -1)$ và $(1; +\\infty)$.
             + THÌ: Chỉ được đưa 1 trong 2 khoảng đó vào đáp án đúng (Ví dụ chọn A là $(1; +\\infty)$).
@@ -206,14 +205,10 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
         - Xử lý lỗi thường gặp về đẳng thức vectơ:
             + Nếu $\\vec{MA} + \\vec{MB} = \\vec{0}$ là đúng 
-            + THÌ:  $\\vec{AM} + \\vec{BM} = \\vec{0}$ cũng đúng.
+            + THÌ:  $\\vec{AM} + \\vec{BM} = \\vec{0}$ hay $\\vec{AM} = \\vec{MB}$ cũng đúng.
             + TUYỆT ĐỐI KHÔNG đưa cả hai đẳng thức đều đúng vào câu hỏi tìm đáp án đúng.
             + Các phương án nhiễu phải là các phương án sai hẳn.
             + Tương tự cho các tình huống khác.
-
-        - ĐẶC BIỆT VỚI CÂU HỎI PHỦ ĐỊNH (Tìm câu SAI, khẳng định KHÔNG ĐÚNG): 
-            + 'correctAnswer' PHẢI là chữ cái của phương án chứa nội dung sai đó.
-            + Ví dụ: Nếu đề hỏi "Mệnh đề nào sai?" và mệnh đề ở phương án C sai về toán học, thì 'correctAnswer' BẮT BUỘC phải là "C".
             
       RULE 3. QUY TẮC CÂU ĐÚNG/SAI (DS):
       - BẮT BUỘC trả về mảng 'statements' gồm 4 phát biểu (a, b, c, d).
@@ -310,12 +305,13 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
              - Để null các trường: 'graphFunction', 'geometryGraph'.
              - Trong 'questionText' phải ghi: "Cho bảng biến thiên như hình bên."
 
-        RULE 10. QUY TẮC ĐÁP ÁN TỌA ĐỘ/VECTƠ:
-          - Tuyệt đối KHÔNG đưa tọa độ (x;y;z) hoặc biểu thức chứa biến vào trường 'correctAnswer' của loại 'TLN'.
-          - Nếu đáp án là tọa độ hoặc biểu thức, BẮT BUỘC phải dùng loại 'TN'.
-          - Các phương án trắc nghiệm (options) chứa tọa độ phải đặt trong LaTeX: "$\vec{a} = (1; 2; 3)$" hoặc "$M(1; -2; 0)$".
+      // Thêm vào cuối danh sách các RULE trong prompt
+      RULE 10. QUY TẮC ĐÁP ÁN TỌA ĐỘ/VECTƠ:
+        - Tuyệt đối KHÔNG đưa tọa độ (x;y;z) hoặc biểu thức chứa biến vào trường 'correctAnswer' của loại 'TLN'.
+        - Nếu đáp án là tọa độ hoặc biểu thức, BẮT BUỘC phải dùng loại 'TN'.
+        - Các phương án trắc nghiệm (options) chứa tọa độ phải đặt trong LaTeX: "$\vec{a} = (1; 2; 3)$" hoặc "$M(1; -2; 0)$".
 
-         Trả về JSON mảng ${totalQuestions} câu.
+              Trả về JSON mảng ${totalQuestions} câu.
     `;
 
     // Mới: Bọc trong retryOperation
@@ -355,7 +351,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       const genAI = new GoogleGenerativeAI(userApiKey);
     
-      // Sử dụng model gemini-3-flash (hoặc pro) để hỗ trợ tốt hình ảnh
+      // Sử dụng model gemini-2.5-flash (hoặc pro) để hỗ trợ tốt hình ảnh
       const model = genAI.getGenerativeModel({
         model: "gemini-3-flash-preview", // Flash nhanh và rẻ hơn cho vision
         generationConfig: {
@@ -371,6 +367,8 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
     
       // 2. Chuẩn bị Prompt (Chỉ đạo AI)
+      // --- TRONG HÀM generateQuizFromImages ---
+
       let taskDescription = "";
       if (mode === 'EXACT') {
         taskDescription = `
@@ -378,7 +376,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           YÊU CẦU ĐẶC BIỆT:
           1. GIỮ NGUYÊN nội dung đề bài và số liệu.
           2. CHUYỂN ĐỔI ĐỊNH DẠNG:
-            - Nếu câu hỏi gốc là Tự luận nhưng kết quả là Tọa độ điểm (x;y;z), Vectơ, Phương trình mặt phẳng/đường thẳng: BẮT BUỘC chuyển về dạng 'TN' (Trắc nghiệm 4 lựa chọn). Hãy tự tạo ra 3 phương án nhiễu logic. Đồng thời hoán vị các phương án đúng và sai.
+            - Nếu câu hỏi gốc là Tự luận nhưng kết quả là Tọa độ điểm (x;y;z), Vectơ, Phương trình mặt phẳng/đường thẳng: BẮT BUỘC chuyển về dạng 'TN' (Trắc nghiệm 4 lựa chọn). Hãy tự tạo ra 3 phương án nhiễu logic.
             - Chỉ dùng dạng 'TLN' (Điền số) khi kết quả là MỘT SỐ thực/số nguyên duy nhất (VD: tính diện tích, thể tích, giá trị biểu thức).
           3. Cung cấp lời giải chi tiết (explanation).
           `;
@@ -386,43 +384,25 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         taskDescription = `
           NHIỆM VỤ: Tạo câu hỏi MỚI tương tự như các dạng toán trong ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. Thay đổi số liệu, giữ nguyên độ khó và dạng bài.
+          1. Thay đổi số liệu và tên gọi, giữ nguyên độ khó và dạng bài.
           2. CHUYỂN ĐỔI ĐỊNH DẠNG:
-            - Các bài toán về Tọa độ, Vectơ, Hình học Oxyz: BẮT BUỘC dùng dạng 'TN' (Trắc nghiệm). Đồng thời hoán vị các phương án đúng và sai.
+            - Các bài toán về Tọa độ, Vectơ, Hình học Oxyz: BẮT BUỘC dùng dạng 'TN' (Trắc nghiệm).
             - Dạng 'TLN' chỉ dùng cho các bài toán ra kết quả là số đơn lẻ.
           3. Tạo số lượng câu tương ứng với số câu trong ảnh.
         `;
       }
 
-    // Trong file geminiService.ts -> hàm generateQuizFromImages
+    
+      const prompt = `
+        Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
+        ${taskDescription}
+        Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
 
-    const prompt = `
-    Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
-    ${taskDescription}
-    Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
-
-    QUAN TRỌNG VỀ OCR (TUYỆT ĐỐI TUÂN THỦ):
-    1. CHÍNH XÁC TUYỆT ĐỐI: Giữ nguyên 100% ký hiệu toán học, hướng vector ($\vec{AB}$ khác $\vec{BA}$), chỉ số dưới/trên. KHÔNG được tự ý "sửa lỗi" đề bài kể cả khi bạn nghĩ đề sai.
-    2. Với các câu hỏi Vector/Hình học Oxyz: Hãy trích xuất cực kỳ cẩn thận từng ký tự. Ví dụ: $\vec{IA}$ phải giữ là $\vec{IA}$, không đổi thành $\vec{AI}$.
-
-    QUAN TRỌNG VỀ TÍNH TOÁN (CHO DẠNG BÀI ĐIỀN SỐ):
-    1. KHÔNG LÀM TRÒN SỚM: Hãy giữ nguyên các biểu thức chính xác (căn thức, phân số, $\pi$, $e$) trong các bước tính trung gian.
-    2. CHỈ LÀM TRÒN Ở BƯỚC CUỐI CÙNG: Chỉ thực hiện làm tròn số khi ra kết quả cuối cùng theo yêu cầu của đề bài (ví dụ: làm tròn đến hàng phần chục).
-    3. Kiểm tra lại kết quả 2 lần để đảm bảo khớp với phép tính chính xác.
-
-    QUAN TRỌNG VỀ OUTPUT:
-    - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
-    - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 10.
-    - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
-    - Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm có 4 options A, B, C, D ).
-
-    QUAN TRỌNG VỀ ĐÁP ÁN TRẮC NGHIỆM:
-        1. 'options': Mảng này phải chứa nội dung của 4 phương án.
-        2. 'correctAnswer': BẮT BUỘC phải là chữ cái (A, B, C hoặc D) tương ứng với vị trí của đáp án đúng trong mảng 'options' mà bạn vừa tạo ra. 
-          - Ví dụ: Nếu đáp án đúng là 25 và bạn đặt 25 ở options[1], thì correctAnswer phải là "B".
-        3. Tuyệt đối không để 'correctAnswer' chứa nội dung văn bản dài hoặc ký hiệu toán học nếu đó là câu trắc nghiệm.
-
-    `;      
+        QUAN TRỌNG:
+        - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
+        - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 9 về định dạng LaTeX, đồ thị, bảng biến thiên đã được quy định trước đó trong hệ thống này.
+        - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
+      `;
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {
