@@ -43,18 +43,17 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
 
   // Hàm phát âm thanh (Đã tối ưu Cleanup)
   const playSound = (correct: boolean) => {
-    if (onUpdateScore) { // Chỉ phát khi đang làm bài
-        const audio = new Audio(correct ? '/correct.mp3' : '/wrong.mp3');
+    if (onUpdateScore) {
+        let audio: HTMLAudioElement | null = new Audio(correct ? '/correct.mp3' : '/wrong.mp3'); // Đổi thành let
         audio.volume = 1.0; 
         
-        // Giúp Garbage Collector thu hồi bộ nhớ nhanh hơn
         audio.onended = () => {
-            (audio as any) = null;
+            audio = null; // Bây giờ có thể gán null an toàn
         };
 
         audio.play().catch(() => {});
     }
-  };
+    };
 
   // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ TỐI ƯU CLEANUP) ---
   useEffect(() => {
@@ -175,47 +174,73 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
   // Logic kiểm tra kết quả
-  const handleCheckResult = () => {
-      if (!userAnswer) return;
-      
-      let correct = false;
-      if (question.type === 'TN') {
-          const userClean = (userAnswer as string).trim().toUpperCase();
-          // Lấy ký tự đầu tiên của đáp án AI (A, B, C, D)
-          const correctClean = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
-          correct = userClean === correctClean;
-      } else if (question.type === 'TLN') {
-          const userVal = parseFloat((userAnswer as string).replace(',', '.'));
-          const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
-          const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
-          
-          if (!isNaN(userVal) && !isNaN(aiVal)) {
-              correct = Math.abs(userVal - aiVal) < 0.05;
-          } else {
-              correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
-          }
-      } else if (question.type === 'DS') {
-          const allCorrect = question.statements?.every(stmt => 
-             userAnswer[stmt.id] === stmt.isCorrect
-          );
-          correct = !!allCorrect;
-      }
+// --- HÀM HỖ TRỢ LỌC ĐÁP ÁN SẠCH ---
+const getCleanAIAnswer = (raw: string): string => {
+    if (!raw) return "";
+    // Sử dụng Regex để tìm chữ cái A, B, C, hoặc D đầu tiên xuất hiện
+    const match = raw.match(/[A-D]/i); 
+    return match ? match[0].toUpperCase() : raw.trim().toUpperCase().charAt(0);
+};
 
-      setIsChecked(true);
-      setIsCorrect(correct);
-      playSound(correct);
-      
-      if (onUpdateScore) onUpdateScore(correct);
+// --- HÀM CHẤM ĐIỂM CHÍNH ---
+const handleCheckResult = () => {
+    if (!userAnswer) return;
+    
+    let correct = false;
 
-      // Gửi dữ liệu về App để lưu
-      if (onDataChange) {
-          onDataChange({
-              ...question,
-              userAnswer: userAnswer,
-              isCorrect: correct
-          });
-      }
-  };
+    // 1. Xử lý Trắc nghiệm (TN)
+    if (question.type === 'TN') {
+        const userClean = (userAnswer as string).trim().toUpperCase();
+        // Sử dụng hàm lọc để lấy duy nhất 1 ký tự A, B, C, D từ AI
+        const correctClean = getCleanAIAnswer(question.correctAnswer || '');
+        
+        correct = userClean === correctClean;
+    } 
+    
+    // 2. Xử lý Điền số (TLN)
+    else if (question.type === 'TLN') {
+        // Chuẩn hóa dấu phẩy thành dấu chấm để parseFloat không lỗi
+        const userVal = parseFloat((userAnswer as string).replace(',', '.'));
+        const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
+        const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
+        
+        if (!isNaN(userVal) && !isNaN(aiVal)) {
+            // Cho phép sai số nhỏ 0.05 để tránh lỗi làm tròn của AI
+            correct = Math.abs(userVal - aiVal) < 0.05;
+        } else {
+            // Nếu không phải số, so sánh chuỗi văn bản thuần
+            correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
+        }
+    } 
+    
+    // 3. Xử lý Đúng/Sai (DS)
+    else if (question.type === 'DS') {
+        // Kiểm tra xem tất cả các phát biểu có khớp với đáp án của AI không
+        const allCorrect = question.statements?.every(stmt => 
+           userAnswer[stmt.id] === stmt.isCorrect
+        );
+        correct = !!allCorrect;
+    }
+
+    // Cập nhật trạng thái hiển thị
+    setIsChecked(true);
+    setIsCorrect(correct);
+    
+    // Phát âm thanh phản hồi (Đảm bảo đã sửa let audio ở hàm playSound)
+    playSound(correct); 
+    
+    // Cập nhật điểm số lên App.tsx
+    if (onUpdateScore) onUpdateScore(correct);
+
+    // Đồng bộ dữ liệu câu hỏi (lưu câu trả lời của người dùng)
+    if (onDataChange) {
+        onDataChange({
+            ...question,
+            userAnswer: userAnswer,
+            isCorrect: correct
+        });
+    }
+    };
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">

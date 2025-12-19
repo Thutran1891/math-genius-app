@@ -197,6 +197,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       RULE 2: NGUYÊN TẮC ĐÁP ÁN ĐÚNG DUY NHẤT (QUAN TRỌNG NHẤT)
         - Với câu hỏi Trắc nghiệm (TN), trong 4 phương án A, B, C, D:
         - CHỈ ĐƯỢC PHÉP CÓ 1 PHƯƠNG ÁN ĐÚNG. 3 phương án còn lại PHẢI LÀ SAI (Phương án nhiễu).
+        - Trường correctAnswer của câu hỏi Trắc nghiệm (TN) BẮT BUỘC chỉ được chứa duy nhất 1 ký tự: "A", "B", "C" hoặc "D". Tuyệt đối không thêm dấu chấm, dấu cách hay văn bản giải thích vào trường này.
         - Xử lý lỗi thường gặp về tính Đơn điệu (Đồng biến/Nghịch biến):
             + Nếu hàm số đồng biến trên cả 2 khoảng $(-\\infty; -1)$ và $(1; +\\infty)$.
             + THÌ: Chỉ được đưa 1 trong 2 khoảng đó vào đáp án đúng (Ví dụ chọn A là $(1; +\\infty)$).
