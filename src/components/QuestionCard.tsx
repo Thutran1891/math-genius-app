@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Question } from '../types';
 import { CheckCircle, XCircle, Eye, EyeOff, Send } from 'lucide-react';
 import { LatexText } from './LatexText';
@@ -24,35 +24,16 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   const [isCorrect, setIsCorrect] = useState(false);
   const graphRef = useRef<HTMLDivElement>(null);
 
-  // --- [NEW] HÀM TÌM ĐÁP ÁN THÔNG MINH (DÙNG CHUNG CHO CẢ CHẤM ĐIỂM VÀ HIỂN THỊ) ---
-  // Sử dụng useMemo để không phải tính toán lại liên tục
-  const smartCorrectAnswer = useMemo(() => {
-    if (question.type !== 'TN') return question.correctAnswer || '';
-
-    let aiRaw = (question.correctAnswer || '').trim();
-
-    // 1. CƠ CHẾ BACKUP: Nếu AI quên trả về đáp án, tự tìm trong lời giải
-    if (!aiRaw || aiRaw.length === 0) {
-        const explanationMatch = question.explanation.match(/(?:chọn|đáp án|phương án|kết quả|đúng là).*?([A-D])(?:$|\.| )/i);
-        if (explanationMatch) {
-            aiRaw = explanationMatch[1];
-        }
-    }
-
-    // 2. CHUẨN HÓA: Dùng Regex để lấy đúng ký tự A, B, C, D
-    const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
-    return match ? match[1].toUpperCase() : aiRaw.toUpperCase().charAt(0);
-  }, [question.correctAnswer, question.explanation, question.type]);
-  // ----------------------------------------------------------------------------------
-
   // Reset state khi chuyển câu hỏi
   useEffect(() => {
     if (question.userAnswer) {
+        // Khôi phục trạng thái nếu đã làm (Xem lại lịch sử)
         setUserAnswer(question.userAnswer);
         setIsChecked(true);
         setIsCorrect(!!question.isCorrect);
         setShowExplanation(false);
     } else {
+        // Reset nếu là bài làm mới
         setUserAnswer(question.type === 'DS' ? {} : '');
         setIsChecked(false);
         setIsCorrect(false);
@@ -60,46 +41,77 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
     }
   }, [question.id, question.userAnswer]);
 
+  // Hàm phát âm thanh (Đã tối ưu Cleanup)
   const playSound = (correct: boolean) => {
-    if (onUpdateScore) { 
+    if (onUpdateScore) { // Chỉ phát khi đang làm bài
         const audio = new Audio(correct ? '/correct.mp3' : '/wrong.mp3');
         audio.volume = 1.0; 
-        audio.onended = () => { (audio as any) = null; };
+        
+        // Giúp Garbage Collector thu hồi bộ nhớ nhanh hơn
+        audio.onended = () => {
+            (audio as any) = null;
+        };
+
         audio.play().catch(() => {});
     }
   };
 
-  // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN ---
+  // --- LOGIC VẼ ĐỒ THỊ & TIỆM CẬN (ĐÃ TỐI ƯU CLEANUP) ---
   useEffect(() => {
+    // Chỉ chạy khi có dữ liệu đồ thị HOẶC tiệm cận, và thư viện đã sẵn sàng
     if ((question.graphFunction || question.asymptotes) && graphRef.current && window.functionPlot) {
         try {
+            // Xóa hình cũ trước khi vẽ mới (Đảm bảo sạch sẽ)
             graphRef.current.innerHTML = '';
+            
+            // Mảng chứa tất cả các đường cần vẽ (Hàm chính + Tiệm cận)
             const dataToPlot: any[] = [];
 
+            // ---------------------------------------------------------
+            // 1. XỬ LÝ HÀM SỐ CHÍNH (Nếu có)
+            // ---------------------------------------------------------
             if (question.graphFunction) {
+                // Làm sạch chuỗi công thức từ AI (LaTeX -> Javascript)
                 let fn = question.graphFunction
-                    .replace(/\$/g, '')
-                    .replace(/\^/g, '**')
-                    .replace(/\\/g, '')
-                    .replace(/ln\(/g, 'log(')
-                    .replace(/e\*\*/g, 'exp(')
+                    .replace(/\$/g, '')           // Bỏ dấu $
+                    .replace(/\^/g, '**')         // Đổi mũ ^ thành **
+                    .replace(/\\/g, '')           // Bỏ ký tự lạ của LaTeX
+                    .replace(/ln\(/g, 'log(')     // Đổi ln -> log
+                    .replace(/e\*\*/g, 'exp(')    // Đổi e mũ
+                    // Tự động thêm Math. cho các hàm lượng giác/toán học
                     .replace(/\b(sin|cos|tan|cot|sqrt|abs|log|exp)\b/g, 'Math.$1') 
+                    // Sửa lỗi nếu lỡ thêm Math.Math.
                     .replace(/Math\.Math\./g, 'Math.')
                     .trim();
 
                 dataToPlot.push({
-                    fn: fn, sampler: 'builtIn', graphType: 'polyline', color: '#2563eb', range: [-10, 10]
+                    fn: fn, 
+                    sampler: 'builtIn',  // Dùng sampler mặc định cho mượt
+                    graphType: 'polyline',
+                    color: '#2563eb',    // Màu xanh dương chủ đạo
+                    range: [-10, 10]
                 });
             }
 
+            // ---------------------------------------------------------
+            // 2. XỬ LÝ TIỆM CẬN (Ngang, Đứng, Xiên)
+            // ---------------------------------------------------------
             if (question.asymptotes && question.asymptotes.length > 0) {
                 question.asymptotes.forEach(asym => {
+                    // Chuẩn hóa: Xóa khoảng trắng, chuyển về chữ thường
                     const cleanAsym = asym.replace(/\s/g, '').toLowerCase();
+                    
+                    // Tách vế trái (x hoặc y) và vế phải (biểu thức)
+                    // Ví dụ: "y = 2*x + 1" -> parts[0]="y", parts[1]="2*x+1"
                     const parts = cleanAsym.split('=');
-                    if (parts.length !== 2) return;
+                    if (parts.length !== 2) return; // Bỏ qua nếu sai cú pháp
 
-                    const type = parts[0]; 
-                    let val = parts[1]
+                    const type = parts[0]; // 'x' hoặc 'y'
+                    let val = parts[1];    
+
+                    // QUAN TRỌNG: Làm sạch biểu thức tiệm cận (để vẽ được tiệm cận xiên)
+                    // Áp dụng quy tắc y hệt như hàm chính
+                    val = val
                         .replace(/\^/g, '**')
                         .replace(/\\/g, '')
                         .replace(/ln\(/g, 'log(')
@@ -107,29 +119,60 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                         .replace(/Math\.Math\./g, 'Math.');
 
                     if (type === 'y') {
+                        // CASE A: Tiệm cận NGANG (y=2) hoặc XIÊN (y=2*x+1)
+                        // Thư viện functionPlot vẽ tốt cả 2 dạng này dưới dạng hàm số
                         dataToPlot.push({
-                            fn: val, graphType: 'polyline', color: '#dc2626', attr: { "stroke-dasharray": "4,4" }
+                            fn: val, 
+                            graphType: 'polyline',
+                            color: '#dc2626', // Màu đỏ báo hiệu đường phụ
+                            attr: { "stroke-dasharray": "4,4" } // Nét đứt
                         });
                     } else if (type === 'x') {
+                        // CASE B: Tiệm cận ĐỨNG (x=1)
+                        // Phải dùng dạng hàm ẩn (implicit): x - val = 0
                         dataToPlot.push({
-                            fn: `x - (${val})`, fnType: 'implicit', color: '#dc2626', attr: { "stroke-dasharray": "4,4" }
+                            fn: `x - (${val})`, 
+                            fnType: 'implicit',
+                            color: '#dc2626',
+                            attr: { "stroke-dasharray": "4,4" }
                         });
                     }
                 });
             }
 
+            // ---------------------------------------------------------
+            // 3. TIẾN HÀNH VẼ
+            // ---------------------------------------------------------
             window.functionPlot({
               target: graphRef.current,
-              width: 450, height: 300, grid: true,
-              data: dataToPlot,
+              width: 450, 
+              height: 300, 
+              grid: true,
+              data: dataToPlot, // Đẩy toàn bộ dữ liệu đã xử lý vào đây
               xAxis: { domain: [-5, 5] },
               yAxis: { domain: [-5, 5] },
-              tip: { xLine: true, yLine: true }
+              tip: {
+                  xLine: true,    // Hiện đường gióng khi di chuột
+                  yLine: true,
+              }
           });
-        } catch (e) { console.error("Lỗi vẽ đồ thị:", e); }
+
+        } catch (e) { 
+            console.error("Lỗi vẽ đồ thị:", e);
+            // Không hiển thị lỗi ra UI để tránh làm người dùng bối rối
+        }
     }
-    return () => { if (graphRef.current) graphRef.current.innerHTML = ''; };
+
+    // [CLEANUP FUNCTION] - QUAN TRỌNG
+    // React sẽ chạy hàm này khi component unmount hoặc trước khi chạy lại useEffect
+    return () => {
+        if (graphRef.current) {
+            graphRef.current.innerHTML = ''; // Xóa sạch nội dung trong div
+        }
+    };
+
   }, [question.graphFunction, question.asymptotes, question.id]); 
+  // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
   // Logic kiểm tra kết quả
   const handleCheckResult = () => {
@@ -138,16 +181,16 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
       let correct = false;
       if (question.type === 'TN') {
           const userClean = (userAnswer as string).trim().toUpperCase();
-          // [UPDATED] So sánh với đáp án thông minh đã tính toán ở trên
-          correct = userClean === smartCorrectAnswer;
-
+          // Lấy ký tự đầu tiên của đáp án AI (A, B, C, D)
+          const correctClean = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
+          correct = userClean === correctClean;
       } else if (question.type === 'TLN') {
           const userVal = parseFloat((userAnswer as string).replace(',', '.'));
           const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
           const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
           
           if (!isNaN(userVal) && !isNaN(aiVal)) {
-              correct = Math.abs(userVal - aiVal) <= 0.15; // Giữ độ lệch an toàn
+              correct = Math.abs(userVal - aiVal) < 0.05;
           } else {
               correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
           }
@@ -161,8 +204,17 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
       setIsChecked(true);
       setIsCorrect(correct);
       playSound(correct);
+      
       if (onUpdateScore) onUpdateScore(correct);
-      if (onDataChange) onDataChange({ ...question, userAnswer: userAnswer, isCorrect: correct });
+
+      // Gửi dữ liệu về App để lưu
+      if (onDataChange) {
+          onDataChange({
+              ...question,
+              userAnswer: userAnswer,
+              isCorrect: correct
+          });
+      }
   };
 
   return (
@@ -186,16 +238,39 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         <LatexText text={question.questionText.replace(/\\n/g, '\n')} />
       </div>
 
+    {/* --- SỬA LẠI KHU VỰC NÀY ĐỂ TRÁNH TRÙNG LẶP --- */}
+    {/* KHU VỰC VẼ HÌNH ẢNH MINH HỌA */}
+    {/* Chỉ hiển thị div bao ngoài nếu có ít nhất 1 loại dữ liệu hình ảnh để tránh khoảng trắng thừa */}
     {(question.geometryGraph || (question.variationTableData && question.variationTableData.xNodes.length > 0) || question.graphFunction) && (
         <div className="space-y-6 flex justify-center mb-6">
             {(() => {
-                if (question.geometryGraph) return <div className="border rounded-lg p-4 bg-gray-50 shadow-inner w-full max-w-md"><DynamicGeometry graph={question.geometryGraph} /></div>;
-                if (question.variationTableData && question.variationTableData.xNodes.length > 0) return <VariationTable data={question.variationTableData} />;
-                if (question.graphFunction) return <div ref={graphRef} className="bg-white border-2 border-gray-300 rounded-lg shadow-sm overflow-hidden" />;
+                // CASE 1: HÌNH HỌC (Ưu tiên cao nhất)
+                if (question.geometryGraph) {
+                    return (
+                        <div className="border rounded-lg p-4 bg-gray-50 shadow-inner w-full max-w-md">
+                            <DynamicGeometry graph={question.geometryGraph} />
+                        </div>
+                    );
+                }
+
+                // CASE 2: BẢNG BIẾN THIÊN
+                if (question.variationTableData && question.variationTableData.xNodes.length > 0) {
+                    return <VariationTable data={question.variationTableData} />;
+                }
+
+                // CASE 3: ĐỒ THỊ HÀM SỐ
+                if (question.graphFunction) {
+                    return (
+                        <div ref={graphRef} className="bg-white border-2 border-gray-300 rounded-lg shadow-sm overflow-hidden" />
+                    );
+                }
+
+                // KHÔNG CÓ DỮ LIỆU -> KHÔNG RENDER GÌ CẢ (Clean UI)
                 return null;
             })()}
         </div>
     )}
+    {/* ------------------------------------------------ */}    
 
       {/* 1. TRẮC NGHIỆM */}
       {question.type === 'TN' && question.options && (
@@ -204,21 +279,30 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
             const label = String.fromCharCode(65 + i); 
             const isSelected = userAnswer === label;
             
+            // --- THAY ĐỔI 1: NỀN VÀNG NHẠT CHO ĐÁP ÁN ---
+            // Sửa class mặc định: Thêm bg-yellow-50 (nền vàng nhạt), border-yellow-200 (viền vàng nhẹ)
+            // Thay hover:bg-gray-50 thành hover:bg-yellow-100 (vàng đậm hơn khi di chuột)
             let css = "p-3 border border-yellow-200 rounded-lg text-left bg-yellow-50 hover:bg-yellow-100 flex gap-2 transition-all shadow-sm ";
             
             if (isChecked) {
-                // [UPDATED] Sử dụng smartCorrectAnswer để tô màu (đồng bộ với logic chấm điểm)
-                const isRightOption = smartCorrectAnswer === label;
+                const aiChar = (question.correctAnswer || '').trim().toUpperCase().charAt(0);
+                const isRightOption = aiChar === label;
 
+                // Giữ nguyên logic tô màu Xanh/Đỏ khi đã kiểm tra
                 if (isRightOption) css = "p-3 border-2 border-green-500 bg-green-50 text-green-800 font-bold flex gap-2 shadow-md";
                 else if (isSelected) css = "p-3 border-2 border-red-500 bg-red-50 text-red-800 flex gap-2 opacity-100";
-                else css += "opacity-50"; 
+                else css += "opacity-50"; // Làm mờ các đáp án không chọn
             } else if (isSelected) {
+                // Giữ nguyên logic tô màu Xanh dương khi đang chọn
                 css = "p-3 border-2 border-blue-500 bg-blue-50 flex gap-2 shadow-md";
             }
 
             return (
               <button key={i} onClick={() => !isChecked && setUserAnswer(label)} className={css}>
+                {/* --- THAY ĐỔI 2: FONT CHỮ VÀ MÀU SẮC TIỀN TỐ (A., B....) --- */}
+                {/* font-serif: Font có chân trông trang trọng hơn */}
+                {/* text-green-800: Màu xanh lá đậm */}
+                {/* text-lg: Cỡ chữ lớn hơn một chút */}
                 <span className="font-serif font-bold text-green-800 text-lg min-w-[25px] leading-none mt-1">
                     {label}.
                 </span>
@@ -293,13 +377,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                 <Send className="w-4 h-4" /> Kiểm tra
               </button>
           ) : (
-              <div className="flex-1 text-sm">
-                  <span className="font-bold text-gray-500">Đáp án: </span> 
-                  {/* Hiển thị đáp án thông minh đã tìm được */}
-                  <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">
-                      {question.type === 'TN' ? smartCorrectAnswer : (question.correctAnswer || "Xem lời giải")}
-                  </span>
-              </div>
+              <div className="flex-1"></div>
           )}
 
           {isChecked && (
@@ -316,14 +394,19 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                   Lời giải chi tiết
               </div>
               
+              {/* --- BẮT ĐẦU SỬA ĐỔI --- */}
               <div className="leading-relaxed text-base">
                 {question.explanation
+                    // Bước 1: Chuẩn hóa xuống dòng (xử lý cả \n của JSON và \\n do AI gen)
                     .replace(/\\n/g, '\n')
-                    .replace(/\\displaystyleint/g, '\\displaystyle \\int')
-                    .replace(/\\displaystylelim/g, '\\displaystyle \\lim')
-                    .replace(/\\displaystylesum/g, '\\displaystyle \\sum')
+                    .replace(/\\displaystyleint/g, '\\displaystyle \\int') // Tách tích phân
+                    .replace(/\\displaystylelim/g, '\\displaystyle \\lim') // Tách giới hạn (phòng hờ)
+                    .replace(/\\displaystylesum/g, '\\displaystyle \\sum') // Tách tổng (phòng hờ)
+                    // Bước 2: Tách chuỗi thành mảng các dòng
                     .split('\n')
+                    // Bước 3: Render từng dòng
                     .map((line, idx) => {
+                        // Bỏ qua dòng trống nếu muốn
                         if (!line.trim()) return null; 
                         return (
                             <div key={idx} className="mb-3 last:mb-0 text-gray-800">
@@ -333,6 +416,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                     })
                 }
               </div>
+              {/* --- KẾT THÚC SỬA ĐỔI --- */}
           </div>
       )}
     </div>
