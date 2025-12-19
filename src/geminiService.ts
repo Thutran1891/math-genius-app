@@ -415,6 +415,13 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 10.
     - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
     - Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm có 4 options A, B, C, D ).
+
+    QUAN TRỌNG VỀ ĐÁP ÁN TRẮC NGHIỆM:
+        1. 'options': Mảng này phải chứa nội dung của 4 phương án.
+        2. 'correctAnswer': BẮT BUỘC phải là chữ cái (A, B, C hoặc D) tương ứng với vị trí của đáp án đúng trong mảng 'options' mà bạn vừa tạo ra. 
+          - Ví dụ: Nếu đáp án đúng là 25 và bạn đặt 25 ở options[1], thì correctAnswer phải là "B".
+        3. Tuyệt đối không để 'correctAnswer' chứa nội dung văn bản dài hoặc ký hiệu toán học nếu đó là câu trắc nghiệm.
+
     `;      
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)

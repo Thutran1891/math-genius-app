@@ -174,13 +174,20 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
   // Logic kiểm tra kết quả
-// --- HÀM HỖ TRỢ LỌC ĐÁP ÁN SẠCH ---
-const getCleanAIAnswer = (raw: string): string => {
-    if (!raw) return "";
-    // Sử dụng Regex để tìm chữ cái A, B, C, hoặc D đầu tiên xuất hiện
-    const match = raw.match(/[A-D]/i); 
-    return match ? match[0].toUpperCase() : raw.trim().toUpperCase().charAt(0);
-};
+// --- CẬP NHẬT HÀM LỌC ĐÁP ÁN AN TOÀN HƠN ---
+    const getCleanAIAnswer = (raw: string): string => {
+        if (!raw) return "";
+        const trimmed = raw.trim().toUpperCase();
+        
+        // Ưu tiên 1: Nếu chỉ là 1 chữ cái A, B, C, D duy nhất
+        if (/^[A-D]$/.test(trimmed)) return trimmed;
+        
+        // Ưu tiên 2: Định dạng "A.", "Đáp án A", "A)"
+        const match = trimmed.match(/^(?:ĐÁP ÁN|CÂU|CHỌN)?\s*([A-D])(?:\.|\)|:|\s|$)/i);
+        if (match) return match[1].toUpperCase();
+
+        return ""; // Nếu không tìm thấy nhãn rõ ràng, trả về rỗng để chuyển sang so sánh nội dung
+    };
 
 // --- HÀM CHẤM ĐIỂM CHÍNH ---
 const handleCheckResult = () => {
@@ -190,13 +197,32 @@ const handleCheckResult = () => {
 
     // 1. Xử lý Trắc nghiệm (TN)
     if (question.type === 'TN') {
-        const userClean = (userAnswer as string).trim().toUpperCase();
-        // Sử dụng hàm lọc để lấy duy nhất 1 ký tự A, B, C, D từ AI
-        const correctClean = getCleanAIAnswer(question.correctAnswer || '');
+        const userLabel = (userAnswer as string).trim().toUpperCase(); // "A", "B"...
+        const rawCorrect = (question.correctAnswer || '').trim();
         
-        correct = userClean === correctClean;
-    } 
-    
+        // Lớp 1: So sánh nhãn (A vs A)
+        const aiLabel = getCleanAIAnswer(rawCorrect);
+        if (aiLabel !== "" && userLabel === aiLabel) {
+            correct = true;
+        } else {
+            // Lớp 2: So sánh nội dung (Dành cho trường hợp AI trả về giá trị như "25" thay vì "A")
+            // Chuẩn hóa: bỏ $, bỏ khoảng trắng, viết thường
+            const normalize = (s: string) => s.replace(/[\$\s\.]/g, '').toLowerCase();
+            const normalizedCorrect = normalize(rawCorrect);
+            
+            // Lấy nội dung của option mà người dùng vừa chọn
+            const selectedOptIdx = userLabel.charCodeAt(0) - 65;
+            const selectedOptContent = question.options?.[selectedOptIdx] || "";
+            const normalizedUserOpt = normalize(selectedOptContent);
+
+            // Kiểm tra xem nội dung có khớp nhau không
+            if (normalizedUserOpt === normalizedCorrect || 
+                normalizedUserOpt.includes(normalizedCorrect) ||
+                normalizedCorrect.includes(normalizedUserOpt)) {
+                correct = true;
+            }
+        }
+        }    
     // 2. Xử lý Điền số (TLN)
     else if (question.type === 'TLN') {
         // Chuẩn hóa dấu phẩy thành dấu chấm để parseFloat không lỗi
