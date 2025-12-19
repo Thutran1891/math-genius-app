@@ -146,7 +146,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
@@ -345,9 +345,9 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       const genAI = new GoogleGenerativeAI(userApiKey);
     
-      // Sử dụng model gemini-2.5-flash (hoặc pro) để hỗ trợ tốt hình ảnh
+      // Sử dụng model gemini-3-flash-preview (hoặc pro) để hỗ trợ tốt hình ảnh
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-flash", // Flash nhanh và rẻ hơn cho vision
+        model: "gemini-3-flash-preview", // Flash nhanh và rẻ hơn cho vision
         generationConfig: {
           responseMimeType: "application/json",
           // Tái sử dụng schema đã định nghĩa ở trên
@@ -413,7 +413,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 export const generateTheory = async (topic: string, userApiKey: string): Promise<string> => {
   if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
   const genAI = new GoogleGenerativeAI(userApiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
   const prompt = `
     Bạn là giáo viên Phổ thông giỏi. Hãy tóm tắt LÝ THUYẾT TRỌNG TÂM cho chủ đề: "${topic}".
