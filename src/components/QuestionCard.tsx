@@ -180,35 +180,14 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         
         let correct = false;
         if (question.type === 'TN') {
+            // Chỉ cần so sánh trực tiếp chữ cái người dùng chọn và chữ cái AI/Shuffle đã định nghĩa
             const userClean = (userAnswer as string).trim().toUpperCase();
-            let aiRaw = (question.correctAnswer || '').trim();
-
-            // --- [NEW] CƠ CHẾ BACKUP THÔNG MINH ---
-            // Nếu AI quên trả về correctAnswer (Đáp án gốc: Không có),
-            // Ta sẽ tự động "đào" đáp án từ trong Lời giải chi tiết.
-            if (!aiRaw || aiRaw.length === 0) {
-                // Tìm các cụm từ: "chọn A", "đáp án B", "phương án C"... ở cuối lời giải
-                // Regex giải thích: Tìm từ khóa -> lấy ký tự A-D tiếp theo
-                const explanationMatch = question.explanation.match(/(?:chọn|đáp án|phương án|kết quả|đúng là).*?([A-D])(?:$|\.| )/i);
-                if (explanationMatch) {
-                    aiRaw = explanationMatch[1];
-                    console.log("Auto-recovered answer from explanation:", aiRaw);
-                }
-            }
-            // ---------------------------------------
+            const aiCorrect = (question.correctAnswer || '').trim().toUpperCase();
             
-            // Regex tìm đáp án A, B, C, D chính xác từ chuỗi aiRaw đã xử lý
-            const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
-            
-            let correctClean = "";
-            if (match) {
-                correctClean = match[1].toUpperCase(); 
-            } else {
-                correctClean = aiRaw.toUpperCase().charAt(0);
-            }
-
-            correct = userClean === correctClean;
-        } else if (question.type === 'TLN') {
+            correct = userClean === aiCorrect;
+        } 
+        
+        else if (question.type === 'TLN') {
             // ... (Giữ nguyên logic TLN như cũ)
             const userVal = parseFloat((userAnswer as string).replace(',', '.'));
             const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
@@ -297,52 +276,50 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
     )}
     {/* ------------------------------------------------ */}    
 
-      {/* 1. TRẮC NGHIỆM */}
-      {question.type === 'TN' && question.options && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-          {question.options.map((opt, i) => {
-            const label = String.fromCharCode(65 + i); 
-            const isSelected = userAnswer === label;
-            
-            // --- THAY ĐỔI 1: NỀN VÀNG NHẠT CHO ĐÁP ÁN ---
-            // Sửa class mặc định: Thêm bg-yellow-50 (nền vàng nhạt), border-yellow-200 (viền vàng nhẹ)
-            // Thay hover:bg-gray-50 thành hover:bg-yellow-100 (vàng đậm hơn khi di chuột)
-            let css = "p-3 border border-yellow-200 rounded-lg text-left bg-yellow-50 hover:bg-yellow-100 flex gap-2 transition-all shadow-sm ";
-            
-            if (isChecked) {
-                // [SỬA LẠI LOGIC HIỂN THỊ KẾT QUẢ]
-                // Tính toán lại correctClean tại đây để tô màu cho đúng (đồng bộ với logic chấm điểm)
-                const aiRaw = (question.correctAnswer || '').trim();
-                const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
-                const correctClean = match ? match[1].toUpperCase() : aiRaw.toUpperCase().charAt(0);
+                {/* 1. TRẮC NGHIỆM */}
+                {/* Trong QuestionCard.tsx */}
+            {question.type === 'TN' && question.options && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                {question.options.map((opt, i) => {
+                const label = String.fromCharCode(65 + i); 
+                const isSelected = userAnswer === label;
+                
+                // Khai báo lại biến css để tránh lỗi Unresolved
+                let css = "p-3 border border-yellow-200 rounded-lg text-left bg-yellow-50 hover:bg-yellow-100 flex gap-2 transition-all shadow-sm ";
+                
+                if (isChecked) {
+                    const aiRaw = (question.correctAnswer || '').trim();
+                    const match = aiRaw.match(/(?:^|[\s*:.])([A-D])(?:$|[\s*:.])/i);
+                    const correctClean = match ? match[1].toUpperCase() : aiRaw.toUpperCase().charAt(0);
+                    const isRightOption = correctClean === label;
 
-                const isRightOption = correctClean === label;
+                    if (isRightOption) css = "p-3 border-2 border-green-500 bg-green-50 text-green-800 font-bold flex gap-2 shadow-md";
+                    else if (isSelected) css = "p-3 border-2 border-red-500 bg-red-50 text-red-800 flex gap-2 opacity-100";
+                    else css += "opacity-50";
+                } else if (isSelected) {
+                    css = "p-3 border-2 border-blue-500 bg-blue-50 flex gap-2 shadow-md";
+                }
 
-                if (isRightOption) css = "p-3 border-2 border-green-500 bg-green-50 text-green-800 font-bold flex gap-2 shadow-md";
-                else if (isSelected) css = "p-3 border-2 border-red-500 bg-red-50 text-red-800 flex gap-2 opacity-100";
-                else css += "opacity-50"; // Làm mờ các đáp án không chọn
-            } else if (isSelected) {
-                // Giữ nguyên logic tô màu Xanh dương khi đang chọn
-                css = "p-3 border-2 border-blue-500 bg-blue-50 flex gap-2 shadow-md";
-            }
+                // Làm sạch dữ liệu đáp án để LatexText render chuẩn
+                const cleanOption = opt.replace(/^[A-D]\.\s*/, '').trim();
 
-            return (
-              <button key={i} onClick={() => !isChecked && setUserAnswer(label)} className={css}>
-                {/* --- THAY ĐỔI 2: FONT CHỮ VÀ MÀU SẮC TIỀN TỐ (A., B....) --- */}
-                {/* font-serif: Font có chân trông trang trọng hơn */}
-                {/* text-green-800: Màu xanh lá đậm */}
-                {/* text-lg: Cỡ chữ lớn hơn một chút */}
-                <span className="font-serif font-bold text-green-800 text-lg min-w-[25px] leading-none mt-1">
-                    {label}.
-                </span>
-                <div className="flex-1 text-gray-800">
-                    <LatexText text={opt.replace(/^[A-D]\.\s*/, '')} />
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      )}
+                return (
+                    <button 
+                    key={i} 
+                    onClick={() => !isChecked && setUserAnswer(label)} 
+                    className={css} // SỬA TẠI ĐÂY: Truyền biến css vào
+                    >
+                    <span className="font-serif font-bold text-green-800 text-lg min-w-[25px] leading-none mt-1">
+                        {label}.
+                    </span>
+                    <div className="flex-1 text-gray-800">
+                        <LatexText text={cleanOption} />
+                    </div>
+                    </button>
+                );
+                })}
+            </div>
+            )}
 
       {/* 2. TỰ LUẬN */}
       {question.type === 'TLN' && (

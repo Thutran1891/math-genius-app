@@ -380,39 +380,33 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         taskDescription = `
           NHIỆM VỤ: Trích xuất và giải chính xác 100% các câu hỏi từ hình ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. GIẢI TOÁN CHI TIẾT: Bạn phải tự giải bài toán trước khi đưa ra đáp án. Cẩn thận các bước trừ tọa độ vector, dấu của biểu thức.
-          2. QUY ƯỚC ĐÁP ÁN: Nội dung đáp án ĐÚNG phải luôn được đặt vào phương án ĐẦU TIÊN (vị trí A) trong mảng 'options'.
-          3. CHUYỂN ĐỔI TN: Nếu câu gốc là tự luận, hãy chuyển thành trắc nghiệm 4 lựa chọn (A, B, C, D). Nếu đáp án chỉ có 1 chữ số đơn lẻ thì mới tạo câu TLN (điền số).
-          4. KHÔNG ĐƯỢC SAI LỖI CƠ BẢN: Đảm bảo lời giải (explanation) và đáp án (correctAnswer) phải khớp nhau hoàn toàn.
+          1. GIẢI TOÁN CHI TIẾT: Tự giải bài toán trước khi đưa ra đáp án. 
+          2. QUY ƯỚC ĐẦU RA: Đáp án ĐÚNG luôn ở vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
+          3. CHUẨN LATEX ĐÁP ÁN: Tất cả các con số, tọa độ, vectơ, phân số trong phần 'options' BẮT BUỘC phải nằm trong dấu $. Ví dụ: "$I\left(-\frac{7}{2}; \frac{15}{2}; -34\right)$". Không được để text thuần nếu có ký hiệu toán.
         `;
       } else {
         taskDescription = `
           NHIỆM VỤ: Tạo câu hỏi MỚI tương tự về kiến thức và độ khó như trong ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số để tạo đề mới.
-          2. QUY ƯỚC ĐÁP ÁN: Luôn đặt nội dung đáp án ĐÚNG vào phương án ĐẦU TIÊN (vị trí A).
-          3. 'correctAnswer' luôn là "A".
-          4. Lời giải phải giải theo số liệu mới bạn đã tạo ra.
+          1. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số.
+          2. QUY ƯỚC ĐẦU RA: Luôn đặt đáp án ĐÚNG vào vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
+          3. CHUẨN LATEX ĐÁP ÁN: Mọi ký hiệu toán học và chữ số trong 'options' phải kẹp trong cặp dấu $.
         `;
       }
-
-    // Trong file geminiService.ts -> hàm generateQuizFromImages
-
-    const prompt = `
-    Bạn là một trợ lý AI chuyên gia Toán học phổ thông và OCR.
-    ${taskDescription}
-    Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
-
-    QUY TẮC CỐ ĐỊNH (TUYỆT ĐỐI TUÂN THỦ):
-    1. QUY TẮC "ĐÚNG TẠI A": Trong mảng 'options', phần tử index 0 (tương ứng câu A) BẮT BUỘC phải là nội dung đúng. Các phần tử index 1, 2, 3 là các phương án nhiễu.
-    2. QUY TẮC "CORRECT-A": Trường 'correctAnswer' BẮT BUỘC phải luôn là "A". 
-    3. OCR CHÍNH XÁC: Trích xuất đúng ký hiệu $\vec{u}$, $\vec{v}$, tọa độ $(x; y; z)$. 
-    4. LỜI GIẢI CHI TIẾT: Trong 'explanation', hãy trình bày các bước giải toán. Cuối cùng kết luận "Vậy chọn đáp án A".
-    5. ĐỐI VỚI VECTOR: Nhắc lại, $\vec{CB} = \vec{B} - \vec{C}$. Hãy tính toán thật kỹ tọa độ này, không được sai dấu.
-
-    TRẢ VỀ JSON ARRAY THEO SCHEMA ĐÃ ĐỊNH NGHĨA.
-    `;    
     
+      const prompt = `
+        Bạn là chuyên gia Toán học và OCR.
+        ${taskDescription}
+        Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+    
+        QUY TẮC HIỂN THỊ BẮT BUỘC:
+        1. QUY TẮC "ĐÚNG TẠI A": Trong mảng 'options', phần tử đầu tiên (index 0) là nội dung ĐÚNG. 
+        2. MÔI TRƯỜNG TOÁN HỌC: Tất cả các chữ số đơn lẻ, tọa độ điểm, biểu thức, phân số trong 'questionText', 'options' và 'explanation' PHẢI được bao bọc bởi dấu $. Ví dụ: viết $x=2$ thay vì x=2, viết $A(1;2;3)$ thay vì A(1;2;3).
+        3. PHÂN SỐ: Luôn dùng $\frac{a}{b}$ hoặc $\dfrac{a}{b}$.
+        4. TỌA ĐỘ: Dùng dấu chấm phẩy ; để ngăn cách các thành phần tọa độ.
+    
+        TRẢ VỀ JSON ARRAY THEO SCHEMA.
+      `;    
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {
         // Mới:
