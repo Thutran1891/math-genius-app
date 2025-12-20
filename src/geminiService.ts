@@ -130,6 +130,7 @@ const questionSchema: any = {
   required: ['id', 'type', 'questionText', 'explanation']
 };
 
+
 // Thêm tham số userApiKey
 export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
   if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
@@ -194,14 +195,12 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
          - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
 
-      RULE 2: NGUYÊN TẮC ĐÁP ÁN ĐÚNG DUY NHẤT (QUAN TRỌNG NHẤT)
-        - Với câu hỏi Trắc nghiệm (TN), trong 4 phương án A, B, C, D:
-        - CHỈ ĐƯỢC PHÉP CÓ 1 PHƯƠNG ÁN ĐÚNG. 3 phương án còn lại PHẢI LÀ SAI (Phương án nhiễu).
-        - Xử lý lỗi thường gặp về tính Đơn điệu (Đồng biến/Nghịch biến):
-            + Nếu hàm số đồng biến trên cả 2 khoảng $(-\\infty; -1)$ và $(1; +\\infty)$.
-            + THÌ: Chỉ được đưa 1 trong 2 khoảng đó vào đáp án đúng (Ví dụ chọn A là $(1; +\\infty)$).
-            + TUYỆT ĐỐI KHÔNG đưa khoảng đúng còn lại (là $(-\\infty; -1)$) vào các phương án B, C, D.
-            + Các phương án nhiễu phải là các khoảng nghịch biến hoặc khoảng sai hẳn.
+      RULE 2: NGUYÊN TẮC ĐÁP ÁN TRẮC NGHIỆM (TN) - CỰC KỲ QUAN TRỌNG:
+    - AI BẮT BUỘC phải đặt nội dung đáp án ĐÚNG vào phương án ĐẦU TIÊN (vị trí A) trong mảng 'options'.
+    - Ba phương án còn lại (B, C, D) phải là các phương án NHIỄU (SAI).
+    - Trường 'correctAnswer' BẮT BUỘC phải luôn trả về giá trị là "A".
+    - Điều này áp dụng cho cả việc trích xuất từ ảnh (EXACT) và tạo mới (SIMILAR).
+    - Khi trích xuất từ ảnh, nếu đáp án đúng trong ảnh là C, bạn vẫn phải đưa nội dung đó lên vị trí A trong mảng 'options' và set 'correctAnswer' = "A".
 
         - Xử lý lỗi thường gặp về đẳng thức vectơ:
             + Nếu $\\vec{MA} + \\vec{MB} = \\vec{0}$ là đúng 
@@ -319,9 +318,15 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
     // Mới: Bọc trong retryOperation
     const result = await retryOperation(async () => {
+    
       return await model.generateContent(prompt);
     });
-    return JSON.parse(result.response.text());
+    // --- ĐÂY LÀ VỊ TRÍ CẦN SỬA ---
+    const responseText = result.response.text();
+    const rawQuestions: Question[] = JSON.parse(responseText);
+    
+    // Tiến hành trộn thứ tự đáp án cho từng câu hỏi trước khi trả về cho App.tsx
+    return rawQuestions.map(q => shuffleQuestion(q));
   } catch (error) {
     console.error("Gemini Error:", error);
     throw error;
@@ -373,48 +378,40 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       let taskDescription = "";
       if (mode === 'EXACT') {
         taskDescription = `
-          NHIỆM VỤ: Trích xuất và giải TẤT CẢ các câu hỏi có trong hình ảnh.
+          NHIỆM VỤ: Trích xuất và giải chính xác 100% các câu hỏi từ hình ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. GIỮ NGUYÊN nội dung đề bài và số liệu.
-          2. CHUYỂN ĐỔI ĐỊNH DẠNG:
-            - Nếu câu hỏi gốc là Tự luận nhưng kết quả là Tọa độ điểm (x;y;z), Vectơ, Phương trình mặt phẳng/đường thẳng: BẮT BUỘC chuyển về dạng 'TN' (Trắc nghiệm 4 lựa chọn). Hãy tự tạo ra 3 phương án nhiễu logic. Đồng thời hoán vị các phương án đúng và sai.
-            - Chỉ dùng dạng 'TLN' (Điền số) khi kết quả là MỘT SỐ thực/số nguyên duy nhất (VD: tính diện tích, thể tích, giá trị biểu thức).
-          3. Cung cấp lời giải chi tiết (explanation).
-          `;
+          1. GIẢI TOÁN CHI TIẾT: Bạn phải tự giải bài toán trước khi đưa ra đáp án. Cẩn thận các bước trừ tọa độ vector, dấu của biểu thức.
+          2. QUY ƯỚC ĐÁP ÁN: Nội dung đáp án ĐÚNG phải luôn được đặt vào phương án ĐẦU TIÊN (vị trí A) trong mảng 'options'.
+          3. CHUYỂN ĐỔI TN: Nếu câu gốc là tự luận, hãy chuyển thành trắc nghiệm 4 lựa chọn (A, B, C, D). Nếu đáp án chỉ có 1 chữ số đơn lẻ thì mới tạo câu TLN (điền số).
+          4. KHÔNG ĐƯỢC SAI LỖI CƠ BẢN: Đảm bảo lời giải (explanation) và đáp án (correctAnswer) phải khớp nhau hoàn toàn.
+        `;
       } else {
         taskDescription = `
-          NHIỆM VỤ: Tạo câu hỏi MỚI tương tự như các dạng toán trong ảnh.
+          NHIỆM VỤ: Tạo câu hỏi MỚI tương tự về kiến thức và độ khó như trong ảnh.
           YÊU CẦU ĐẶC BIỆT:
-          1. Thay đổi số liệu, giữ nguyên độ khó và dạng bài.
-          2. CHUYỂN ĐỔI ĐỊNH DẠNG:
-            - Các bài toán về Tọa độ, Vectơ, Hình học Oxyz: BẮT BUỘC dùng dạng 'TN' (Trắc nghiệm). Đồng thời hoán vị các phương án đúng và sai.
-            - Dạng 'TLN' chỉ dùng cho các bài toán ra kết quả là số đơn lẻ.
-          3. Tạo số lượng câu tương ứng với số câu trong ảnh.
+          1. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số để tạo đề mới.
+          2. QUY ƯỚC ĐÁP ÁN: Luôn đặt nội dung đáp án ĐÚNG vào phương án ĐẦU TIÊN (vị trí A).
+          3. 'correctAnswer' luôn là "A".
+          4. Lời giải phải giải theo số liệu mới bạn đã tạo ra.
         `;
       }
 
     // Trong file geminiService.ts -> hàm generateQuizFromImages
 
     const prompt = `
-    Bạn là một trợ lý AI chuyên về Toán học và OCR (Nhận dạng quang học).
+    Bạn là một trợ lý AI chuyên gia Toán học phổ thông và OCR.
     ${taskDescription}
     Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
 
-    QUAN TRỌNG VỀ OCR (TUYỆT ĐỐI TUÂN THỦ):
-    1. CHÍNH XÁC TUYỆT ĐỐI: Giữ nguyên 100% ký hiệu toán học, hướng vector ($\vec{AB}$ khác $\vec{BA}$), chỉ số dưới/trên. KHÔNG được tự ý "sửa lỗi" đề bài kể cả khi bạn nghĩ đề sai.
-    2. Với các câu hỏi Vector/Hình học Oxyz: Hãy trích xuất cực kỳ cẩn thận từng ký tự. Ví dụ: $\vec{IA}$ phải giữ là $\vec{IA}$, không đổi thành $\vec{AI}$.
+    QUY TẮC CỐ ĐỊNH (TUYỆT ĐỐI TUÂN THỦ):
+    1. QUY TẮC "ĐÚNG TẠI A": Trong mảng 'options', phần tử index 0 (tương ứng câu A) BẮT BUỘC phải là nội dung đúng. Các phần tử index 1, 2, 3 là các phương án nhiễu.
+    2. QUY TẮC "CORRECT-A": Trường 'correctAnswer' BẮT BUỘC phải luôn là "A". 
+    3. OCR CHÍNH XÁC: Trích xuất đúng ký hiệu $\vec{u}$, $\vec{v}$, tọa độ $(x; y; z)$. 
+    4. LỜI GIẢI CHI TIẾT: Trong 'explanation', hãy trình bày các bước giải toán. Cuối cùng kết luận "Vậy chọn đáp án A".
+    5. ĐỐI VỚI VECTOR: Nhắc lại, $\vec{CB} = \vec{B} - \vec{C}$. Hãy tính toán thật kỹ tọa độ này, không được sai dấu.
 
-    QUAN TRỌNG VỀ TÍNH TOÁN (CHO DẠNG BÀI ĐIỀN SỐ):
-    1. KHÔNG LÀM TRÒN SỚM: Hãy giữ nguyên các biểu thức chính xác (căn thức, phân số, $\pi$, $e$) trong các bước tính trung gian.
-    2. CHỈ LÀM TRÒN Ở BƯỚC CUỐI CÙNG: Chỉ thực hiện làm tròn số khi ra kết quả cuối cùng theo yêu cầu của đề bài (ví dụ: làm tròn đến hàng phần chục).
-    3. Kiểm tra lại kết quả 2 lần để đảm bảo khớp với phép tính chính xác.
-
-    QUAN TRỌNG VỀ OUTPUT:
-    - Output BẮT BUỘC phải là JSON Array theo schema đã định nghĩa.
-    - Tuân thủ nghiêm ngặt các RULE 1 đến RULE 10.
-    - Nếu là câu trắc nghiệm (TN) trong ảnh, hãy trích xuất đủ các options A, B, C, D và xác định correctAnswer.
-    - Nếu là tự luận, hãy chuyển về dạng TN (Trắc nghiệm có 4 options A, B, C, D ).
-    `;      
+    TRẢ VỀ JSON ARRAY THEO SCHEMA ĐÃ ĐỊNH NGHĨA.
+    `;    
     
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {
@@ -423,8 +420,14 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
           return await model.generateContent([prompt, ...imageParts]);
         });
         const responseText = result.response.text();
-        return JSON.parse(responseText);
-      } catch (error: any) {
+
+        // Bước 1: Chuyển văn bản từ AI thành mảng đối tượng Question
+        const rawQuestions: Question[] = JSON.parse(responseText);
+    
+        // Bước 2: Trộn đáp án ngay tại đây và trả về kết quả cuối cùng
+        return rawQuestions.map(q => shuffleQuestion(q));
+            } 
+          catch (error: any) {
           console.error("Gemini Vision Error:", error);
           // Bắt lỗi cụ thể liên quan đến ảnh (ví dụ: ảnh quá lớn, định dạng không hỗ trợ)
           if (error.message?.includes("image")) {
@@ -455,4 +458,31 @@ export const generateTheory = async (topic: string, userApiKey: string): Promise
     console.error("Lỗi lấy lý thuyết:", error);
     return "Không thể tải lý thuyết lúc này. Vui lòng thử lại.";
   }
+};
+
+// Hàm trộn mảng Fisher-Yates
+export const shuffleQuestion = (question: Question): Question => {
+  if (question.type !== 'TN' || !question.options || question.options.length < 2) {
+    return question;
+  }
+
+  // Lấy ra nội dung đáp án đúng (đang ở vị trí A - index 0 theo quy ước mới)
+  const correctContent = question.options[0];
+  
+  // Trộn mảng options
+  const shuffledOptions = [...question.options];
+  for (let i = shuffledOptions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+  }
+
+  // Tìm vị trí mới của nội dung đáp án đúng
+  const newCorrectIndex = shuffledOptions.indexOf(correctContent);
+  const newCorrectLetter = String.fromCharCode(65 + newCorrectIndex); // 0->A, 1->B...
+
+  return {
+    ...question,
+    options: shuffledOptions,
+    correctAnswer: newCorrectLetter // Cập nhật lại chữ cái đúng mới (A, B, C hoặc D)
+  };
 };
