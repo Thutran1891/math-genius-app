@@ -195,7 +195,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
             
             if (!isNaN(userVal) && !isNaN(aiVal)) {
                 // Giữ độ lệch 0.15 cho an toàn
-                correct = Math.abs(userVal - aiVal) <= 0.15; 
+                correct = Math.abs(userVal - aiVal) <= 0.01; 
             } else {
                 correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
             }
