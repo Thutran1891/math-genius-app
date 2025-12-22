@@ -191,7 +191,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
         - TUYỆT ĐỐI KHÔNG viết lời mô tả hình ảnh vào đây (Ví dụ SAI: "(Hình vẽ mô tả một đồ thị...)").
         - Nếu đề bài cần hình, hãy nói "Cho đồ thị như hình bên." và dùng các trường bên dưới để vẽ.
         - 'explanation': Lời giải chi tiết. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
-        - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ...
+        - Trong lời giải có câu chốt cuối cùng: Vậy đáp án đúng là ... (số hoặc biểu thức/mệnh đề - không viết tiền tố A/B/C/D).
         - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
          - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
 
