@@ -383,11 +383,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
                 <Send className="w-4 h-4" /> Kiểm tra
               </button>
           ) : (
-              <div className="flex-1 text-sm">
-                  {/* [THÊM MỚI] HIỂN THỊ ĐÁP ÁN ĐÚNG CỦA AI ĐỂ ĐỐI CHIẾU */}
-                  <span className="font-bold text-gray-500">Đáp án gốc: </span> 
-                  <span className="font-mono text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded">{question.correctAnswer || "Không có"}</span>
-              </div>
+            <div className="flex-1" />
           )}
 
           {isChecked && (
