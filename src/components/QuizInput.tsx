@@ -8,7 +8,8 @@ import { useSubscription } from './SubscriptionGuard'; // Import Hook lấy ngà
 import { generateTheory } from '../geminiService'; // Import hàm mới
 import { LatexText } from './LatexText'; // Để hiển thị công thức toán
 // Thêm Image, Upload, Copy, Wand2 vào dòng import từ 'lucide-react'
-import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X, Image, Upload, Copy, Wand2, Trash2, RefreshCcw } from 'lucide-react';
+import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X, Image, Upload, Copy, Wand2, Trash2, RefreshCcw, Camera} from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 // ----------------------------------
 interface Props {
   // Callback cũ cho tạo đề theo chủ đề
@@ -35,19 +36,77 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
   const [loadingTheory, setLoadingTheory] = useState(false);
   // -------------------------------------
   // Hàm xử lý khi chọn file
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files);
-      const totalFiles = selectedImages.length + filesArray.length;
-      if (totalFiles > 4) {
-        alert("Chỉ được chọn tối đa 4 ảnh!");
-        return;
+// 1. Hàm dùng chung để kiểm tra và thêm ảnh vào State
+const addImagesToState = async (files: File[]) => {
+  // 1. Kiểm tra số lượng ảnh trước
+  const totalFiles = selectedImages.length + files.length;
+  if (totalFiles > 4) {
+    alert("Chỉ được chọn tối đa 4 ảnh!");
+    return;
+  }
+
+  // Cấu hình nén ảnh
+  const options = {
+    maxSizeMB: 1,          // Dung lượng tối đa 1MB (đủ rõ cho đề toán)
+    maxWidthOrHeight: 1600, // Chiều rộng/cao tối đa 1600px
+    useWebWorker: true,    // Chạy ngầm để không gây đơ giao diện
+  };
+
+  try {
+    const compressedFiles: File[] = [];
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+
+      // Nếu file đã nhỏ hơn 1MB thì không cần nén sâu
+      if (file.size / 1024 / 1024 > 1) {
+        console.log(`Đang nén file: ${file.name}...`);
+        const compressedFile = await imageCompression(file, options);
+        // Chuyển đổi lại thành đối tượng File để giữ tên và định dạng
+        compressedFiles.push(new File([compressedFile], file.name, { type: file.type }));
+      } else {
+        compressedFiles.push(file);
       }
-      // Lọc chỉ lấy ảnh
-      const validImages = filesArray.filter(file => file.type.startsWith('image/'));
-      setSelectedImages(prev => [...prev, ...validImages]);
+    }
+
+    setSelectedImages(prev => [...prev, ...compressedFiles]);
+  } catch (error) {
+    console.error("Lỗi khi nén ảnh:", error);
+    // Nếu lỗi nén, vẫn cho phép dùng ảnh gốc để không gián đoạn người dùng
+    const validImages = files.filter(file => file.type.startsWith('image/'));
+    setSelectedImages(prev => [...prev, ...validImages]);
+  }
+};
+
+// 2. Cập nhật hàm xử lý chọn file cũ
+const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (e.target.files) {
+    addImagesToState(Array.from(e.target.files));
+  }
+};
+
+
+// 3. Logic xử lý sự kiện DÁN (Paste)
+useEffect(() => {
+  const handlePaste = (event: ClipboardEvent) => {
+    const items = event.clipboardData?.items;
+    if (items) {
+      const files: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf("image") !== -1) {
+          const blob = items[i].getAsFile();
+          if (blob) files.push(blob);
+        }
+      }
+      if (files.length > 0) {
+        addImagesToState(files);
+      }
     }
   };
+
+  window.addEventListener('paste', handlePaste);
+  return () => window.removeEventListener('paste', handlePaste);
+}, [selectedImages]); // Lắng nghe để cập nhật số lượng ảnh  
 
   // Hàm xóa ảnh đã chọn
   const removeImage = (index: number) => {
@@ -120,6 +179,20 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
     // Gửi Key kèm config
     onGenerate({ topic, distribution: matrix, additionalPrompt: prompt }, apiKey);
   };
+
+// 1. Tạo một function để lấy số câu dự kiến
+  const getDisplayTotal = () => {
+    // Nếu đang dùng tính năng ảnh
+    if (selectedImages.length > 0) {
+      // Tìm số trong chuỗi prompt (ví dụ: "Tạo 5 câu" -> lấy số 5)
+      const match = prompt.match(/\d+/); 
+      if (match) return match[0];
+      return "?"; // Nếu không thấy số thì để dấu ? vì AI sẽ tự đếm trong ảnh
+    }
+    // Nếu tạo theo chủ đề bình thường
+    return totalQuestions;
+  };
+
 
   return (
     <div className="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-xl border border-blue-100 relative">
@@ -256,41 +329,51 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
       <p className="text-sm text-gray-500 mb-4">Load tối đa 2 trang - tuỳ độ khó dễ hay ngắn dài của lời giải.</p>
 
       {/* Khu vực chọn file và hiển thị thumbnail */}
-      <div className="mb-4">
-          <div className="flex items-center gap-4 mb-3">
-              <label htmlFor="image-upload" className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors border border-gray-300">
-                  <Upload size={18}/> Chọn ảnh (PNG/JPG)
-              </label>
-              <input
-                  id="image-upload"
-                  type="file"
-                  multiple
-                  accept="image/png, image/jpeg, image/jpg"
-                  className="hidden"
-                  onChange={handleImageChange}
-                  disabled={isLoading}
-              />
-              <span className="text-sm text-gray-500">{selectedImages.length}/4 ảnh đã chọn</span>
-          </div>
+            <div className="mb-4">
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+            {/* Nút Chọn file có sẵn */}
+            <label htmlFor="image-upload" className="cursor-pointer bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors border border-gray-300 text-sm">
+                <Upload size={18}/> Chọn file
+            </label>
+            <input id="image-upload" type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} disabled={isLoading} />
 
-          {/* Thumbnails */}
-          {selectedImages.length > 0 && (
-              <div className="flex gap-3 flex-wrap mt-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
-                  {selectedImages.map((file, index) => (
-                      <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-300 shadow-sm group">
-                          <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover" />
-                          <button
-                              onClick={() => removeImage(index)}
-                              className="absolute top-1 right-1 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Xóa ảnh"
-                          >
-                              <Trash2 size={14} />
-                          </button>
-                      </div>
-                  ))}
-              </div>
-          )}
+            {/* NÚT CHỤP ẢNH MỚI */}
+            <label htmlFor="camera-upload" className="cursor-pointer bg-blue-50 hover:bg-blue-100 text-blue-700 px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors border border-blue-200 text-sm">
+                <Camera size={18}/> Chụp hình
+            </label>
+            <input id="camera-upload" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImageChange} disabled={isLoading} />
+
+            {/* Gợi ý dán ảnh */}
+            <span className="text-xs text-gray-400 flex items-center gap-1 bg-gray-50 px-2 py-2 rounded-md border border-dashed border-gray-300">
+                <Copy size={12}/> Nhấn Ctrl+V để dán ảnh
+            </span>
+        </div>
+
+        <div className="flex justify-between items-center px-1">
+            <span className="text-sm font-medium text-gray-500">{selectedImages.length}/4 ảnh đã chọn</span>
+            {selectedImages.length > 0 && (
+                <button onClick={() => setSelectedImages([])} className="text-xs text-red-500 hover:underline">Xóa tất cả</button>
+            )}
+        </div>
+
+        {/* Thumbnails (Giữ nguyên logic cũ của bạn) */}
+        {selectedImages.length > 0 && (
+            <div className="flex gap-3 flex-wrap mt-3 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                {selectedImages.map((file, index) => (
+                    <div key={index} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-300 shadow-sm group">
+                        <img src={URL.createObjectURL(file)} alt="preview" className="w-full h-full object-cover" />
+                        <button
+                            onClick={() => removeImage(index)}
+                            className="absolute top-1 right-1 bg-red-500/80 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        )}
       </div>
+
 
           {/* --- THÊM Ô NHẬP TÊN ĐỀ --- */}
       <div className="mb-3">
@@ -339,23 +422,22 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
           <div className="flex-grow border-t border-gray-300"></div>
     </div>
       {/* ------------------------------------------- */}
-      <button 
-        onClick={handleSubmit}
-        disabled={isLoading}
-        className="w-full py-4 bg-primary text-white rounded-xl font-bold text-lg hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
-      >
-        {isLoading ? (
-          // HIỂN THỊ KHI ĐANG TẢI
-          <div className="flex items-center gap-3">
-              {/* Icon xoay tròn nhờ class animate-spin */}
-              <RefreshCcw className="animate-spin" size={24} /> 
-              <span>AI đang suy nghĩ ({totalQuestions} câu)...</span>
-          </div>
-        ) : (          
-          // HIỂN THỊ BÌNH THƯỜNG
-          <><Sparkles /> TẠO THEO CHỦ ĐỀ ({totalQuestions} CÂU)</>
-        )}
-      </button>
+            <button 
+              onClick={handleSubmit}
+              disabled={isLoading}
+              className="..."
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-3">
+                    <RefreshCcw className="animate-spin" size={24} /> 
+                    {/* Sửa dòng này */}
+                    <span>AI đang suy nghĩ ({getDisplayTotal()} câu)...</span>
+                </div>
+              ) : (          
+                <><Sparkles /> TẠO THEO CHỦ ĐỀ ({totalQuestions} CÂU)</>
+              )}
+            </button>
+
       {/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (MỚI THÊM) --- */}
       <div className="mt-6 text-center border-t pt-4">
         {isPremium ? (

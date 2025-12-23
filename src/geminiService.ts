@@ -378,31 +378,38 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       let taskDescription = "";
       if (mode === 'EXACT') {
         taskDescription = `
-          NHIỆM VỤ: Trích xuất và giải chính xác 100% các câu hỏi từ hình ảnh.
-          YÊU CẦU ĐẶC BIỆT:
-          1. GIẢI TOÁN CHI TIẾT: Tự giải bài toán trước khi đưa ra đáp án. 
-          2. QUY ƯỚC ĐẦU RA: Đáp án ĐÚNG luôn ở vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
-          3. CHUẨN LATEX ĐÁP ÁN: Tất cả các con số, tọa độ, vectơ, phân số trong phần 'options' BẮT BUỘC phải nằm trong dấu $. Ví dụ: "$I\left(-\frac{7}{2}; \frac{15}{2}; -34\right)$". Không được để text thuần nếu có ký hiệu toán.
+          NHIỆM VỤ: 
+          1. Đếm chính xác tổng số câu hỏi có trong các ảnh.
+          2. Trích xuất và giải chi tiết TẤT CẢ các câu hỏi đó.
+          3. Nếu ảnh là lý thuyết và không có câu hỏi, hãy tự tạo số lượng câu hỏi tương ứng theo yêu cầu của người dùng.
+          4. GIẢI TOÁN CHI TIẾT: Tự giải bài toán trước khi đưa ra đáp án. 
+          5. QUY ƯỚC ĐẦU RA: Đáp án ĐÚNG luôn ở vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
+          6. CHUẨN LATEX ĐÁP ÁN: Tất cả các con số, tọa độ, vectơ, phân số trong phần 'options' BẮT BUỘC phải nằm trong dấu $. Ví dụ: "$I\left(-\frac{7}{2}; \frac{15}{2}; -34\right)$". Không được để text thuần nếu có ký hiệu toán.
         `;
       } else {
         taskDescription = `
-          NHIỆM VỤ: Tạo câu hỏi MỚI tương tự về kiến thức và độ khó như trong ảnh.
-          YÊU CẦU ĐẶC BIỆT:
-          1. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số.
-          2. QUY ƯỚC ĐẦU RA: Luôn đặt đáp án ĐÚNG vào vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
-          3. CHUẨN LATEX ĐÁP ÁN: Mọi ký hiệu toán học và chữ số trong 'options' phải kẹp trong cặp dấu $.
+          NHIỆM VỤ: 
+          1. Đếm chính xác tổng số câu hỏi có trong các ảnh. 
+          2. Tạo câu hỏi MỚI tương tự về kiến thức và độ khó như trong ảnh.
+          3. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số, tên, bối cảnh.
+          4. QUY ƯỚC ĐẦU RA: Luôn đặt đáp án ĐÚNG vào vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
+          5. CHUẨN LATEX ĐÁP ÁN: Mọi ký hiệu toán học và chữ số trong 'options' phải kẹp trong cặp dấu $.
         `;
       }
     
       const prompt = `
       Bạn là chuyên gia Toán học và OCR (nhận diện chữ viết) hàng đầu.
       ${taskDescription}
-      Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+      Yêu cầu bổ sung/Số lượng câu từ người dùng: "${additionalPrompt}"
     
       QUY TRÌNH XỬ LÝ (BẮT BUỘC):
       1. QUÉT TOÀN BỘ ẢNH: Đếm chính xác tổng số câu hỏi xuất hiện trong (các) ảnh được cung cấp.
       2. KHÔNG ĐƯỢC BỎ SÓT: Phải chuyển đổi TẤT CẢ các câu hỏi đã đếm được sang định dạng JSON.
       3. KIỂM TRA ĐẦU RA: Đảm bảo số lượng phần tử trong mảng JSON trả về bằng đúng số lượng câu hỏi có trong ảnh.
+
+      QUY TẮC ĐẾM & TẠO:
+      - Nếu trong "Yêu cầu bổ sung" người dùng có nhập số lượng (VD: "Tạo 5 câu", "Lấy 10 câu"), hãy ưu tiên thực hiện đúng số lượng đó.
+      - Nếu không có yêu cầu số lượng cụ thể, hãy bám sát số câu thực tế trong ảnh.
     
       QUY TẮC HIỂN THỊ BẮT BUỘC:
       - QUY TẮC "ĐÚNG TẠI A": Trong mảng 'options', phần tử đầu tiên (index 0) là nội dung ĐÚNG. 
