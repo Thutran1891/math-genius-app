@@ -250,7 +250,7 @@ function App() {
         
         {/* --- TOAST NOTIFICATION --- */}
         {showToast && (
-            <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-300">
+            <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-100">
                 <CheckCircle className="w-6 h-6 text-white" />
                 <span className="font-bold text-sm">Đã lưu kết quả vào Lịch sử!</span>
             </div>
