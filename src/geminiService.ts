@@ -395,18 +395,25 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
       }
     
       const prompt = `
-        Bạn là chuyên gia Toán học và OCR.
-        ${taskDescription}
-        Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
+      Bạn là chuyên gia Toán học và OCR (nhận diện chữ viết) hàng đầu.
+      ${taskDescription}
+      Bổ sung yêu cầu từ người dùng: "${additionalPrompt}"
     
-        QUY TẮC HIỂN THỊ BẮT BUỘC:
-        1. QUY TẮC "ĐÚNG TẠI A": Trong mảng 'options', phần tử đầu tiên (index 0) là nội dung ĐÚNG. 
-        2. MÔI TRƯỜNG TOÁN HỌC: Tất cả các chữ số đơn lẻ, tọa độ điểm, biểu thức, phân số trong 'questionText', 'options' và 'explanation' PHẢI được bao bọc bởi dấu $. Ví dụ: viết $x=2$ thay vì x=2, viết $A(1;2;3)$ thay vì A(1;2;3).
-        3. PHÂN SỐ: Luôn dùng $\frac{a}{b}$ hoặc $\dfrac{a}{b}$.
-        4. TỌA ĐỘ: Dùng dấu chấm phẩy ; để ngăn cách các thành phần tọa độ.
+      QUY TRÌNH XỬ LÝ (BẮT BUỘC):
+      1. QUÉT TOÀN BỘ ẢNH: Đếm chính xác tổng số câu hỏi xuất hiện trong (các) ảnh được cung cấp.
+      2. KHÔNG ĐƯỢC BỎ SÓT: Phải chuyển đổi TẤT CẢ các câu hỏi đã đếm được sang định dạng JSON.
+      3. KIỂM TRA ĐẦU RA: Đảm bảo số lượng phần tử trong mảng JSON trả về bằng đúng số lượng câu hỏi có trong ảnh.
     
-        TRẢ VỀ JSON ARRAY THEO SCHEMA.
-      `;    
+      QUY TẮC HIỂN THỊ BẮT BUỘC:
+      - QUY TẮC "ĐÚNG TẠI A": Trong mảng 'options', phần tử đầu tiên (index 0) là nội dung ĐÚNG. 
+      - MÔI TRƯỜNG TOÁN HỌC: Tất cả các chữ số, tọa độ, biểu thức, phân số PHẢI được bao bọc bởi dấu $. Ví dụ: $x=2$, $A(1;2;3)$.
+      - PHÂN SỐ: Luôn dùng $\\frac{a}{b}$ hoặc $\\dfrac{a}{b}$.
+      - TỌA ĐỘ: Dùng dấu chấm phẩy ";" để ngăn cách (ví dụ: $(1; 2; 3)$).
+      - LOẠI CÂU HỎI: Tự động phân loại 'type' là 'TN' (Trắc nghiệm), 'TLN' (Điền số) hoặc 'DS' (Đúng/Sai) dựa trên nội dung ảnh. 
+      - LƯU Ý: Nếu câu hỏi là câu tự luận thì chỉ viết 'type' 'TLN' khi đáp số là một số (số thực hoặc số nguyên) đơn lẻ duy nhất, ngược lại thì chuyển về 'type' 'TN' (trắc nghiệm) và tự bổ sung thêm 3 phương án nhiễu hợp lý.
+    
+      TRẢ VỀ JSON ARRAY CHỨA ĐỦ SỐ LƯỢNG CÂU HỎI.
+    `;      
       // 3. Gửi yêu cầu (Prompt text + Image parts)
       try {
         // Mới:
