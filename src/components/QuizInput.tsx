@@ -408,21 +408,23 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
           <div className="flex-grow border-t border-gray-300"></div>
     </div>
       {/* ------------------------------------------- */}
-            <button 
+        <button 
               onClick={handleSubmit}
               disabled={isLoading}
-              className="..."
+              className="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none shadow-lg shadow-blue-200"
             >
               {isLoading ? (
                 <div className="flex items-center gap-3">
                     <RefreshCcw className="animate-spin" size={24} /> 
-                    {/* Sửa dòng này */}
                     <span>AI đang suy nghĩ ({getDisplayTotal()} câu)...</span>
                 </div>
               ) : (          
-                <><Sparkles /> TẠO THEO CHỦ ĐỀ ({totalQuestions} CÂU)</>
+                <div className="flex items-center gap-2">
+                    <Sparkles size={20} /> 
+                    TẠO THEO CHỦ ĐỀ ({totalQuestions} CÂU)
+                </div>
               )}
-            </button>
+      </button>
 
       {/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (MỚI THÊM) --- */}
       <div className="mt-6 text-center border-t pt-4">
