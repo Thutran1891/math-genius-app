@@ -426,16 +426,26 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
               )}
       </button>
 
-      {/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (MỚI THÊM) --- */}
+{/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (CẬP NHẬT) --- */}
       <div className="mt-6 text-center border-t pt-4">
         {isPremium ? (
             <div className="text-sm font-bold text-green-600 flex items-center justify-center gap-1">
                 <Sparkles size={16} /> Tài khoản VIP (Không giới hạn)
             </div>
         ) : (
-            <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
-                <Clock size={14} /> 
-                Bạn còn <b className="text-blue-600">{daysLeft} ngày</b> dùng thử miễn phí.
+            <div className="space-y-2">
+                <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                    <Clock size={14} /> 
+                    Bạn còn <b className="text-blue-600">{daysLeft} ngày</b> dùng thử miễn phí.
+                </div>
+                
+                {/* THÊM MỚI: Dòng mời trà ủng hộ tác giả */}
+                <div className="bg-orange-50 p-3 rounded-xl border border-dashed border-orange-200 inline-block">
+                    <p className="text-[11px] text-orange-800 italic">
+                        Mời tác giả ly Trà qua stk: <b>Kienlongbank: 36480233</b>
+                        <br /> (nếu thấy ứng dụng hữu ích)
+                    </p>
+                </div>
             </div>
         )}
       </div>

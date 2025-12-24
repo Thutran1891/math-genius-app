@@ -57,7 +57,7 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
           setDaysLeft(Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
       } else {
           const trialEnd = new Date(start);
-          trialEnd.setDate(trialEnd.getDate() + 30);
+          trialEnd.setDate(trialEnd.getDate() + 365);
           const diffTime = trialEnd.getTime() - now.getTime();
           setDaysLeft(Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
       }
@@ -83,7 +83,7 @@ export const SubscriptionGuard: React.FC<Props> = ({ children }) => {
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Hết hạn dùng thử</h2>
           <p className="text-gray-600 mb-6">
-            Bạn đã hết 30 ngày miễn phí. Vui lòng gia hạn để tiếp tục sử dụng.
+            Bạn đã hết 365 ngày miễn phí. Vui lòng gia hạn để tiếp tục sử dụng.
           </p>
 
           <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-6 text-left">
