@@ -12,9 +12,10 @@ interface Props {
   index: number;
   onUpdateScore?: (points: number) => void;
     onDataChange?: (q: Question) => void;
+    isLocked?: boolean; // <-- Thêm dòng này
 }
 
-export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, onDataChange }) => {
+export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, onDataChange, isLocked }) => {
   const [showExplanation, setShowExplanation] = useState(false);
   
   // State lưu câu trả lời
@@ -311,6 +312,7 @@ const handleCheckResult = () => {
                     <button 
                     key={i} 
                     onClick={() => !isChecked && setUserAnswer(label)} 
+                    disabled={isChecked || isLocked} // <-- Khóa nút
                     className={css} // SỬA TẠI ĐÂY: Truyền biến css vào
                     >
                     <span className="font-serif font-bold text-green-800 text-lg min-w-[25px] leading-none mt-1">
@@ -333,7 +335,9 @@ const handleCheckResult = () => {
                   placeholder="Nhập đáp số..." 
                   value={userAnswer || ''}
                   onChange={e => setUserAnswer(e.target.value)}
-                  disabled={isChecked}
+                //   disabled={isChecked}
+                  disabled={isChecked || isLocked} // <-- Khóa nút
+
                   onKeyDown={(e) => e.key === 'Enter' && handleCheckResult()}
               />
           </div>
@@ -364,10 +368,16 @@ const handleCheckResult = () => {
                             else btnClass += "bg-white text-gray-500 hover:bg-gray-100";
                         }
                         return (
-                          <button key={label} disabled={isChecked} onClick={() => setUserAnswer({ ...userAnswer, [stmt.id]: isTrueBtn })} className={btnClass}>
-                            {label}
-                          </button>
-                        )
+                            <button 
+                                key={label} 
+                                // Gộp chung vào 1 dòng duy nhất, xóa dòng disabled lặp lại phía trên
+                                disabled={isChecked || isLocked} 
+                                onClick={() => !isChecked && !isLocked && setUserAnswer({ ...userAnswer, [stmt.id]: isTrueBtn })} 
+                                className={btnClass}
+                                >
+                                {label}
+                            </button>
+                          )
                       })}
                     </div>
                   </div>

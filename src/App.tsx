@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'; // Thêm useCallback
+import { useState, useEffect, useRef, useCallback } from 'react'; // Thêm useCallback
 import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
 import { Login } from './components/Login';
@@ -8,7 +8,7 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { LatexText } from './components/LatexText';
 import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
 
@@ -37,6 +37,108 @@ function App() {
   const [showTheory, setShowTheory] = useState(false);
   const [theoryContent, setTheoryContent] = useState('');
   const [loadingTheory, setLoadingTheory] = useState(false);
+
+    // Thêm vào vùng khai báo useState
+    // Thêm vào cùng chỗ với các useRef khác trong App.tsx
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  const maxTotalScore = questions.reduce((sum, q) => {
+    if (q.type === 'DS') return sum + 4;
+    if (q.type === 'TLN') return sum + 2; //
+    return sum + 1;
+  }, 0);
+
+
+  const handleSaveResult = useCallback(async (forcedTime?: number) => {
+    // Giữ nguyên logic kiểm tra của bạn
+    if (!user || isSavedRef.current) return;
+    
+    isSavedRef.current = true;
+    setIsSaved(true);
+  
+    // Logic tính điểm trực tiếp của bạn rất tốt, giữ nguyên:
+    const currentScore = questions.reduce((sum, q) => {
+      if (q.type === 'DS') {
+        const userAns = (q.userAnswer || {}) as Record<string, boolean>;
+        return sum + (q.statements?.filter(s => userAns[s.id] === s.isCorrect).length || 0);
+      }
+      if (q.type === 'TLN') {
+        const uVal = parseFloat(q.userAnswer?.toString().replace(',', '.') || '');
+        const cVal = parseFloat(q.correctAnswer?.toString().replace(',', '.') || '');
+        return sum + (!isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01 ? 2 : 0);
+      }
+      return sum + (q.userAnswer === q.correctAnswer ? 1 : 0);
+    }, 0);
+  
+    const finalTimeSpent = forcedTime !== undefined ? forcedTime : elapsedTime;
+  
+    try {
+      const historyRef = collection(db, "users", user.uid, "examHistory");
+      await addDoc(historyRef, {
+        topic: config?.topic || "Đề thi",
+        score: currentScore,
+        total: maxTotalScore,
+        timeSpent: finalTimeSpent,
+        timeLimit: config?.timeLimit || 15,
+        date: serverTimestamp(),
+        fullData: JSON.stringify(questions),
+        violationCount: violationCountRef.current
+      });
+      
+      if (timerRef.current) clearInterval(timerRef.current);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (e) {
+      console.error("Lỗi khi lưu:", e);
+      isSavedRef.current = false;
+      setIsSaved(false);
+    }
+  // Quan trọng: Thêm questions vào mảng này để hàm luôn lấy dữ liệu mới nhất
+  }, [user, questions, elapsedTime, config, maxTotalScore]);
+  
+
+  // useEffect xử lý bộ đếm
+  // Logic đếm giờ và Tự động khóa bài
+  useEffect(() => {
+    // Điều kiện: Có câu hỏi, chưa lưu điểm và không phải đang xem lịch sử
+    if (questions.length > 0 && !isSaved && !viewHistory) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => {
+          const newTime = prev + 1;
+          const limitInSeconds = (config?.timeLimit || 15) * 60;
+  
+          // --- TỰ ĐỘNG LƯU VÀ KHÓA BÀI KHI HẾT GIỜ ---
+          if (newTime >= limitInSeconds) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            
+            // Truyền newTime trực tiếp để History ghi nhận đúng thời gian giới hạn
+            handleSaveResult(newTime); 
+            
+            return limitInSeconds;
+          }
+          return newTime;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+    
+    // THAY ĐỔI QUAN TRỌNG: Theo dõi toàn bộ mảng 'questions' thay vì chỉ '.length'
+    // Điều này đảm bảo mỗi khi người dùng chọn đáp án, useEffect sẽ biết 
+    // và chuẩn bị hàm handleSaveResult với dữ liệu mới nhất.
+  }, [questions, isSaved, viewHistory, config?.timeLimit, handleSaveResult]);
+
+  // Hàm định dạng hiển thị mm:ss
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s < 10 ? '0' + s : s}`;
+  };
 
   // Đồng bộ State React sang Ref liên tục
   useEffect(() => {
@@ -86,15 +188,16 @@ function App() {
     setScore(0);
     setIsSaved(false);
     isSavedRef.current = false;
-    setAttemptCount(1);
+    setAttemptCount(prev => prev + 1); // Tăng số lần làm bài
+    setElapsedTime(0); // <--- THÊM DÒNG NÀY ĐỂ RESET BỘ ĐẾM VỀ 0
     
     // [QUAN TRỌNG] Reset bộ đếm vi phạm về 0
     setViolationCount(0);
     violationCountRef.current = 0; 
     lastViolationTime.current = 0;
     
-    setQuestions([]);
-    setTheoryContent('');
+    // setQuestions([]);
+    // setTheoryContent('');
   };
 
   const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
@@ -112,7 +215,8 @@ function App() {
           TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
           DS: { BIET: 0, HIEU: 0, VANDUNG: 0 }
         },
-        additionalPrompt: prompt
+        additionalPrompt: prompt,
+        timeLimit: 15 // Thêm dòng này (mặc định 15 phút cho đề từ ảnh)
     });  
 
     try {
@@ -182,7 +286,8 @@ function App() {
         TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
         DS: { BIET: 0, HIEU: 0, VANDUNG: 0 } 
       },
-      additionalPrompt: ""
+      additionalPrompt: "",
+      timeLimit: 15 // Thêm dòng này
     });
 
     const cleanQuestions = oldQuestions.map(q => ({
@@ -209,43 +314,11 @@ const handleUpdateScore = (points: number) => {
   //   if (q.type === 'DS') return sum + 4;
   //   return sum + 1;
   // }, 0);
-  const maxTotalScore = questions.reduce((sum, q) => {
-    if (q.type === 'DS') return sum + 4;
-    if (q.type === 'TLN') return sum + 2; //
-    return sum + 1;
-  }, 0);
   
-  const handleSaveResult = async () => {
-    // Cập nhật điều kiện: Cho phép lưu cả khi config null (trường hợp tạo từ ảnh)
-    if (!user || isSavedRef.current) return;
-    
-    // Chặn tức thì bằng Ref để tránh lưu trùng
-    isSavedRef.current = true;
-    setIsSaved(true); 
-  
-    try {
-      const historyRef = collection(db, "users", user.uid, "examHistory");
-      await addDoc(historyRef, {
-        // Nếu có config thì lấy topic, nếu không (tạo từ ảnh) thì để mặc định
-        topic: config?.topic || "Đề thi",
-        score: score,
-        total: maxTotalScore, // Lưu tổng điểm theo thang mới
-        date: serverTimestamp(),
-        fullData: JSON.stringify(questions),
-        violationCount: violationCountRef.current 
-      }
-    );
-      
-      setShowToast(true); 
-      setTimeout(() => setShowToast(false), 3000); 
-  
-    } catch (e) {
-      console.error("Lỗi lưu:", e);
-      isSavedRef.current = false; 
-      setIsSaved(false); 
-      alert("Không thể lưu kết quả. Vui lòng thử lại.");
-    }
-  };
+// Trong App.tsx
+
+  // 1. Cập nhật hàm handleSaveResult để nhận tham số thời gian chủ động
+  // 1. Nhớ thêm useCallback vào dòng import từ 'react'
 
   if (!user) return <Login />;
 
@@ -294,6 +367,10 @@ const handleUpdateScore = (points: number) => {
                     {config?.topic} {attemptCount > 1 && <span className="text-red-500 text-base font-normal">(Làm lại lần {attemptCount})</span>}
                 </h2>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                  {/* ĐỒNG HỒ ĐẾM XUÔI */}
+                  <span className={`flex items-center gap-1 font-mono font-bold px-2 py-1 rounded ${elapsedTime >= (config?.timeLimit || 0) * 60 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-blue-700'}`}>
+                    <Clock size={14} /> {formatTime(elapsedTime)} / {config?.timeLimit}:00
+                  </span>
                 <span className="flex items-center gap-1">
                   <Trophy size={16} className="text-yellow-500" /> 
                   Điểm: <b className="text-primary">{score}/{maxTotalScore}</b>
@@ -310,12 +387,18 @@ const handleUpdateScore = (points: number) => {
                   )}
                   
                   {!isSaved ? (
-                      <button onClick={handleSaveResult} className="flex items-center gap-1 text-green-600 hover:underline font-medium text-xs bg-green-50 px-2 py-1 rounded border border-green-200">
-                          <Save size={14}/> Lưu điểm
-                      </button>
-                  ) : (
-                      <span className="text-green-600 text-xs font-bold flex items-center gap-1"><Save size={14}/> Đã lưu</span>
-                  )}
+                    <button 
+                      onClick={() => handleSaveResult()} 
+                      className="flex items-center gap-1 text-green-600 hover:text-green-700 font-bold bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg border border-green-200 shadow-sm transition-colors"
+                    >
+                        <Save size={16}/> 
+                        <span>Lưu điểm</span>
+                    </button>
+                ) : (
+                    <span className="text-green-600 text-sm font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 opacity-60">
+                        <CheckCircle size={16}/> Đã lưu
+                    </span>
+                )}
                 </div>
               </div>
               
@@ -347,6 +430,7 @@ const handleUpdateScore = (points: number) => {
                   question={q} 
                   onUpdateScore={handleUpdateScore} 
                   onDataChange={handleQuestionUpdate}
+                  isLocked={isSaved} // <-- TRUYỀN GIÁ TRỊ TẠI ĐÂY
                 />
               ))}
             </div>

@@ -35,6 +35,8 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
   const [theoryContent, setTheoryContent] = useState('');
   const [loadingTheory, setLoadingTheory] = useState(false);
   // -------------------------------------
+  // 1. Thêm state trong QuizInput
+  const [timeLimit, setTimeLimit] = useState(15);
   // 1. Tạo Ref để hỗ trợ Dán ảnh trên Mobile (Đặt dưới selectedImages)
   const pasteInputRef = useRef<HTMLInputElement>(null);
 
@@ -135,18 +137,17 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
     }
   };
   // -----------------------------
+  // 2. Cập nhật hàm handleSubmit để gửi kèm timeLimit
   const handleSubmit = () => {
-    // Validate Key
-    if (!apiKey.trim()) return alert("Vui lòng nhập API Key để tiếp tục!");
+    if (!apiKey.trim()) return alert("Vui lòng nhập API Key!");
     if (!topic) return alert("Vui lòng nhập chủ đề!");
-    if (totalQuestions === 0) return alert("Vui lòng nhập số lượng câu hỏi ít nhất là 1!");
     
-    // Lưu Key nếu người dùng chọn
-    if (saveKey) localStorage.setItem('user_gemini_key', apiKey);
-    else localStorage.removeItem('user_gemini_key');
-
-    // Gửi Key kèm config
-    onGenerate({ topic, distribution: matrix, additionalPrompt: prompt }, apiKey);
+    onGenerate({ 
+      topic, 
+      distribution: matrix, 
+      additionalPrompt: prompt,
+      timeLimit: timeLimit // Gửi số phút xuống App.tsx
+    }, apiKey);
   };
 
 // 1. Tạo một function để lấy số câu dự kiến
@@ -407,6 +408,20 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
           <span className="flex-shrink mx-4 text-gray-400 text-sm font-medium">HOẶC TẠO THEO CHỦ ĐỀ</span>
           <div className="flex-grow border-t border-gray-300"></div>
     </div>
+    {/* 3. Thêm UI vào trước nút "Tạo theo chủ đề" */}
+    <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
+    <label className="text-sm font-bold text-blue-800 mb-2 flex items-center gap-2">
+      <Clock size={18}/> Thời gian làm bài (phút)
+    </label>
+      <input 
+        type="number" 
+        value={timeLimit}
+        onChange={(e) => setTimeLimit(Math.max(1, parseInt(e.target.value) || 0))}
+        className="w-full p-2 border border-blue-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <p className="text-[11px] text-blue-600 mt-1 italic">* Đồng hồ sẽ đếm xuôi để theo dõi tổng thời gian làm bài.</p>
+    </div>
+
       {/* ------------------------------------------- */}
         <button 
               onClick={handleSubmit}
@@ -426,7 +441,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
               )}
       </button>
 
-{/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (CẬP NHẬT) --- */}
+  {/* --- PHẦN HIỂN THỊ SỐ NGÀY CÒN LẠI (CẬP NHẬT) --- */}
       <div className="mt-6 text-center border-t pt-4">
         {isPremium ? (
             <div className="text-sm font-bold text-green-600 flex items-center justify-center gap-1">

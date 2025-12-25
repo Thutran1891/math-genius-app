@@ -24,6 +24,7 @@ export interface VariationTableData {
 
 export interface QuizConfig {
   topic: string;
+  timeLimit: number; // Số phút làm bài (giáo viên yêu cầu)
   distribution: {
     TN: { BIET: number; HIEU: number; VANDUNG: number };
     TLN: { BIET: number; HIEU: number; VANDUNG: number };

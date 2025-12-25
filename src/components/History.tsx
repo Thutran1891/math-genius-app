@@ -13,6 +13,8 @@ interface HistoryItem {
   date: any; 
   fullData?: string; 
   violationCount?: number;
+  timeSpent?: number;
+  timeLimit?: number;
 }
 
 interface Props {
@@ -181,15 +183,26 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
           </div>
         ) : (
           <div className="space-y-3">
-            {history.map((item) => {
-          const score10 = item.total > 0 ? ((item.score / item.total) * 10).toFixed(1) : "0.0";
-          const sVal = parseFloat(score10);
-          const dateObj = item.date?.toDate ? item.date.toDate() : new Date();
-          
-          // Xác định màu sắc dựa trên giá trị số sVal
-          const scoreColor = sVal >= 8 ? 'text-green-600' : sVal >= 5 ? 'text-blue-600' : 'text-red-600';
+          {history.map((item) => {
+              // 1. Tính toán điểm số hệ 10 (Sử dụng dự phòng || 0 để tránh lỗi NaN)
+              const scoreVal = item.score || 0;
+              const totalVal = item.total || 1; // Tránh chia cho 0
+              const score10 = ((scoreVal / totalVal) * 10).toFixed(1);
+              const sVal = parseFloat(score10);
+              
+              // 2. Xử lý ngày tháng
+              const dateObj = item.date?.toDate ? item.date.toDate() : new Date();
+              
+              // 3. Xác định màu sắc điểm số
+              const scoreColor = sVal >= 8 ? 'text-green-600' : sVal >= 5 ? 'text-blue-600' : 'text-red-600';
 
-          const attemptCount = getAttemptInfo(item);
+              // 4. Tính toán thời gian làm bài (Chuyển đổi giây -> phút:giây)
+              const timeInSeconds = item.timeSpent || 0; 
+              const minutes = Math.floor(timeInSeconds / 60);
+              const seconds = timeInSeconds % 60;
+              const displayTime = `${minutes}p ${seconds < 10 ? '0' + seconds : seconds}s`;
+
+              const attemptCount = getAttemptInfo(item);
 
               return (
                 <div 
@@ -220,12 +233,22 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
                             )}
                         </h3>
 
+                        {/* Tìm đoạn này và chèn thêm phần Clock */}
                         <div className="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
+                          
+                          {/* 1. Hiển thị thời gian làm bài (MỚI THÊM) */}
+                          <span className="flex items-center gap-1 text-orange-600 font-bold bg-orange-50 px-1.5 py-0.5 rounded">
+                            <Clock size={12}/> {displayTime}
+                          </span>
+
+                          {/* 2. Hiển thị lỗi vi phạm (Đã có) */}
                           {item.violationCount && item.violationCount > 0 && (
-                                <span className="flex items-center gap-1 text-red-500 font-bold bg-red-50 px-1 rounded">
-                                    <AlertTriangle size={12}/> {item.violationCount} lỗi
-                                </span>
-                            )}
+                            <span className="flex items-center gap-1 text-red-500 font-bold bg-red-50 px-1 rounded">
+                                <AlertTriangle size={12}/> {item.violationCount} lỗi
+                            </span>
+                          )}
+
+                          {/* 3. Hiển thị ngày tháng (Đã có) */}
                           <span className="flex items-center gap-1">
                               <Calendar size={12}/> 
                               {dateObj.toLocaleString('vi-VN', { 
@@ -233,6 +256,7 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
                               })}
                           </span>
                           
+                          {/* 4. Hiển thị điểm số (Đã có) */}
                           <span className="flex items-center gap-1">
                               <Trophy size={12}/> {item.score}/{item.total} điểm
                           </span>
