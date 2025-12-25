@@ -182,14 +182,14 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
         ) : (
           <div className="space-y-3">
             {history.map((item) => {
-              const score10 = ((item.score / item.total) * 10).toFixed(1);
-              const dateObj = item.date?.toDate ? item.date.toDate() : new Date();
-              
-              let scoreColor = "text-red-500";
-              if (Number(score10) >= 8) scoreColor = "text-green-500";
-              else if (Number(score10) >= 5) scoreColor = "text-yellow-600";
+          const score10 = item.total > 0 ? ((item.score / item.total) * 10).toFixed(1) : "0.0";
+          const sVal = parseFloat(score10);
+          const dateObj = item.date?.toDate ? item.date.toDate() : new Date();
+          
+          // Xác định màu sắc dựa trên giá trị số sVal
+          const scoreColor = sVal >= 8 ? 'text-green-600' : sVal >= 5 ? 'text-blue-600' : 'text-red-600';
 
-              const attemptCount = getAttemptInfo(item);
+          const attemptCount = getAttemptInfo(item);
 
               return (
                 <div 
@@ -233,7 +233,9 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
                               })}
                           </span>
                           
-                          <span className="flex items-center gap-1"><Trophy size={12}/> {item.score}/{item.total} câu</span>
+                          <span className="flex items-center gap-1">
+                              <Trophy size={12}/> {item.score}/{item.total} điểm
+                          </span>
                         </div>
                       </div>
                       

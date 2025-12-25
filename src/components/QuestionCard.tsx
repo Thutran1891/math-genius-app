@@ -10,8 +10,8 @@ declare global { interface Window { functionPlot: any; } }
 interface Props {
   question: Question;
   index: number;
-  onUpdateScore?: (isCorrect: boolean) => void;
-  onDataChange?: (q: Question) => void;
+  onUpdateScore?: (points: number) => void;
+    onDataChange?: (q: Question) => void;
 }
 
 export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, onDataChange }) => {
@@ -49,7 +49,7 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
         
         // Giúp Garbage Collector thu hồi bộ nhớ nhanh hơn
         audio.onended = () => {
-            (audio as any) = null;
+            // (audio as any) = null;
         };
 
         audio.play().catch(() => {});
@@ -175,51 +175,47 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   // Dependency: Chạy lại khi hàm số, tiệm cận hoặc ID câu hỏi thay đổi
 
     // Logic kiểm tra kết quả
-    const handleCheckResult = () => {
-        if (!userAnswer) return;
-        
-        let correct = false;
-        if (question.type === 'TN') {
-            // Chỉ cần so sánh trực tiếp chữ cái người dùng chọn và chữ cái AI/Shuffle đã định nghĩa
-            const userClean = (userAnswer as string).trim().toUpperCase();
-            const aiCorrect = (question.correctAnswer || '').trim().toUpperCase();
-            
-            correct = userClean === aiCorrect;
-        } 
-        
-        else if (question.type === 'TLN') {
-            // ... (Giữ nguyên logic TLN như cũ)
-            const userVal = parseFloat((userAnswer as string).replace(',', '.'));
-            const aiValMatch = (question.correctAnswer || '').replace(',', '.').match(/-?[\d.]+/);
-            const aiVal = aiValMatch ? parseFloat(aiValMatch[0]) : NaN;
-            
-            if (!isNaN(userVal) && !isNaN(aiVal)) {
-                // Giữ độ lệch 0.15 cho an toàn
-                correct = Math.abs(userVal - aiVal) <= 0.01; 
-            } else {
-                correct = (userAnswer as string).trim().toLowerCase() === (question.correctAnswer || '').trim().toLowerCase();
-            }
-        } else if (question.type === 'DS') {
-            const allCorrect = question.statements?.every(stmt => 
-            userAnswer[stmt.id] === stmt.isCorrect
-            );
-            correct = !!allCorrect;
-        }
+    // File: QuestionCard.tsx
 
-        setIsChecked(true);
-        setIsCorrect(correct);
-        playSound(correct);
-        
-        if (onUpdateScore) onUpdateScore(correct);
+const handleCheckResult = () => {
+    if (userAnswer === null || userAnswer === '') return;
+    
+    let pointsEarned = 0;
+    let maxPoints = 1; // Mặc định TN và TLN là 1 điểm
+  
+    if (question.type === 'TN') {
+      const isCorrectTN = userAnswer === question.correctAnswer;
+      pointsEarned = isCorrectTN ? 1 : 0;
+    } 
+    else if (question.type === 'TLN') {
+      const uVal = parseFloat(userAnswer.toString().replace(',', '.'));
+      const cVal = parseFloat(question.correctAnswer?.toString().replace(',', '.') || '');
+      const isCorrectTLN = !isNaN(uVal) && Math.abs(uVal - cVal) < 0.01;
+      pointsEarned = isCorrectTLN ? 1 : 0;
+    } 
+    else if (question.type === 'DS') {
+      maxPoints = 4; // Câu Đúng/Sai tối đa 4 điểm
+      // Đếm số ý đúng: mỗi ý đúng được 1 điểm
+      const correctStatementsCount = question.statements?.filter(
+        s => userAnswer[s.id] === s.isCorrect
+      ).length || 0;
+      
+      pointsEarned = correctStatementsCount;
+    }
+  
+    const isFullyCorrect = pointsEarned === maxPoints; // Để hiển thị icon xanh/đỏ
+  
+    setIsChecked(true);
+    setIsCorrect(isFullyCorrect);
+    playSound(isFullyCorrect);
+  
+    // Gửi số điểm kiếm được về App.tsx
+    if (onUpdateScore) onUpdateScore(pointsEarned); // Giữ nguyên callback cũ nếu không muốn sửa App.tsx quá nhiều
+    // Hoặc tốt nhất là sửa callback onUpdateScore để nhận vào số điểm (number)
+    
+    if (onDataChange) onDataChange({ ...question, userAnswer, isCorrect: isFullyCorrect });
+  };
 
-        if (onDataChange) {
-            onDataChange({
-                ...question,
-                userAnswer: userAnswer,
-                isCorrect: correct
-            });
-        }
-    };
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6 mb-6">
