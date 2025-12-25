@@ -195,36 +195,50 @@ function App() {
     setViewHistory(false);
   };
 
-  const handleUpdateScore = (isCorrect: boolean) => {
-    if (isCorrect) setScore(prev => prev + 1);
-  };
+  // Thay đổi tham số từ boolean sang number (điểm số)
+const handleUpdateScore = (points: number) => {
+  setScore(prev => prev + points);
+};
 
   const handleQuestionUpdate = (updatedQ: Question) => {
     setQuestions(prev => prev.map(q => q.id === updatedQ.id ? updatedQ : q));
   };
 
+    // Thêm đoạn này dưới các dòng khai báo useState
+  // const maxTotalScore = questions.reduce((sum, q) => {
+  //   if (q.type === 'DS') return sum + 4;
+  //   return sum + 1;
+  // }, 0);
+  const maxTotalScore = questions.reduce((sum, q) => {
+    if (q.type === 'DS') return sum + 4;
+    if (q.type === 'TLN') return sum + 2; //
+    return sum + 1;
+  }, 0);
+  
   const handleSaveResult = async () => {
-    if (!user || !config || isSavedRef.current) return;
+    // Cập nhật điều kiện: Cho phép lưu cả khi config null (trường hợp tạo từ ảnh)
+    if (!user || isSavedRef.current) return;
     
-    // Chặn tức thì bằng Ref
+    // Chặn tức thì bằng Ref để tránh lưu trùng
     isSavedRef.current = true;
     setIsSaved(true); 
-
+  
     try {
       const historyRef = collection(db, "users", user.uid, "examHistory");
       await addDoc(historyRef, {
-        topic: config.topic,
+        // Nếu có config thì lấy topic, nếu không (tạo từ ảnh) thì để mặc định
+        topic: config?.topic || "Đề thi",
         score: score,
-        total: questions.length,
+        total: maxTotalScore, // Lưu tổng điểm theo thang mới
         date: serverTimestamp(),
         fullData: JSON.stringify(questions),
-        // Lưu giá trị từ Ref để đảm bảo chính xác nhất
         violationCount: violationCountRef.current 
-      });
+      }
+    );
       
       setShowToast(true); 
       setTimeout(() => setShowToast(false), 3000); 
-
+  
     } catch (e) {
       console.error("Lỗi lưu:", e);
       isSavedRef.current = false; 
@@ -243,6 +257,7 @@ function App() {
       />
     );
   }
+
 
   return (
     <SubscriptionGuard>
@@ -279,7 +294,13 @@ function App() {
                     {config?.topic} {attemptCount > 1 && <span className="text-red-500 text-base font-normal">(Làm lại lần {attemptCount})</span>}
                 </h2>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
-                  <span className="flex items-center gap-1"><Trophy size={16} className="text-yellow-500" /> Đúng: <b className="text-primary">{score}/{questions.length}</b></span>
+                <span className="flex items-center gap-1">
+                  <Trophy size={16} className="text-yellow-500" /> 
+                  Điểm: <b className="text-primary">{score}/{maxTotalScore}</b>
+                  <span className="ml-1 text-green-600 font-bold">
+                    ({maxTotalScore > 0 ? ((score / maxTotalScore) * 10).toFixed(1) : "0.0"}đ)
+                  </span>
+                </span>
                   
                   {/* Hiển thị số lỗi vi phạm */}
                   {violationCount > 0 && (

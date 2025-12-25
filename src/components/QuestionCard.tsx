@@ -188,10 +188,18 @@ const handleCheckResult = () => {
       pointsEarned = isCorrectTN ? 1 : 0;
     } 
     else if (question.type === 'TLN') {
-      const uVal = parseFloat(userAnswer.toString().replace(',', '.'));
-      const cVal = parseFloat(question.correctAnswer?.toString().replace(',', '.') || '');
-      const isCorrectTLN = !isNaN(uVal) && Math.abs(uVal - cVal) < 0.01;
-      pointsEarned = isCorrectTLN ? 1 : 0;
+        // Làm sạch dữ liệu để tránh lỗi dấu phẩy/chấm hoặc khoảng trắng
+        const cleanUser = userAnswer.toString().replace(/\s/g, '').replace(',', '.');
+        const cleanCorrect = (question.correctAnswer || '').toString().replace(/\s/g, '').replace(',', '.');
+    
+        const uVal = parseFloat(cleanUser);
+        const cVal = parseFloat(cleanCorrect);
+    
+        // So sánh với sai số 0.01
+        const isCorrectTLN = !isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01;
+        
+        pointsEarned = isCorrectTLN ? 2 : 0; // Tính 2 điểm nếu đúng
+        maxPoints = 2;
     } 
     else if (question.type === 'DS') {
       maxPoints = 4; // Câu Đúng/Sai tối đa 4 điểm
@@ -203,14 +211,14 @@ const handleCheckResult = () => {
       pointsEarned = correctStatementsCount;
     }
   
-    const isFullyCorrect = pointsEarned === maxPoints; // Để hiển thị icon xanh/đỏ
-  
+// CHỖ QUAN TRỌNG NHẤT: Cập nhật lại biến này trước khi gọi playSound
+    const isFullyCorrect = pointsEarned === maxPoints; // Phải nằm sau các khối IF tính điểm
+
     setIsChecked(true);
-    setIsCorrect(isFullyCorrect);
-    playSound(isFullyCorrect);
-  
-    // Gửi số điểm kiếm được về App.tsx
-    if (onUpdateScore) onUpdateScore(pointsEarned); // Giữ nguyên callback cũ nếu không muốn sửa App.tsx quá nhiều
+    setIsCorrect(isFullyCorrect); // Cập nhật trạng thái hiển thị (Xanh/Đỏ)
+    playSound(isFullyCorrect); // Phát âm thanh dựa trên kết quả mới nhất
+
+    if (onUpdateScore) onUpdateScore(pointsEarned);    // Giữ nguyên callback cũ nếu không muốn sửa App.tsx quá nhiều
     // Hoặc tốt nhất là sửa callback onUpdateScore để nhận vào số điểm (number)
     
     if (onDataChange) onDataChange({ ...question, userAnswer, isCorrect: isFullyCorrect });
