@@ -132,7 +132,9 @@ const questionSchema: any = {
 
 
 // Thêm tham số userApiKey
-export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
+// export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
+  // Sửa khai báo hàm để nhận signal
+export const generateQuiz = async (config: QuizConfig, userApiKey: string, signal?: AbortSignal) => {
   if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
 
   // Khởi tạo GenAI với key người dùng nhập (thay vì key mặc định)
@@ -316,18 +318,25 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
          Trả về JSON mảng ${totalQuestions} câu.
     `;
 
-    // Mới: Bọc trong retryOperation
     const result = await retryOperation(async () => {
-    
-      return await model.generateContent(prompt);
+      return await model.generateContent(prompt, { signal }); 
     });
-    // --- ĐÂY LÀ VỊ TRÍ CẦN SỬA ---
+
+    // Lấy text từ response
     const responseText = result.response.text();
+    
+    // Parse JSON
     const rawQuestions: Question[] = JSON.parse(responseText);
     
-    // Tiến hành trộn thứ tự đáp án cho từng câu hỏi trước khi trả về cho App.tsx
+    // Trả về kết quả đã shuffle
     return rawQuestions.map(q => shuffleQuestion(q));
-  } catch (error) {
+
+  } catch (error: any) {
+    // Nếu lỗi do người dùng chủ động hủy (AbortError) thì không cần log error nghiêm trọng
+    if (error.name === 'AbortError') {
+      console.log("Request was cancelled by user");
+      throw error;
+    }
     console.error("Gemini Error:", error);
     throw error;
   }
@@ -348,31 +357,31 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
 
   // --- BỔ SUNG: HÀM TẠO ĐỀ TỪ ẢNH ---
   export const generateQuizFromImages = async (
-      imageFiles: File[],
-      mode: 'EXACT' | 'SIMILAR', // EXACT: Giống hệt, SIMILAR: Tương tự
-      userApiKey: string,
-      additionalPrompt: string = ""
-    ): Promise<Question[]> => {
-      if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
-      if (imageFiles.length === 0) throw new Error("Vui lòng chọn ít nhất 1 ảnh!");
-      if (imageFiles.length > 4) throw new Error("Tối đa chỉ được chọn 4 ảnh!");
-    
-      const genAI = new GoogleGenerativeAI(userApiKey);
-    
-      // Sử dụng model gemini-3-flash (hoặc pro) để hỗ trợ tốt hình ảnh
-      const model = genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview", // Flash nhanh và rẻ hơn cho vision
-        generationConfig: {
-          responseMimeType: "application/json",
-          // Tái sử dụng schema đã định nghĩa ở trên
-          responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
-          temperature: mode === 'EXACT' ? 0.1 : 0.4, // EXACT cần chính xác (temp thấp), SIMILAR cần sáng tạo (temp cao hơn)
-          maxOutputTokens: 20000,
-        }
-      });
-    
-      // 1. Chuẩn bị dữ liệu hình ảnh
-      const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
+    imageFiles: File[],
+    mode: 'EXACT' | 'SIMILAR',
+    userApiKey: string,
+    additionalPrompt: string = "",
+    signal?: AbortSignal // Tham số optional để ở cuối cùng
+  ): Promise<Question[]> => {
+  
+    if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+    if (imageFiles.length === 0) throw new Error("Vui lòng chọn ít nhất 1 ảnh!");
+    if (imageFiles.length > 4) throw new Error("Tối đa chỉ được chọn 4 ảnh!");
+  
+    const genAI = new GoogleGenerativeAI(userApiKey);
+  
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3-flash-preview",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
+        temperature: mode === 'EXACT' ? 0.1 : 0.4,
+        maxOutputTokens: 20000,
+      }
+    });
+  
+    // 1. Chuẩn bị dữ liệu hình ảnh
+    const imageParts = await Promise.all(imageFiles.map(fileToGenerativePart));
     
       // 2. Chuẩn bị Prompt (Chỉ đạo AI)
       let taskDescription = "";
@@ -421,32 +430,39 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string): Prom
     
       TRẢ VỀ JSON ARRAY CHỨA ĐỦ SỐ LƯỢNG CÂU HỎI.
     `;      
-      // 3. Gửi yêu cầu (Prompt text + Image parts)
-      try {
-        // Mới:
-        const result = await retryOperation(async () => {
-          return await model.generateContent([prompt, ...imageParts]);
-        });
-        const responseText = result.response.text();
+      // 3. Gửi yêu cầu (Bọc trong try-catch và dùng retryOperation)
+  try {
+    const result = await retryOperation(async () => {
+      // Truyền [prompt, ...imageParts] và object chứa signal
+      return await model.generateContent([prompt, ...imageParts], { signal });
+    });
 
-        // Bước 1: Chuyển văn bản từ AI thành mảng đối tượng Question
-        const rawQuestions: Question[] = JSON.parse(responseText);
-    
-        // Bước 2: Trộn đáp án ngay tại đây và trả về kết quả cuối cùng
-        return rawQuestions.map(q => shuffleQuestion(q));
-            } 
-          catch (error: any) {
-          console.error("Gemini Vision Error:", error);
-          // Bắt lỗi cụ thể liên quan đến ảnh (ví dụ: ảnh quá lớn, định dạng không hỗ trợ)
-          if (error.message?.includes("image")) {
-              throw new Error("Lỗi xử lý ảnh. Vui lòng kiểm tra lại định dạng hoặc dung lượng ảnh.");
-          }
-        throw error;
-      }
-    };
+    const responseText = result.response.text();
+
+    // Bước 1: Chuyển văn bản từ AI thành mảng đối tượng Question
+    const rawQuestions: Question[] = JSON.parse(responseText);
+
+    // Bước 2: Trộn đáp án và trả về
+    return rawQuestions.map(q => shuffleQuestion(q));
+
+  } catch (error: any) {
+    // Xử lý khi người dùng chủ động hủy request
+    if (error.name === 'AbortError') {
+      console.log("User cancelled the request.");
+      throw error;
+    }
+
+    console.error("Gemini Vision Error:", error);
+    if (error.message?.includes("image")) {
+      throw new Error("Lỗi xử lý ảnh. Vui lòng kiểm tra lại định dạng hoặc dung lượng ảnh.");
+    }
+    throw error;
+  }
+};
 // Thêm hàm sinh lý thuyết
-export const generateTheory = async (topic: string, userApiKey: string): Promise<string> => {
+export const generateTheory = async (topic: string, userApiKey: string, signal?: AbortSignal): Promise<string> => {
   if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+  
   const genAI = new GoogleGenerativeAI(userApiKey);
   const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
@@ -459,10 +475,19 @@ export const generateTheory = async (topic: string, userApiKey: string): Promise
     4. Chia mục rõ ràng (I. Định nghĩa, II. Công thức...).
   `;
 
+
   try {
-    const result = await model.generateContent(prompt);
+    // Sửa lỗi: Chỉ gọi 1 lần, dùng đúng biến prompt và truyền signal
+    const result = await model.generateContent(prompt, { signal });
+    
     return result.response.text();
-  } catch (error) {
+  } catch (error: any) {
+    // Xử lý trường hợp người dùng hủy request
+    if (error.name === 'AbortError') {
+      console.log("Hủy tải lý thuyết bởi người dùng.");
+      throw error; // Hoặc trả về chuỗi rỗng tùy logic của bạn
+    }
+
     console.error("Lỗi lấy lý thuyết:", error);
     return "Không thể tải lý thuyết lúc này. Vui lòng thử lại.";
   }
