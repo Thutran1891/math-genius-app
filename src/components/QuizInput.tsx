@@ -15,8 +15,7 @@ interface Props {
   // Callback cũ cho tạo đề theo chủ đề
   onGenerate: (config: QuizConfig, apiKey: string) => void;
   // Cập nhật dòng này: thêm tham số topicName (string) vào cuối
-  onGenerateFromImage?: (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => void;
-  isLoading: boolean;
+  onGenerateFromImage?: (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, timeLimit: number, topicName?: string) => void;  isLoading: boolean;
 }
 
 export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, isLoading }) => {
@@ -381,7 +380,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
                   if(!apiKey) return alert("Vui lòng nhập API Key!");
                   if(selectedImages.length === 0) return alert("Vui lòng chọn ảnh!");
                   // Truyền thêm imageTopic vào cuối hàm
-                  onGenerateFromImage?.(selectedImages, 'EXACT', prompt, apiKey, imageTopic);
+                  onGenerateFromImage?.(selectedImages, 'EXACT', prompt, apiKey, timeLimit, imageTopic);
               }}
               disabled={isLoading || selectedImages.length === 0}
               className="py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none shadow-sm shadow-teal-200"
@@ -393,7 +392,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
                   if(!apiKey) return alert("Vui lòng nhập API Key!");
                   if(selectedImages.length === 0) return alert("Vui lòng chọn ảnh!");
                   // Truyền thêm imageTopic vào cuối hàm
-                  onGenerateFromImage?.(selectedImages, 'SIMILAR', prompt, apiKey, imageTopic);
+                  onGenerateFromImage?.(selectedImages, 'SIMILAR', prompt, apiKey, timeLimit, imageTopic);
               }}
               disabled={isLoading || selectedImages.length === 0}
               className="py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60 disabled:pointer-events-none shadow-sm shadow-indigo-200"

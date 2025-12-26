@@ -200,7 +200,7 @@ function App() {
     // setTheoryContent('');
   };
 
-  const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, topicName?: string) => {
+  const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, timeLimit: number, topicName?: string) => {
     setLoading(true);
     setCurrentApiKey(apiKey);
     resetQuizState(); // Gọi hàm reset
@@ -216,7 +216,7 @@ function App() {
           DS: { BIET: 0, HIEU: 0, VANDUNG: 0 }
         },
         additionalPrompt: prompt,
-        timeLimit: 15 // Thêm dòng này (mặc định 15 phút cho đề từ ảnh)
+        timeLimit: timeLimit || 15
     });  
 
     try {
