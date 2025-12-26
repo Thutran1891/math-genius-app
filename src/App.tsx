@@ -188,7 +188,7 @@ function App() {
     setScore(0);
     setIsSaved(false);
     isSavedRef.current = false;
-    setAttemptCount(prev => prev + 1); // Tăng số lần làm bài
+    // setAttemptCount(prev => prev + 1); // Tăng số lần làm bài
     setElapsedTime(0); // <--- THÊM DÒNG NÀY ĐỂ RESET BỘ ĐẾM VỀ 0
     
     // [QUAN TRỌNG] Reset bộ đếm vi phạm về 0
@@ -272,11 +272,12 @@ function App() {
   };
 
   const handleRegenerate = () => {
+    setAttemptCount(prev => prev + 1); // <--- CHUYỂN DÒNG ĐÓ XUỐNG ĐÂY
     if (config && currentApiKey) handleGenerate(config, currentApiKey);
   };
 
-  const handleLoadExamFromHistory = (oldQuestions: Question[], topic: string) => {
-    resetQuizState(); // Gọi hàm reset
+  const handleLoadExamFromHistory = (oldQuestions: Question[], topic: string, savedTimeLimit: number) => {
+    resetQuizState();
     setLoading(false);
 
     setConfig({
@@ -287,7 +288,7 @@ function App() {
         DS: { BIET: 0, HIEU: 0, VANDUNG: 0 } 
       },
       additionalPrompt: "",
-      timeLimit: 15 // Thêm dòng này
+      timeLimit: savedTimeLimit || 15
     });
 
     const cleanQuestions = oldQuestions.map(q => ({

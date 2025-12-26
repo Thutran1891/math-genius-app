@@ -19,7 +19,8 @@ interface HistoryItem {
 
 interface Props {
   onBack: () => void;
-  onLoadExam: (questions: Question[], topic: string) => void; 
+  // Sửa dòng dưới đây để nhận thêm timeLimit (số)
+  onLoadExam: (questions: Question[], topic: string, timeLimit: number) => void; 
 }
 
 export const History: React.FC<Props> = ({ onBack, onLoadExam }) => { 
@@ -118,7 +119,7 @@ export const History: React.FC<Props> = ({ onBack, onLoadExam }) => {
                 </div>
 
                 <button 
-                    onClick={() => onLoadExam(questions, selectedExam.topic)}
+                    onClick={() => onLoadExam(questions, selectedExam.topic, selectedExam.timeLimit || 15)} // Thêm tham số thứ 3
                     className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-blue-700 shadow-sm active:scale-95 transition-all"
                 >
                     <RotateCcw size={18}/> Làm lại đề này

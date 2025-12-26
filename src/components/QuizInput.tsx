@@ -198,7 +198,9 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
             </a>
         </div>
         <input 
-          type="password"
+          type="text" // Đổi từ password thành text
+          style={{ WebkitTextSecurity: 'disc' } as any} // CSS để hiện dấu chấm ẩn như password
+          autoComplete="new-password" // Đánh lừa trình duyệt không gợi ý lưu
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder="Dán mã Key bắt đầu bằng AIza..." 
