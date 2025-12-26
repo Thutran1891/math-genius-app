@@ -39,6 +39,10 @@ function App() {
   const [loadingTheory, setLoadingTheory] = useState(false);
 
     // Thêm vào vùng khai báo useState
+// ... các state cũ ...
+  const [sourceType, setSourceType] = useState<'TOPIC' | 'IMAGE'>('TOPIC');
+  const [lastImages, setLastImages] = useState<File[]>([]); 
+  const [imageMode, setImageMode] = useState<'EXACT' | 'SIMILAR'>('SIMILAR');   // Lưu ảnh để dùng lại khi đổi đề
     // Thêm vào cùng chỗ với các useRef khác trong App.tsx
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
@@ -190,6 +194,8 @@ function App() {
     isSavedRef.current = false;
     // setAttemptCount(prev => prev + 1); // Tăng số lần làm bài
     setElapsedTime(0); // <--- THÊM DÒNG NÀY ĐỂ RESET BỘ ĐẾM VỀ 0
+    // Đảm bảo lần đầu tạo luôn là 1
+    setAttemptCount(1);
     
     // [QUAN TRỌNG] Reset bộ đếm vi phạm về 0
     setViolationCount(0);
@@ -200,33 +206,43 @@ function App() {
     // setTheoryContent('');
   };
 
-  const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, timeLimit: number, topicName?: string) => {
+  const handleGenerateFromImage = async (
+    images: File[], 
+    mode: 'EXACT' | 'SIMILAR', 
+    prompt: string, 
+    apiKey: string, 
+    timeLimit: number, 
+    topicName?: string
+  ) => {
     setLoading(true);
-    setCurrentApiKey(apiKey);
-    resetQuizState(); // Gọi hàm reset
-
+    setCurrentApiKey(apiKey); // QUAN TRỌNG: Lưu Key ngay lập tức để nút Đổi đề có thể dùng
+    resetQuizState(); 
+  
+    // Lưu thông tin để nút "Đổi đề" biết phải làm gì
+    setSourceType('IMAGE');    
+    setLastImages(images);     
+    setImageMode(mode);        
+  
     const defaultName = mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh";
     const finalTopic = topicName && topicName.trim() !== "" ? topicName : defaultName;
-
+  
+    // Cập nhật config để hiển thị tiêu đề và thời gian
     setConfig({
-        topic: finalTopic,
-        distribution: {
-          TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
-          TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
-          DS: { BIET: 0, HIEU: 0, VANDUNG: 0 }
-        },
-        additionalPrompt: prompt,
-        timeLimit: timeLimit || 15
+      topic: finalTopic,
+      distribution: { 
+        TN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
+        TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
+        DS: { BIET: 0, HIEU: 0, VANDUNG: 0 } 
+      },
+      additionalPrompt: prompt,
+      timeLimit: timeLimit || 15
     });  
-
+  
     try {
+      // Gọi API với apiKey truyền trực tiếp từ tham số
       const result = await generateQuizFromImages(images, mode, apiKey, prompt);
       setQuestions(result);
-      if (result.length === 0) {
-          alert("AI không tìm thấy câu hỏi nào trong ảnh. Vui lòng thử ảnh khác rõ nét hơn.");
-      }
     } catch (error: any) {
-      console.error("Lỗi tạo đề từ ảnh:", error);
       alert("Lỗi: " + error.message);
     } finally {
       setLoading(false);
@@ -257,6 +273,7 @@ function App() {
   };
 
   const handleGenerate = async (newConfig: QuizConfig, apiKey: string) => {
+    setSourceType('TOPIC'); // Đánh dấu là tạo từ chủ đề
     setLoading(true);
     setConfig(newConfig);
     setCurrentApiKey(apiKey);
@@ -271,9 +288,43 @@ function App() {
     }
   };
 
-  const handleRegenerate = () => {
-    setAttemptCount(prev => prev + 1); // <--- CHUYỂN DÒNG ĐÓ XUỐNG ĐÂY
-    if (config && currentApiKey) handleGenerate(config, currentApiKey);
+  const handleRegenerate = async () => {
+    // Kiểm tra API Key đã được lưu từ bước trên chưa
+    if (!currentApiKey) {
+      alert("Không tìm thấy API Key. Vui lòng nhập lại API Key ở màn hình chính.");
+      return;
+    }
+    if (!config) return;
+  
+    setAttemptCount(prev => prev + 1); // Tăng số lần (Lần 2 trở đi sẽ hiện chú thích)
+    setLoading(true);
+  
+    try {
+      if (sourceType === 'TOPIC') {
+        const result = await generateQuiz(config, currentApiKey);
+        setQuestions(result);
+      } else {
+        // Dùng các biến đã lưu: lastImages và imageMode
+        if (lastImages.length > 0) {
+          const result = await generateQuizFromImages(
+            lastImages, 
+            imageMode, // Đã sử dụng biến này, sẽ hết báo lỗi vàng
+            currentApiKey,
+            config.additionalPrompt
+          );
+          setQuestions(result);
+        }
+      }
+      
+      // Reset lại trạng thái làm bài cho đề mới
+      setScore(0);
+      setElapsedTime(0);
+      setIsSaved(false);
+    } catch (error: any) {
+      alert("Lỗi khi đổi đề: " + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLoadExamFromHistory = (oldQuestions: Question[], topic: string, savedTimeLimit: number) => {
