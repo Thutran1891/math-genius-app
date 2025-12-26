@@ -21,7 +21,6 @@ function App() {
   const [currentApiKey, setCurrentApiKey] = useState<string>("");
   const [viewHistory, setViewHistory] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null); // Thêm dòng này
   
   const [attemptCount, setAttemptCount] = useState(1);
   const [violationCount, setViolationCount] = useState(0);
@@ -200,19 +199,11 @@ function App() {
     // setQuestions([]);
     // setTheoryContent('');
   };
-  const handleCancel = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-      setLoading(false);
-    }
-  };
 
   const handleGenerateFromImage = async (images: File[], mode: 'EXACT' | 'SIMILAR', prompt: string, apiKey: string, timeLimit: number, topicName?: string) => {
     setLoading(true);
     setCurrentApiKey(apiKey);
     resetQuizState(); // Gọi hàm reset
-    abortControllerRef.current = new AbortController(); // Khởi tạo
 
     const defaultName = mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh";
     const finalTopic = topicName && topicName.trim() !== "" ? topicName : defaultName;
@@ -229,22 +220,19 @@ function App() {
     });  
 
     try {
-      const result = await generateQuizFromImages(images, mode, apiKey, prompt, abortControllerRef.current.signal);
+      const result = await generateQuizFromImages(images, mode, apiKey, prompt);
       setQuestions(result);
       if (result.length === 0) {
-        alert("AI không tìm thấy câu hỏi nào trong ảnh. Vui lòng thử ảnh khác rõ nét hơn.");
+          alert("AI không tìm thấy câu hỏi nào trong ảnh. Vui lòng thử ảnh khác rõ nét hơn.");
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') return;
-      console.error(error);
-      // Viết lại dòng alert này
-      alert("Lỗi khi tạo đề từ ảnh.");
+      console.error("Lỗi tạo đề từ ảnh:", error);
+      alert("Lỗi: " + error.message);
     } finally {
       setLoading(false);
-      abortControllerRef.current = null;
     }
-  }
-  
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -272,22 +260,14 @@ function App() {
     setLoading(true);
     setConfig(newConfig);
     setCurrentApiKey(apiKey);
-    resetQuizState(); 
-    
-    abortControllerRef.current = new AbortController();
-    
+    resetQuizState(); // Gọi hàm reset
     try {
-      // Sửa 'quizConfig' thành 'newConfig'
-      const result = await generateQuiz(newConfig, apiKey, abortControllerRef.current.signal);
+      const result = await generateQuiz(newConfig, apiKey);
       setQuestions(result);
     } catch (error: any) {
-      if (error.name === 'AbortError') return;
-      console.error(error);
-      // Viết lại dòng alert để sạch ký tự lạ
-      alert("Lỗi khi tạo đề hoặc yêu cầu bị hủy.");
+      alert("Lỗi: " + error.message);
     } finally {
       setLoading(false);
-      abortControllerRef.current = null;
     }
   };
 
@@ -330,6 +310,15 @@ const handleUpdateScore = (points: number) => {
     setQuestions(prev => prev.map(q => q.id === updatedQ.id ? updatedQ : q));
   };
 
+    // Thêm đoạn này dưới các dòng khai báo useState
+  // const maxTotalScore = questions.reduce((sum, q) => {
+  //   if (q.type === 'DS') return sum + 4;
+  //   return sum + 1;
+  // }, 0);
+  
+// Trong App.tsx
+
+  // 1. Cập nhật hàm handleSaveResult để nhận tham số thời gian chủ động
   // 1. Nhớ thêm useCallback vào dòng import từ 'react'
 
   if (!user) return <Login />;
@@ -350,32 +339,18 @@ const handleUpdateScore = (points: number) => {
         
         {/* --- TOAST NOTIFICATION --- */}
         {showToast && (
-          <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-100">
-            <CheckCircle className="w-6 h-6 text-white" />
-            <span className="font-bold text-sm">Đã lưu kết quả vào Lịch sử!</span>
-          </div>
+            <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-100">
+                <CheckCircle className="w-6 h-6 text-white" />
+                <span className="font-bold text-sm">Đã lưu kết quả vào Lịch sử!</span>
+            </div>
         )}
-  
-        {/* --- LOADING OVERLAY (Đưa ra ngoài để tránh lỗi lồng nhau) --- */}
-        {loading && (
-          <div className="fixed inset-0 bg-white/80 backdrop-blur-sm z-[100] flex flex-col items-center justify-center">
-            <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-orange-800 font-medium animate-pulse mb-6">AI đang tạo đề thi, vui lòng đợi...</p>
-            <button 
-              onClick={handleCancel}
-              className="px-6 py-2 bg-red-50 text-red-600 border border-red-200 rounded-full hover:bg-red-100 transition-all font-semibold flex items-center gap-2"
-            >
-              <X size={18} /> HỦY TẠO ĐỀ
-            </button>
-          </div>
-        )}
-  
+
         {questions.length === 0 ? (
           <>
             <div className="max-w-2xl mx-auto mb-4 flex justify-end">
-              <button onClick={() => setViewHistory(true)} className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors">
-                <HistoryIcon size={20}/> Xem Lịch sử
-              </button>
+               <button onClick={() => setViewHistory(true)} className="flex items-center gap-2 text-blue-600 font-bold hover:bg-blue-50 px-4 py-2 rounded-lg transition-colors">
+                  <HistoryIcon size={20}/> Xem Lịch sử
+               </button>
             </div>
             <QuizInput 
               onGenerate={handleGenerate} 
@@ -390,24 +365,26 @@ const handleUpdateScore = (points: number) => {
             <div className="bg-white p-4 rounded-xl shadow-sm border border-blue-100 mb-6 flex flex-col sm:flex-row justify-between items-center sticky top-2 z-10 gap-3">
               <div className="flex-1">
                 <h2 className="font-bold text-lg text-gray-800 line-clamp-1">
-                  {config?.topic} {attemptCount > 1 && <span className="text-red-500 text-base font-normal">(Làm lại lần {attemptCount})</span>}
+                    {config?.topic} {attemptCount > 1 && <span className="text-red-500 text-base font-normal">(Làm lại lần {attemptCount})</span>}
                 </h2>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mt-1">
+                <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                  {/* ĐỒNG HỒ ĐẾM XUÔI */}
                   <span className={`flex items-center gap-1 font-mono font-bold px-2 py-1 rounded ${elapsedTime >= (config?.timeLimit || 0) * 60 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-blue-700'}`}>
                     <Clock size={14} /> {formatTime(elapsedTime)} / {config?.timeLimit}:00
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Trophy size={16} className="text-yellow-500" /> 
-                    Điểm: <b className="text-primary">{score}/{maxTotalScore}</b>
-                    <span className="ml-1 text-green-600 font-bold">
-                      ({maxTotalScore > 0 ? ((score / maxTotalScore) * 10).toFixed(1) : "0.0"}đ)
-                    </span>
+                <span className="flex items-center gap-1">
+                  <Trophy size={16} className="text-yellow-500" /> 
+                  Điểm: <b className="text-primary">{score}/{maxTotalScore}</b>
+                  <span className="ml-1 text-green-600 font-bold">
+                    ({maxTotalScore > 0 ? ((score / maxTotalScore) * 10).toFixed(1) : "0.0"}đ)
                   </span>
+                </span>
                   
+                  {/* Hiển thị số lỗi vi phạm */}
                   {violationCount > 0 && (
-                    <span className="flex items-center gap-1 text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-200 animate-pulse">
-                      <AlertTriangle size={14} /> Rời tab: {violationCount} lần
-                    </span>
+                      <span className="flex items-center gap-1 text-red-600 font-bold bg-red-100 px-2 py-1 rounded border border-red-200 animate-pulse">
+                          <AlertTriangle size={14} /> Rời tab: {violationCount} lần
+                      </span>
                   )}
                   
                   {!isSaved ? (
@@ -415,13 +392,14 @@ const handleUpdateScore = (points: number) => {
                       onClick={() => handleSaveResult()} 
                       className="flex items-center gap-1 text-green-600 hover:text-green-700 font-bold bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg border border-green-200 shadow-sm transition-colors"
                     >
-                      <Save size={16}/> <span>Lưu điểm</span>
+                        <Save size={16}/> 
+                        <span>Lưu điểm</span>
                     </button>
-                  ) : (
+                ) : (
                     <span className="text-green-600 text-sm font-bold flex items-center gap-1 bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 opacity-60">
-                      <CheckCircle size={16}/> Đã lưu
+                        <CheckCircle size={16}/> Đã lưu
                     </span>
-                  )}
+                )}
                 </div>
               </div>
               
@@ -432,18 +410,18 @@ const handleUpdateScore = (points: number) => {
                 >
                   <BookOpen size={18}/> <span className="hidden sm:inline">Lý thuyết</span>
                 </button>
-  
+
                 <button onClick={() => setQuestions([])} className="flex-1 sm:flex-none justify-center px-3 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm font-medium flex items-center gap-1 border border-transparent hover:border-gray-200">
                   <ArrowLeft size={16}/> <span className="hidden sm:inline">Thoát</span>
                 </button>
                 
                 <button onClick={handleRegenerate} disabled={loading} className="flex-1 sm:flex-none justify-center flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:bg-blue-700 disabled:opacity-50 shadow-sm">
                   <RefreshCcw size={16} className={loading ? "animate-spin" : ""} />
-                  Làm đề mới
+                  {loading ? "Đang tạo..." : <span className="hidden sm:inline">Đổi đề</span>}
                 </button>
               </div>
             </div>
-  
+
             {/* Questions List */}
             <div className="space-y-6 pb-20">
               {questions.map((q, idx) => (
@@ -451,43 +429,43 @@ const handleUpdateScore = (points: number) => {
                   key={q.id || idx} 
                   index={idx} 
                   question={q} 
-                  onUpdateScore={handleUpdateScore} // SỬ DỤNG HÀM ĐỂ HẾT CẢNH BÁO
-                  onDataChange={handleQuestionUpdate} // SỬ DỤNG HÀM ĐỂ HẾT CẢNH BÁO
-                  isLocked={isSaved}
+                  onUpdateScore={handleUpdateScore} 
+                  onDataChange={handleQuestionUpdate}
+                  isLocked={isSaved} // <-- TRUYỀN GIÁ TRỊ TẠI ĐÂY
                 />
               ))}
             </div>
-  
+
             {/* Theory Modal */}
             {showTheory && (
               <div className="fixed top-24 right-5 w-[450px] max-w-[90vw] h-[80vh] bg-white rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.15)] border border-gray-200 z-50 flex flex-col animate-in slide-in-from-right duration-300">
-                <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
-                  <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
-                    <BookOpen size={20}/> KIẾN THỨC: {config?.topic}
-                  </h3>
-                  <button 
-                    onClick={() => setShowTheory(false)} 
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-100"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-  
-                <div className="p-5 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-sm scroll-smooth">
-                  {loadingTheory ? (
-                    <div className="flex flex-col items-center justify-center h-full space-y-3">
-                      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-gray-500 text-xs animate-pulse">Đang tra cứu kiến thức...</p>
-                    </div>
-                  ) : (
-                    <div className="whitespace-pre-wrap">
-                      <LatexText text={theoryContent} />
-                    </div>
-                  )}
-                </div>                  
+                  <div className="p-4 border-b flex justify-between items-center bg-orange-50 rounded-t-2xl">
+                      <h3 className="text-lg font-bold text-orange-800 flex items-center gap-2">
+                          <BookOpen size={20}/> KIẾN THỨC: {config?.topic}
+                      </h3>
+                      <button 
+                          onClick={() => setShowTheory(false)} 
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all shadow-sm border border-gray-100"
+                      >
+                          <X size={18} />
+                      </button>
+                  </div>
+
+                  <div className="p-5 overflow-y-auto flex-1 text-gray-800 leading-relaxed text-sm scroll-smooth">
+                      {loadingTheory ? (
+                          <div className="flex flex-col items-center justify-center h-full space-y-3">
+                              <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                              <p className="text-gray-500 text-xs animate-pulse">Đang tra cứu kiến thức...</p>
+                          </div>
+                      ) : (
+                          <div className="whitespace-pre-wrap">
+                              <LatexText text={theoryContent} />
+                          </div>
+                      )}
+                  </div>                  
               </div>
             )}
-  
+
           </div>
         )}    
       </div>
