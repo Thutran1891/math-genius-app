@@ -1,3 +1,4 @@
+import confetti from 'canvas-confetti';
 import { useState, useEffect, useRef, useCallback } from 'react'; // Thêm useCallback
 import { QuizInput } from './components/QuizInput';
 import { QuestionCard } from './components/QuestionCard';
@@ -46,7 +47,8 @@ function App() {
     // Thêm vào cùng chỗ với các useRef khác trong App.tsx
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-
+  // Âm thanh chúc mừng
+  const [showPerfectScoreModal, setShowPerfectScoreModal] = useState(false);
   const maxTotalScore = questions.reduce((sum, q) => {
     if (q.type === 'DS') return sum + 4;
     if (q.type === 'TLN') return sum + 2; //
@@ -55,29 +57,89 @@ function App() {
 
 
   const handleSaveResult = useCallback(async (forcedTime?: number) => {
-    // Giữ nguyên logic kiểm tra của bạn
     if (!user || isSavedRef.current) return;
-    
-    isSavedRef.current = true;
-    setIsSaved(true);
   
-    // Logic tính điểm trực tiếp của bạn rất tốt, giữ nguyên:
-    const currentScore = questions.reduce((sum, q) => {
+    // 1. Chốt danh sách câu hỏi và tính toán isCorrect
+    const finalizedQuestions = questions.map(q => {
+      // Nếu đã bấm "Kiểm tra" lẻ, giữ nguyên
+      if (q.isCorrect !== undefined) return q;
+  
+      let isCorrect = false;
+      const userAns = q.userAnswer;
+  
+      if (userAns !== undefined && userAns !== null) {
+        if (q.type === 'TN') {
+          isCorrect = userAns === q.correctAnswer;
+        } 
+        else if (q.type === 'TLN') {
+          const uVal = parseFloat(userAns.toString().replace(/\s/g, '').replace(',', '.'));
+          const cVal = parseFloat(q.correctAnswer?.toString().replace(/\s/g, '').replace(',', '.') || '');
+          isCorrect = !isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01;
+        } 
+        else if (q.type === 'DS') {
+          const ansObj = (userAns || {}) as Record<string, boolean>;
+          const correctCount = q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0;
+          // Chốt câu DS là đúng hoàn toàn nếu đạt 4/4 ý
+          isCorrect = (correctCount === 4);
+        }
+      }
+      // QUAN TRỌNG: Trả về userAnswer để không mất dấu vết trên UI
+      return { ...q, isCorrect, userAnswer: userAns };
+    });
+  
+    // 2. TÍNH ĐIỂM TỔNG HỢP (Chấm theo từng ý cho câu DS)
+    const currentScore = finalizedQuestions.reduce((sum, q) => {
       if (q.type === 'DS') {
-        const userAns = (q.userAnswer || {}) as Record<string, boolean>;
-        return sum + (q.statements?.filter(s => userAns[s.id] === s.isCorrect).length || 0);
+        const ansObj = (q.userAnswer || {}) as Record<string, boolean>;
+        const correctCount = q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0;
+        return sum + correctCount; // Mỗi ý đúng của câu DS được 1 điểm
       }
-      if (q.type === 'TLN') {
-        const uVal = parseFloat(q.userAnswer?.toString().replace(',', '.') || '');
-        const cVal = parseFloat(q.correctAnswer?.toString().replace(',', '.') || '');
-        return sum + (!isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01 ? 2 : 0);
-      }
-      return sum + (q.userAnswer === q.correctAnswer ? 1 : 0);
+      if (q.type === 'TLN') return sum + (q.isCorrect ? 2 : 0);
+      return sum + (q.isCorrect ? 1 : 0);
     }, 0);
   
-    const finalTimeSpent = forcedTime !== undefined ? forcedTime : elapsedTime;
+    // 3. Cập nhật State
+    setQuestions(finalizedQuestions);
+    setScore(currentScore);
+    setIsSaved(true);
+    isSavedRef.current = true;
   
+    // App.tsx
+
+// PHÁO HOA
+
+if (currentScore > 0 && currentScore === maxTotalScore) {
+  // 1. PHÁT ÂM THANH CHÚC MỪNG
+  // Bạn hãy để file congrats.mp3 vào thư mục public của dự án
+  const audio = new Audio('/congrats.mp3'); 
+  audio.volume = 0.7;
+  audio.play().catch(e => console.warn("Trình duyệt chặn phát âm thanh tự động:", e));
+
+  // 2. HIỆU ỨNG PHÁO HOA
+  const duration = 3 * 1000;
+  const animationEnd = Date.now() + duration;
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+
+  const interval: any = setInterval(function() {
+    const timeLeft = animationEnd - Date.now();
+    if (timeLeft <= 0) return clearInterval(interval);
+
+    const particleCount = 50 * (timeLeft / duration);
+    confetti({ ...defaults, particleCount, origin: { x: 0.2, y: 0.6 } });
+    confetti({ ...defaults, particleCount, origin: { x: 0.8, y: 0.6 } });
+  }, 250);
+
+  // 3. HIỂN THỊ THÔNG BÁO XUẤT SẮC (Tùy chọn)
+  // Bạn có thể dùng hàm alert đơn giản hoặc set một State để hiện Modal đẹp hơn
+  setTimeout(() => {
+    alert("🌟 XUẤT SẮC! Bạn đã đạt điểm tối đa 10/10! 🌟");
+  }, 500);
+  setShowPerfectScoreModal(true);
+}
+
+    // Lưu vào Firestore
     try {
+      const finalTimeSpent = forcedTime !== undefined ? forcedTime : elapsedTime;
       const historyRef = collection(db, "users", user.uid, "examHistory");
       await addDoc(historyRef, {
         topic: config?.topic || "Đề thi",
@@ -86,7 +148,7 @@ function App() {
         timeSpent: finalTimeSpent,
         timeLimit: config?.timeLimit || 15,
         date: serverTimestamp(),
-        fullData: JSON.stringify(questions),
+        fullData: JSON.stringify(finalizedQuestions),
         violationCount: violationCountRef.current
       });
       
@@ -95,10 +157,9 @@ function App() {
       setTimeout(() => setShowToast(false), 3000);
     } catch (e) {
       console.error("Lỗi khi lưu:", e);
-      isSavedRef.current = false;
       setIsSaved(false);
+      isSavedRef.current = false;
     }
-  // Quan trọng: Thêm questions vào mảng này để hàm luôn lấy dữ liệu mới nhất
   }, [user, questions, elapsedTime, config, maxTotalScore]);
   
 
@@ -357,9 +418,12 @@ const handleUpdateScore = (points: number) => {
   setScore(prev => prev + points);
 };
 
-  const handleQuestionUpdate = (updatedQ: Question) => {
-    setQuestions(prev => prev.map(q => q.id === updatedQ.id ? updatedQ : q));
-  };
+const handleQuestionUpdate = useCallback((updatedQ: Question) => {
+  setQuestions(prev => {
+    // Chỉ cập nhật nếu thực sự có sự thay đổi để tránh render thừa
+    return prev.map(q => (q.id === updatedQ.id ? updatedQ : q));
+  });
+}, []);
 
     // Thêm đoạn này dưới các dòng khai báo useState
   // const maxTotalScore = questions.reduce((sum, q) => {
@@ -516,6 +580,33 @@ const handleUpdateScore = (points: number) => {
                   </div>                  
               </div>
             )}
+
+    {showPerfectScoreModal && (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in">
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-yellow-400 relative overflow-hidden">
+          {/* Hiệu ứng tia sáng nền */}
+          <div className="absolute inset-0 bg-gradient-to-b from-yellow-50 to-white -z-10"></div>
+          
+          <div className="mb-4 inline-block p-4 bg-yellow-100 rounded-full text-yellow-600">
+            <Trophy size={60} strokeWidth={2.5} />
+          </div>
+          
+          <h2 className="text-3xl font-black text-gray-800 mb-2">QUÁ TUYỆT VỜI!</h2>
+          <p className="text-gray-600 mb-6 font-medium">Bạn đã hoàn thành bài thi với số điểm tuyệt đối</p>
+          
+          <div className="bg-yellow-500 text-white text-5xl font-black py-4 rounded-2xl mb-6 shadow-lg shadow-yellow-200">
+            10 <span className="text-2xl">/ 10</span>
+          </div>
+
+          <button 
+            onClick={() => setShowPerfectScoreModal(false)}
+            className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-transform active:scale-95"
+          >
+            Tiếp tục học tập
+          </button>
+        </div>
+      </div>
+    )}
 
           </div>
         )}    

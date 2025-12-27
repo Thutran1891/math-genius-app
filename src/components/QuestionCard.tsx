@@ -26,21 +26,31 @@ export const QuestionCard: React.FC<Props> = ({ question, index, onUpdateScore, 
   const graphRef = useRef<HTMLDivElement>(null);
 
   // Reset state khi chuyển câu hỏi
-  useEffect(() => {
-    if (question.userAnswer) {
-        // Khôi phục trạng thái nếu đã làm (Xem lại lịch sử)
-        setUserAnswer(question.userAnswer);
-        setIsChecked(true);
-        setIsCorrect(!!question.isCorrect);
+  // QuestionCard.tsx
+
+    // QuestionCard.tsx
+
+    useEffect(() => {
+        // Khôi phục đáp án người dùng đã nhập
+        if (question.userAnswer !== undefined) {
+            setUserAnswer(question.userAnswer);
+        } else {
+            setUserAnswer(question.type === 'DS' ? {} : '');
+        }
+    
+        // CHỈ hiện trạng thái Xanh/Đỏ nếu:
+        // 1. Câu hỏi đã được bấm "Kiểm tra" (question.isCorrect không undefined)
+        // 2. HOẶC Bài thi đã bị khóa (isLocked === true)
+        if (question.isCorrect !== undefined || isLocked) {
+            setIsChecked(true);
+            setIsCorrect(!!question.isCorrect);
+        } else {
+            setIsChecked(false);
+            setIsCorrect(false);
+        }
+        
         setShowExplanation(false);
-    } else {
-        // Reset nếu là bài làm mới
-        setUserAnswer(question.type === 'DS' ? {} : '');
-        setIsChecked(false);
-        setIsCorrect(false);
-        setShowExplanation(false);
-    }
-  }, [question.id, question.userAnswer]);
+    }, [question.id, question.isCorrect, isLocked]); // Theo dõi isCorrect và isLocked
 
   // Hàm phát âm thanh (Đã tối ưu Cleanup)
   const playSound = (correct: boolean) => {
@@ -311,7 +321,16 @@ const handleCheckResult = () => {
                 return (
                     <button 
                     key={i} 
-                    onClick={() => !isChecked && setUserAnswer(label)} 
+                    onClick={() => {
+                        if (!isChecked && !isLocked) {
+                            const newAns = label;
+                            setUserAnswer(newAns); // Cập nhật giao diện tại chỗ
+                            
+                            // BÁO CÁO NGAY LẬP TỨC VỀ APP.TSX
+                            onDataChange?.({ ...question, userAnswer: newAns }); 
+                        }
+                    }}
+
                     disabled={isChecked || isLocked} // <-- Khóa nút
                     className={css} // SỬA TẠI ĐÂY: Truyền biến css vào
                     >
@@ -334,7 +353,14 @@ const handleCheckResult = () => {
                   className="border-2 border-gray-300 p-3 rounded-lg flex-1 focus:border-blue-500 outline-none font-bold text-lg" 
                   placeholder="Nhập đáp số..." 
                   value={userAnswer || ''}
-                  onChange={e => setUserAnswer(e.target.value)}
+                  onChange={(e) => {
+                    const newAns = e.target.value;
+                    setUserAnswer(newAns);
+                    
+                    // ĐỒNG BỘ DỮ LIỆU KHI NGƯỜI DÙNG ĐANG GÕ
+                    onDataChange?.({ ...question, userAnswer: newAns });
+                }}
+
                 //   disabled={isChecked}
                   disabled={isChecked || isLocked} // <-- Khóa nút
 
