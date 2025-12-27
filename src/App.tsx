@@ -130,10 +130,6 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
   }, 250);
 
   // 3. HIỂN THỊ THÔNG BÁO XUẤT SẮC (Tùy chọn)
-  // Bạn có thể dùng hàm alert đơn giản hoặc set một State để hiện Modal đẹp hơn
-  setTimeout(() => {
-    alert("🌟 XUẤT SẮC! Bạn đã đạt điểm tối đa 10/10! 🌟");
-  }, 500);
   setShowPerfectScoreModal(true);
 }
 
