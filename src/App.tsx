@@ -48,7 +48,13 @@ function App() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   // Âm thanh chúc mừng
-  const [showPerfectScoreModal, setShowPerfectScoreModal] = useState(false);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultFeedback, setResultFeedback] = useState({
+    title: '',
+    message: '',
+    colorClass: '',
+    score: ''
+  });
   const maxTotalScore = questions.reduce((sum, q) => {
     if (q.type === 'DS') return sum + 4;
     if (q.type === 'TLN') return sum + 2; //
@@ -118,7 +124,7 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
   // 2. HIỆU ỨNG PHÁO HOA
   const duration = 3 * 1000;
   const animationEnd = Date.now() + duration;
-  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 100 };
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 999 };
 
   const interval: any = setInterval(function() {
     const timeLeft = animationEnd - Date.now();
@@ -130,7 +136,46 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
   }, 250);
 
   // 3. HIỂN THỊ THÔNG BÁO XUẤT SẮC (Tùy chọn)
-  setShowPerfectScoreModal(true);
+  const score10Raw = maxTotalScore > 0 ? (currentScore / maxTotalScore) * 10 : 0;
+const s10 = parseFloat(score10Raw.toFixed(1));
+
+let feedback = { title: '', message: '', colorClass: '' };
+
+if (s10 === 10) {
+    feedback = { 
+      title: 'QUÁ TUYỆT VỜI!', 
+      message: 'Bạn đã hoàn thành bài thi với số điểm tuyệt đối', 
+      colorClass: 'bg-yellow-500 border-yellow-400 text-yellow-600' 
+    };
+    // Chỉ bắn pháo hoa và phát âm thanh "congrats" khi đạt điểm 10
+    const audio = new Audio('/congrats.mp3');
+    audio.play().catch(() => {});
+    // ... giữ nguyên code confetti với zIndex: 999 như đã sửa ở bước trước ...
+} 
+else if (s10 >= 8) {
+    feedback = { 
+      title: 'RẤT TỐT!', 
+      message: 'Kết quả rất ấn tượng, hãy tiếp tục phát huy nhé!', 
+      colorClass: 'bg-green-500 border-green-400 text-green-600' 
+    };
+} 
+else if (s10 >= 5) {
+    feedback = { 
+      title: 'KHÁ TỐT!', 
+      message: 'Bạn đã nắm được kiến thức cơ bản, cố gắng thêm chút nữa nhé!', 
+      colorClass: 'bg-blue-500 border-blue-400 text-blue-600' 
+    };
+} 
+else {
+    feedback = { 
+      title: 'CẦN CỐ GẮNG!', 
+      message: 'Đáng tiếc, bạn cần xem lại lý thuyết và luyện tập thêm.', 
+      colorClass: 'bg-red-500 border-red-400 text-red-600' 
+    };
+}
+
+setResultFeedback({ ...feedback, score: s10.toString() });
+setShowResultModal(true);
 }
 
     // Lưu vào Firestore
@@ -577,25 +622,25 @@ const handleQuestionUpdate = useCallback((updatedQ: Question) => {
               </div>
             )}
 
-    {showPerfectScoreModal && (
+        {/* Thay thế đoạn hiển thị showPerfectScoreModal ở cuối file App.tsx */}
+    {showResultModal && (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in">
-        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 border-yellow-400 relative overflow-hidden">
-          {/* Hiệu ứng tia sáng nền */}
-          <div className="absolute inset-0 bg-gradient-to-b from-yellow-50 to-white -z-10"></div>
+        <div className={`bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 relative overflow-hidden ${resultFeedback.colorClass.split(' ')[1]}`}>
+          <div className="absolute inset-0 bg-gradient-to-b from-white/50 to-white -z-10"></div>
           
-          <div className="mb-4 inline-block p-4 bg-yellow-100 rounded-full text-yellow-600">
+          <div className={`mb-4 inline-block p-4 rounded-full ${resultFeedback.colorClass.split(' ')[2].replace('text', 'bg').replace('600', '100')} ${resultFeedback.colorClass.split(' ')[2]}`}>
             <Trophy size={60} strokeWidth={2.5} />
           </div>
           
-          <h2 className="text-3xl font-black text-gray-800 mb-2">QUÁ TUYỆT VỜI!</h2>
-          <p className="text-gray-600 mb-6 font-medium">Bạn đã hoàn thành bài thi với số điểm tuyệt đối</p>
+          <h2 className="text-3xl font-black text-gray-800 mb-2 uppercase">{resultFeedback.title}</h2>
+          <p className="text-gray-600 mb-6 font-medium leading-tight">{resultFeedback.message}</p>
           
-          <div className="bg-yellow-500 text-white text-5xl font-black py-4 rounded-2xl mb-6 shadow-lg shadow-yellow-200">
-            10 <span className="text-2xl">/ 10</span>
+          <div className={`${resultFeedback.colorClass.split(' ')[0]} text-white text-5xl font-black py-4 rounded-2xl mb-6 shadow-lg`}>
+            {resultFeedback.score} <span className="text-2xl">/ 10</span>
           </div>
 
           <button 
-            onClick={() => setShowPerfectScoreModal(false)}
+            onClick={() => setShowResultModal(false)}
             className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-transform active:scale-95"
           >
             Tiếp tục học tập
