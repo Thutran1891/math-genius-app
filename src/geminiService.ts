@@ -326,7 +326,44 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
     const responseText = result.response.text();
     
     // Parse JSON
-    const rawQuestions: Question[] = JSON.parse(responseText);
+    let rawQuestions: Question[] = [];
+    try {
+        // Loại bỏ các ký tự không phải JSON ở đầu/cuối (phòng trường hợp AI trả về text kèm markdown)
+        const jsonStart = responseText.indexOf('[');
+        const jsonEnd = responseText.lastIndexOf(']') + 1;
+        const cleanJson = responseText.substring(jsonStart, jsonEnd);
+        
+        rawQuestions = JSON.parse(cleanJson);
+      } catch (error: any) {
+        if (error.name === 'AbortError') throw error;
+      
+        // Phân tích mã lỗi từ Gemini API
+        const status = error.status || (error.message?.includes('429') ? 429 : 
+                                       error.message?.includes('400') ? 400 : 
+                                       error.message?.includes('503') ? 503 : 500);
+      
+        let msg = "Đã xảy ra lỗi không xác định.";
+        let detail = "Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau.";
+      
+        switch (status) {
+          case 429:
+            msg = "Hết lượt sử dụng (Rate Limit)";
+            detail = "Key API của bạn đã hết hạn mức miễn phí hoặc bạn đang yêu cầu quá nhanh. Hãy chờ 1 phút hoặc đổi Key khác.";
+            break;
+          case 400:
+            msg = "Yêu cầu quá tải (JSON/Tokens)";
+            detail = "Nội dung phản hồi có thể quá dài khiến cấu trúc dữ liệu bị lỗi. Hãy thử giảm số lượng câu hỏi xuống (dưới 10 câu).";
+            break;
+          case 503:
+          case 500:
+            msg = "Máy chủ AI đang bận";
+            detail = "Hệ thống Google Gemini đang quá tải. Bạn hãy nhấn 'Tạo lại' sau khoảng 10-30 giây.";
+            break;
+        }
+      
+        // Ném ra một object chứa cả tiêu đề và chi tiết
+        throw new Error(JSON.stringify({ title: msg, detail: detail }));
+      }
     
     // Trả về kết quả đã shuffle
     return rawQuestions.map(q => shuffleQuestion(q));
@@ -440,8 +477,44 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
     const responseText = result.response.text();
 
     // Bước 1: Chuyển văn bản từ AI thành mảng đối tượng Question
-    const rawQuestions: Question[] = JSON.parse(responseText);
-
+    let rawQuestions: Question[] = [];
+    try {
+        // Loại bỏ các ký tự không phải JSON ở đầu/cuối (phòng trường hợp AI trả về text kèm markdown)
+        const jsonStart = responseText.indexOf('[');
+        const jsonEnd = responseText.lastIndexOf(']') + 1;
+        const cleanJson = responseText.substring(jsonStart, jsonEnd);
+        
+        rawQuestions = JSON.parse(cleanJson);
+      } catch (error: any) {
+        if (error.name === 'AbortError') throw error;
+      
+        // Phân tích mã lỗi từ Gemini API
+        const status = error.status || (error.message?.includes('429') ? 429 : 
+                                       error.message?.includes('400') ? 400 : 
+                                       error.message?.includes('503') ? 503 : 500);
+      
+        let msg = "Đã xảy ra lỗi không xác định.";
+        let detail = "Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau.";
+      
+        switch (status) {
+          case 429:
+            msg = "Hết lượt sử dụng (Rate Limit)";
+            detail = "Key API của bạn đã hết hạn mức miễn phí hoặc bạn đang yêu cầu quá nhanh. Hãy chờ 1 phút hoặc đổi Key khác.";
+            break;
+          case 400:
+            msg = "Yêu cầu quá tải (JSON/Tokens)";
+            detail = "Nội dung phản hồi có thể quá dài khiến cấu trúc dữ liệu bị lỗi. Hãy thử giảm số lượng câu hỏi xuống (dưới 10 câu).";
+            break;
+          case 503:
+          case 500:
+            msg = "Máy chủ AI đang bận";
+            detail = "Hệ thống Google Gemini đang quá tải. Bạn hãy nhấn 'Tạo lại' sau khoảng 10-30 giây.";
+            break;
+        }
+      
+        // Ném ra một object chứa cả tiêu đề và chi tiết
+        throw new Error(JSON.stringify({ title: msg, detail: detail }));
+      }
     // Bước 2: Trộn đáp án và trả về
     return rawQuestions.map(q => shuffleQuestion(q));
 

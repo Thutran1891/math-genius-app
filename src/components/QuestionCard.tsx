@@ -323,13 +323,12 @@ const handleCheckResult = () => {
                     key={i} 
                     onClick={() => {
                         if (!isChecked && !isLocked) {
-                            const newAns = label;
-                            setUserAnswer(newAns); // Cập nhật giao diện tại chỗ
-                            
-                            // BÁO CÁO NGAY LẬP TỨC VỀ APP.TSX
-                            onDataChange?.({ ...question, userAnswer: newAns }); 
+                          const newAns = label;
+                          setUserAnswer(newAns);
+                          // Đồng bộ ngay lập tức để App.tsx biết bạn đã chọn câu này
+                          onDataChange?.({ ...question, userAnswer: newAns });
                         }
-                    }}
+                      }}
 
                     disabled={isChecked || isLocked} // <-- Khóa nút
                     className={css} // SỬA TẠI ĐÂY: Truyền biến css vào
@@ -353,13 +352,12 @@ const handleCheckResult = () => {
                   className="border-2 border-gray-300 p-3 rounded-lg flex-1 focus:border-blue-500 outline-none font-bold text-lg" 
                   placeholder="Nhập đáp số..." 
                   value={userAnswer || ''}
-                  onChange={(e) => {
+                  onChange={e => {
                     const newAns = e.target.value;
                     setUserAnswer(newAns);
-                    
-                    // ĐỒNG BỘ DỮ LIỆU KHI NGƯỜI DÙNG ĐANG GÕ
+                    // App.tsx sẽ nhận được từng ký tự bạn đang gõ
                     onDataChange?.({ ...question, userAnswer: newAns });
-                }}
+                  }}
 
                 //   disabled={isChecked}
                   disabled={isChecked || isLocked} // <-- Khóa nút
@@ -398,7 +396,16 @@ const handleCheckResult = () => {
                                 key={label} 
                                 // Gộp chung vào 1 dòng duy nhất, xóa dòng disabled lặp lại phía trên
                                 disabled={isChecked || isLocked} 
-                                onClick={() => !isChecked && !isLocked && setUserAnswer({ ...userAnswer, [stmt.id]: isTrueBtn })} 
+                                onClick={() => {
+                                    if (!isChecked && !isLocked) {
+                                      // Tạo object mới từ state hiện tại
+                                      const newAns = { ...userAnswer, [stmt.id]: isTrueBtn };
+                                      setUserAnswer(newAns);
+                                      // Gửi toàn bộ trạng thái các câu đúng/sai về App
+                                      onDataChange?.({ ...question, userAnswer: newAns });
+                                    }
+                                  }}
+
                                 className={btnClass}
                                 >
                                 {label}

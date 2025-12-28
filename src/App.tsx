@@ -13,6 +13,8 @@ import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, 
 import { LatexText } from './components/LatexText';
 import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
 
+
+
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -47,6 +49,8 @@ function App() {
     // Thêm vào cùng chỗ với các useRef khác trong App.tsx
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  // Bắt lỗi
+  const [errorInfo, setErrorInfo] = useState<{title: string, detail: string} | null>(null);
   // Âm thanh chúc mừng
   const [showResultModal, setShowResultModal] = useState(false);
   const [resultFeedback, setResultFeedback] = useState({
@@ -110,7 +114,6 @@ function App() {
     setIsSaved(true);
     isSavedRef.current = true;
   
-    // App.tsx
 
 // PHÁO HOA
 
@@ -133,50 +136,61 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
     const particleCount = 50 * (timeLeft / duration);
     confetti({ ...defaults, particleCount, origin: { x: 0.2, y: 0.6 } });
     confetti({ ...defaults, particleCount, origin: { x: 0.8, y: 0.6 } });
-  }, 250);
-
-  // 3. HIỂN THỊ THÔNG BÁO XUẤT SẮC (Tùy chọn)
-  const score10Raw = maxTotalScore > 0 ? (currentScore / maxTotalScore) * 10 : 0;
-const s10 = parseFloat(score10Raw.toFixed(1));
-
-let feedback = { title: '', message: '', colorClass: '' };
-
-if (s10 === 10) {
-    feedback = { 
-      title: 'QUÁ TUYỆT VỜI!', 
-      message: 'Bạn đã hoàn thành bài thi với số điểm tuyệt đối', 
-      colorClass: 'bg-yellow-500 border-yellow-400 text-yellow-600' 
-    };
-    // Chỉ bắn pháo hoa và phát âm thanh "congrats" khi đạt điểm 10
-    const audio = new Audio('/congrats.mp3');
-    audio.play().catch(() => {});
-    // ... giữ nguyên code confetti với zIndex: 999 như đã sửa ở bước trước ...
-} 
-else if (s10 >= 8) {
-    feedback = { 
-      title: 'RẤT TỐT!', 
-      message: 'Kết quả rất ấn tượng, hãy tiếp tục phát huy nhé!', 
-      colorClass: 'bg-green-500 border-green-400 text-green-600' 
-    };
-} 
-else if (s10 >= 5) {
-    feedback = { 
-      title: 'KHÁ TỐT!', 
-      message: 'Bạn đã nắm được kiến thức cơ bản, cố gắng thêm chút nữa nhé!', 
-      colorClass: 'bg-blue-500 border-blue-400 text-blue-600' 
-    };
-} 
-else {
-    feedback = { 
-      title: 'CẦN CỐ GẮNG!', 
-      message: 'Đáng tiếc, bạn cần xem lại lý thuyết và luyện tập thêm.', 
-      colorClass: 'bg-red-500 border-red-400 text-red-600' 
-    };
+  }, 250);  
 }
 
-setResultFeedback({ ...feedback, score: s10.toString() });
-setShowResultModal(true);
-}
+      // 1. TÍNH ĐIỂM HỆ 10 ĐỂ PHÂN LOẠI FEEDBACK
+    const score10Raw = maxTotalScore > 0 ? (currentScore / maxTotalScore) * 10 : 0;
+    const s10 = parseFloat(score10Raw.toFixed(1));
+
+    let feedback = { title: '', message: '', colorClass: '' };
+
+    // 2. PHÂN LOẠI THÔNG BÁO THEO MỨC ĐIỂM
+    if (s10 === 10) {
+        feedback = { 
+            title: 'QUÁ TUYỆT VỜI!', 
+            message: 'Bạn đã hoàn thành bài thi với số điểm tuyệt đối!', 
+            colorClass: 'bg-yellow-500 border-yellow-400 text-yellow-600' 
+        };
+        
+        // Chỉ bắn pháo hoa và phát âm thanh khi đạt điểm 10
+        const audio = new Audio('/congrats.mp3');
+        audio.play().catch(() => {});
+        
+        const duration = 3 * 1000;
+        const animationEnd = Date.now() + duration;
+        const interval: any = setInterval(function() {
+            const timeLeft = animationEnd - Date.now();
+            if (timeLeft <= 0) return clearInterval(interval);
+            confetti({ particleCount: 50, spread: 360, origin: { x: 0.2, y: 0.6 }, zIndex: 999 });
+            confetti({ particleCount: 50, spread: 360, origin: { x: 0.8, y: 0.6 }, zIndex: 999 });
+        }, 250);
+    } 
+    else if (s10 >= 8) {
+        feedback = { 
+            title: 'RẤT TỐT!', 
+            message: 'Kết quả rất ấn tượng, hãy tiếp tục phát huy nhé!', 
+            colorClass: 'bg-green-500 border-green-400 text-green-600' 
+        };
+    } 
+    else if (s10 >= 5) {
+        feedback = { 
+            title: 'KHÁ TỐT!', 
+            message: 'Bạn đã nắm được kiến thức cơ bản, cố gắng thêm chút nữa nhé!', 
+            colorClass: 'bg-blue-500 border-blue-400 text-blue-600' 
+        };
+    } 
+    else {
+        feedback = { 
+            title: 'CẦN CỐ GẮNG!', 
+            message: 'Đáng tiếc, bạn cần xem lại lý thuyết và luyện tập thêm.', 
+            colorClass: 'bg-red-500 border-red-400 text-red-600' 
+        };
+    }
+
+    // 3. HIỂN THỊ MODAL (Dòng này cực kỳ quan trọng, nằm ngoài các lệnh IF trên)
+    setResultFeedback({ ...feedback, score: s10.toString() });
+    setShowResultModal(true);
 
     // Lưu vào Firestore
     try {
@@ -317,6 +331,7 @@ setShowResultModal(true);
     topicName?: string
   ) => {
     setLoading(true);
+    setErrorInfo(null); // Reset lỗi cũ
     setCurrentApiKey(apiKey); // QUAN TRỌNG: Lưu Key ngay lập tức để nút Đổi đề có thể dùng
     resetQuizState(); 
   
@@ -345,9 +360,15 @@ setShowResultModal(true);
       const result = await generateQuizFromImages(images, mode, apiKey, prompt);
       setQuestions(result);
     } catch (error: any) {
-      alert("Lỗi: " + error.message);
+      try {
+        // Thử parse lỗi từ JSON string chúng ta đã tạo ở Bước 1
+        const parsedError = JSON.parse(error.message);
+        setErrorInfo(parsedError);
+      } catch {
+        setErrorInfo({ title: "Lỗi hệ thống", detail: error.message });
+      }
     } finally {
-      setLoading(false);
+      setLoading(false); // Đảm bảo luôn tắt Loading
     }
   };
 
@@ -384,9 +405,15 @@ setShowResultModal(true);
       const result = await generateQuiz(newConfig, apiKey);
       setQuestions(result);
     } catch (error: any) {
-      alert("Lỗi: " + error.message);
+      try {
+        // Thử parse lỗi từ JSON string chúng ta đã tạo ở Bước 1
+        const parsedError = JSON.parse(error.message);
+        setErrorInfo(parsedError);
+      } catch {
+        setErrorInfo({ title: "Lỗi hệ thống", detail: error.message });
+      }
     } finally {
-      setLoading(false);
+      setLoading(false); // Đảm bảo luôn tắt Loading
     }
   };
 
@@ -622,7 +649,28 @@ const handleQuestionUpdate = useCallback((updatedQ: Question) => {
               </div>
             )}
 
-        {/* Thay thế đoạn hiển thị showPerfectScoreModal ở cuối file App.tsx */}
+      {/* Báo lỗi */}
+            {errorInfo && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[250] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border-t-4 border-red-500">
+            <div className="flex items-center gap-3 text-red-600 mb-4">
+              <AlertTriangle size={24} />
+              <h3 className="font-bold text-lg">{errorInfo.title}</h3>
+            </div>
+            <p className="text-gray-600 text-sm mb-6 leading-relaxed">
+              {errorInfo.detail}
+            </p>
+            <button 
+              onClick={() => setErrorInfo(null)}
+              className="w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+
+        {/* Thống báo kết quả thi */}
     {showResultModal && (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in">
         <div className={`bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-4 relative overflow-hidden ${resultFeedback.colorClass.split(' ')[1]}`}>
