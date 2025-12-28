@@ -9,10 +9,10 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
-import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import { LatexText } from './components/LatexText';
 import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
-
+import { TimerDisplay } from './components/TimerDisplay';
 
 
 function App() {
@@ -48,7 +48,8 @@ function App() {
   const [imageMode, setImageMode] = useState<'EXACT' | 'SIMILAR'>('SIMILAR');   // Lưu ảnh để dùng lại khi đổi đề
     // Thêm vào cùng chỗ với các useRef khác trong App.tsx
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  // const [elapsedTime, setElapsedTime] = useState(0);
+  const [savedTime, setSavedTime] = useState(0);
   // Bắt lỗi
   const [errorInfo, setErrorInfo] = useState<{title: string, detail: string} | null>(null);
   // Âm thanh chúc mừng
@@ -65,6 +66,75 @@ function App() {
     return sum + 1;
   }, 0);
 
+  // TỰ ĐỘNG LƯU -----------------
+  // App.tsx hoặc một file util riêng
+const STORAGE_KEY = "current_quiz_session";
+
+const saveSession = (data: {
+  questions: any[],
+  elapsedTime: number,
+  config: any,
+  violationCount: number
+}) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    ...data,
+    timestamp: Date.now()
+  }));
+};
+
+const clearSession = () => {
+  localStorage.removeItem(STORAGE_KEY);
+};
+
+const getSavedSession = () => {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return null;
+  
+  const parsed = JSON.parse(saved);
+  // Nếu dữ liệu quá cũ (ví dụ > 24h), có thể bỏ qua không khôi phục
+  const isExpired = Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000;
+  return isExpired ? null : parsed;
+};
+
+  // --- ĐẶT Ở ĐÂY (Sau các khai báo useState) ---
+  useEffect(() => {
+    // Chúng ta chỉ khôi phục khi có user và chưa có câu hỏi nào hiện tại (để tránh ghi đè bài mới)
+    if (user && questions.length === 0) {
+      const savedSession = getSavedSession();
+      
+      if (savedSession) {
+        const confirmRestore = window.confirm(
+          `Hệ thống tìm thấy bài làm dở dang: "${savedSession.config.topic}". Bạn có muốn tiếp tục không?`
+        );
+
+        if (confirmRestore) {
+          setQuestions(savedSession.questions);
+          setSavedTime(savedSession.elapsedTime);
+          setConfig(savedSession.config);
+          setViolationCount(savedSession.violationCount);
+          violationCountRef.current = savedSession.violationCount;
+        } else {
+          clearSession();
+        }
+      }
+    }
+  }, [user]); // Chạy lại khi trạng thái đăng nhập thay đổi  
+
+  // --- ĐẶT Ở ĐÂY (Phía dưới các logic xử lý khác) ---
+  useEffect(() => {
+    // Chỉ lưu khi đang có bài (questions > 0) và bài đó chưa được nộp (isSaved = false)
+    if (questions.length > 0 && !isSaved) {
+      saveSession({
+        questions,
+        elapsedTime: savedTime,
+        config,
+        violationCount: violationCountRef.current
+      });
+    }
+  }, [questions, savedTime, isSaved]); 
+  // useEffect này sẽ "lắng nghe": mỗi khi học sinh chọn đáp án (questions thay đổi) 
+  // hoặc đồng hồ nhảy (elapsedTime thay đổi), nó sẽ lưu ngay lập tức.  
+  // --------------------------------------
 
   const handleSaveResult = useCallback(async (forcedTime?: number) => {
     if (!user || isSavedRef.current) return;
@@ -114,31 +184,7 @@ function App() {
     setIsSaved(true);
     isSavedRef.current = true;
   
-
-// PHÁO HOA
-
-if (currentScore > 0 && currentScore === maxTotalScore) {
-  // 1. PHÁT ÂM THANH CHÚC MỪNG
-  // Bạn hãy để file congrats.mp3 vào thư mục public của dự án
-  const audio = new Audio('/congrats.mp3'); 
-  audio.volume = 0.7;
-  audio.play().catch(e => console.warn("Trình duyệt chặn phát âm thanh tự động:", e));
-
-  // 2. HIỆU ỨNG PHÁO HOA
-  const duration = 3 * 1000;
-  const animationEnd = Date.now() + duration;
-  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 999 };
-
-  const interval: any = setInterval(function() {
-    const timeLeft = animationEnd - Date.now();
-    if (timeLeft <= 0) return clearInterval(interval);
-
-    const particleCount = 50 * (timeLeft / duration);
-    confetti({ ...defaults, particleCount, origin: { x: 0.2, y: 0.6 } });
-    confetti({ ...defaults, particleCount, origin: { x: 0.8, y: 0.6 } });
-  }, 250);  
-}
-
+    // THÔNG BÁO KẾT QUẢ
       // 1. TÍNH ĐIỂM HỆ 10 ĐỂ PHÂN LOẠI FEEDBACK
     const score10Raw = maxTotalScore > 0 ? (currentScore / maxTotalScore) * 10 : 0;
     const s10 = parseFloat(score10Raw.toFixed(1));
@@ -194,7 +240,7 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
 
     // Lưu vào Firestore
     try {
-      const finalTimeSpent = forcedTime !== undefined ? forcedTime : elapsedTime;
+      const finalTimeSpent = forcedTime !== undefined ? forcedTime : savedTime;
       const historyRef = collection(db, "users", user.uid, "examHistory");
       await addDoc(historyRef, {
         topic: config?.topic || "Đề thi",
@@ -210,12 +256,14 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
       if (timerRef.current) clearInterval(timerRef.current);
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
+      // THÊM DÒNG NÀY:
+      clearSession();
     } catch (e) {
       console.error("Lỗi khi lưu:", e);
       setIsSaved(false);
       isSavedRef.current = false;
     }
-  }, [user, questions, elapsedTime, config, maxTotalScore]);
+  }, [user, questions, savedTime, config, maxTotalScore]);
   
 
   // useEffect xử lý bộ đếm
@@ -224,7 +272,7 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
     // Điều kiện: Có câu hỏi, chưa lưu điểm và không phải đang xem lịch sử
     if (questions.length > 0 && !isSaved && !viewHistory) {
       timerRef.current = setInterval(() => {
-        setElapsedTime(prev => {
+        setSavedTime(prev => {
           const newTime = prev + 1;
           const limitInSeconds = (config?.timeLimit || 15) * 60;
   
@@ -253,12 +301,6 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
     // và chuẩn bị hàm handleSaveResult với dữ liệu mới nhất.
   }, [questions, isSaved, viewHistory, config?.timeLimit, handleSaveResult]);
 
-  // Hàm định dạng hiển thị mm:ss
-  const formatTime = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? '0' + s : s}`;
-  };
 
   // Đồng bộ State React sang Ref liên tục
   useEffect(() => {
@@ -309,7 +351,7 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
     setIsSaved(false);
     isSavedRef.current = false;
     // setAttemptCount(prev => prev + 1); // Tăng số lần làm bài
-    setElapsedTime(0); // <--- THÊM DÒNG NÀY ĐỂ RESET BỘ ĐẾM VỀ 0
+    setSavedTime(0);
     // Đảm bảo lần đầu tạo luôn là 1
     setAttemptCount(1);
     
@@ -447,7 +489,7 @@ if (currentScore > 0 && currentScore === maxTotalScore) {
       
       // Reset lại trạng thái làm bài cho đề mới
       setScore(0);
-      setElapsedTime(0);
+      setSavedTime(0);
       setIsSaved(false);
     } catch (error: any) {
       alert("Lỗi khi đổi đề: " + error.message);
@@ -552,9 +594,17 @@ const handleQuestionUpdate = useCallback((updatedQ: Question) => {
                 </h2>
                 <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
                   {/* ĐỒNG HỒ ĐẾM XUÔI */}
-                  <span className={`flex items-center gap-1 font-mono font-bold px-2 py-1 rounded ${elapsedTime >= (config?.timeLimit || 0) * 60 ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-blue-700'}`}>
-                    <Clock size={14} /> {formatTime(elapsedTime)} / {config?.timeLimit}:00
-                  </span>
+                  <TimerDisplay 
+                    timeLimit={config?.timeLimit || 15}
+                    isSaved={isSaved}
+                    initialTime={savedTime} 
+                    onChange={(currentTime) => setSavedTime(currentTime)} // Nhận thời gian để Auto-save
+                    onTimeUp={(finalTime) => {
+                      setSavedTime(finalTime);
+                      handleSaveResult(finalTime);
+                    }}
+                  />
+
                 <span className="flex items-center gap-1">
                   <Trophy size={16} className="text-yellow-500" /> 
                   Điểm: <b className="text-primary">{score}/{maxTotalScore}</b>
