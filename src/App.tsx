@@ -18,6 +18,7 @@ import { TimerDisplay } from './components/TimerDisplay';
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const questionsRef = useRef<Question[]>([]); // Thêm dòng này
   const [loading, setLoading] = useState(false);
   const [config, setConfig] = useState<QuizConfig | null>(null);
   const [score, setScore] = useState(0);
@@ -65,6 +66,12 @@ function App() {
     if (q.type === 'TLN') return sum + 2; //
     return sum + 1;
   }, 0);
+
+  const handleQuestionDataChange = useCallback((updatedQuestion: Question) => {
+    setQuestions(prev => prev.map(q => 
+      q.id === updatedQuestion.id ? updatedQuestion : q
+    ));
+  }, []);
 
   // TỰ ĐỘNG LƯU -----------------
   // App.tsx hoặc một file util riêng
@@ -135,54 +142,54 @@ const getSavedSession = () => {
   // useEffect này sẽ "lắng nghe": mỗi khi học sinh chọn đáp án (questions thay đổi) 
   // hoặc đồng hồ nhảy (elapsedTime thay đổi), nó sẽ lưu ngay lập tức.  
   // --------------------------------------
+  // Cập nhật ref mỗi khi state questions thay đổi
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
 
   const handleSaveResult = useCallback(async (forcedTime?: number) => {
     if (!user || isSavedRef.current) return;
   
-    // 1. Chốt danh sách câu hỏi và tính toán isCorrect
-    const finalizedQuestions = questions.map(q => {
-      // Nếu đã bấm "Kiểm tra" lẻ, giữ nguyên
-      if (q.isCorrect !== undefined) return q;
-  
-      let isCorrect = false;
-      const userAns = q.userAnswer;
-  
-      if (userAns !== undefined && userAns !== null) {
-        if (q.type === 'TN') {
-          isCorrect = userAns === q.correctAnswer;
-        } 
-        else if (q.type === 'TLN') {
-          const uVal = parseFloat(userAns.toString().replace(/\s/g, '').replace(',', '.'));
-          const cVal = parseFloat(q.correctAnswer?.toString().replace(/\s/g, '').replace(',', '.') || '');
-          isCorrect = !isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01;
-        } 
-        else if (q.type === 'DS') {
-          const ansObj = (userAns || {}) as Record<string, boolean>;
-          const correctCount = q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0;
-          // Chốt câu DS là đúng hoàn toàn nếu đạt 4/4 ý
-          isCorrect = (correctCount === 4);
-        }
-      }
-      // QUAN TRỌNG: Trả về userAnswer để không mất dấu vết trên UI
-      return { ...q, isCorrect, userAnswer: userAns };
-    });
-  
-    // 2. TÍNH ĐIỂM TỔNG HỢP (Chấm theo từng ý cho câu DS)
-    const currentScore = finalizedQuestions.reduce((sum, q) => {
-      if (q.type === 'DS') {
-        const ansObj = (q.userAnswer || {}) as Record<string, boolean>;
-        const correctCount = q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0;
-        return sum + correctCount; // Mỗi ý đúng của câu DS được 1 điểm
-      }
-      if (q.type === 'TLN') return sum + (q.isCorrect ? 2 : 0);
-      return sum + (q.isCorrect ? 1 : 0);
-    }, 0);
-  
-    // 3. Cập nhật State
-    setQuestions(finalizedQuestions);
-    setScore(currentScore);
-    setIsSaved(true);
-    isSavedRef.current = true;
+    // LẤY DỮ LIỆU MỚI NHẤT TỪ REF thay vì state câu hỏi trực tiếp
+  const currentQuestions = questionsRef.current;
+
+  const finalizedQuestions = currentQuestions.map(q => {
+    // Nếu đã bấm "Kiểm tra" (isCorrect đã có true/false) thì giữ nguyên
+    if (q.isCorrect !== undefined) return q;
+
+    // Nếu chưa bấm "Kiểm tra", tiến hành chấm điểm dựa trên userAnswer đã lưu
+    let isCorrect = false;
+    const userAns = q.userAnswer;
+    if (!userAns) return { ...q, isCorrect: false };
+
+    if (q.type === 'TN') {
+      isCorrect = userAns === q.correctAnswer;
+    } else if (q.type === 'TLN') {
+      const uVal = parseFloat(userAns.toString().replace(',', '.'));
+      const cVal = parseFloat(q.correctAnswer?.toString().replace(',', '.') || '');
+      isCorrect = !isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01;
+    } else if (q.type === 'DS') {
+      const ansObj = (userAns as unknown || {}) as Record<string, boolean>; // Thêm || {}
+      const correctCount = q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0;
+      isCorrect = (correctCount === (q.statements?.length || 4));
+  }
+    return { ...q, isCorrect };
+  });
+
+  // Tính tổng điểm
+  const currentScore = finalizedQuestions.reduce((sum, q) => {
+    if (q.type === 'DS') {
+      const ansObj = (q.userAnswer || {}) as Record<string, boolean>;
+      return sum + (q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0);
+    }
+    if (q.type === 'TLN') return sum + (q.isCorrect ? 2 : 0);
+    return sum + (q.isCorrect ? 1 : 0);
+  }, 0);
+
+  setQuestions(finalizedQuestions);
+  setScore(currentScore);
+  setIsSaved(true);
+  isSavedRef.current = true;
   
     // THÔNG BÁO KẾT QUẢ
       // 1. TÍNH ĐIỂM HỆ 10 ĐỂ PHÂN LOẠI FEEDBACK
@@ -528,12 +535,6 @@ const handleUpdateScore = (points: number) => {
   setScore(prev => prev + points);
 };
 
-const handleQuestionUpdate = useCallback((updatedQ: Question) => {
-  setQuestions(prev => {
-    // Chỉ cập nhật nếu thực sự có sự thay đổi để tránh render thừa
-    return prev.map(q => (q.id === updatedQ.id ? updatedQ : q));
-  });
-}, []);
 
     // Thêm đoạn này dưới các dòng khai báo useState
   // const maxTotalScore = questions.reduce((sum, q) => {
@@ -657,16 +658,16 @@ const handleQuestionUpdate = useCallback((updatedQ: Question) => {
 
             {/* Questions List */}
             <div className="space-y-6 pb-20">
-              {questions.map((q, idx) => (
-                <QuestionCard 
-                  key={q.id || idx} 
-                  index={idx} 
-                  question={q} 
-                  onUpdateScore={handleUpdateScore} 
-                  onDataChange={handleQuestionUpdate}
-                  isLocked={isSaved} // <-- TRUYỀN GIÁ TRỊ TẠI ĐÂY
-                />
-              ))}
+            {questions.map((q, idx) => (
+            <QuestionCard 
+              key={q.id || idx} 
+              index={idx} 
+              question={q} 
+              onUpdateScore={handleUpdateScore} 
+              onDataChange={handleQuestionDataChange} // Đổi từ handleQuestionUpdate sang hàm này
+              isLocked={isSaved} 
+            />
+          ))}
             </div>
 
             {/* Theory Modal */}
