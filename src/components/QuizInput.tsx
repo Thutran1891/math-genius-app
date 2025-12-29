@@ -101,6 +101,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
 
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">AI TẠO ĐỀ</h1>
+        <p className="text-green-500 mb-2">Xin chào, {auth.currentUser?.displayName}!</p>
         <div className="inline-block bg-yellow-100 px-6 py-2 rounded-xl border border-yellow-300">
           <p className="text-violet-700 font-bold text-base">Tác giả: Trần Thị Kim Thu</p>
           <p className="text-violet-600 text-xs font-bold uppercase tracking-wider mt-1">Trường THPT Cây Dương</p>
