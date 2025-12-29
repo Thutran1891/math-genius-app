@@ -134,52 +134,83 @@ const questionSchema: any = {
 // Thêm tham số userApiKey
 // export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
   // Sửa khai báo hàm để nhận signal
-export const generateQuiz = async (config: QuizConfig, userApiKey: string, signal?: AbortSignal) => {
-  if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+  export const generateQuiz = async (config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> => {
+    if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
 
-  // Khởi tạo GenAI với key người dùng nhập (thay vì key mặc định)
-  const genAI = new GoogleGenerativeAI(userApiKey);
+    // 1. CHIA BATCH: Mỗi đợt chỉ làm 3-4 câu để đảm bảo ổn định
+    const BATCH_SIZE = 4;
+    const taskBatches: QuizConfig[] = [];
+    const remainingDist = JSON.parse(JSON.stringify(config.distribution));
 
-  const tnCount = (config.distribution.TN.BIET || 0) + (config.distribution.TN.HIEU || 0) + (config.distribution.TN.VANDUNG || 0);
-  const tlnCount = (config.distribution.TLN.BIET || 0) + (config.distribution.TLN.HIEU || 0) + (config.distribution.TLN.VANDUNG || 0);
-  const dsCount = (config.distribution.DS.BIET || 0) + (config.distribution.DS.HIEU || 0) + (config.distribution.DS.VANDUNG || 0);
-  const totalQuestions = tnCount + tlnCount + dsCount;
+    const hasRemaining = () => {
+        return Object.values(remainingDist).some((type: any) => 
+            Object.values(type).some((val: any) => val > 0)
+        );
+    };
 
-  if (totalQuestions === 0) throw new Error("Nhập số lượng câu hỏi!");
+    while (hasRemaining()) {
+        const batchDist = {
+            TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+            TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+            DS: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+        };
+        let countInBatch = 0;
 
-  try {
+        for (const type of ['TN', 'TLN', 'DS'] as const) {
+            for (const level of ['BIET', 'HIEU', 'VANDUNG'] as const) {
+                while (remainingDist[type][level] > 0 && countInBatch < BATCH_SIZE) {
+                    batchDist[type][level]++;
+                    remainingDist[type][level]--;
+                    countInBatch++;
+                }
+            }
+        }
+        taskBatches.push({ ...config, distribution: batchDist });
+    }
+
+    // 2. GỌI API SONG SONG
+    try {
+        const results = await Promise.all(
+            taskBatches.map(batchConfig => callGeminiAPI(batchConfig, userApiKey, signal))
+        );
+        return results.flat().sort(() => Math.random() - 0.5);
+    } catch (error: any) {
+        if (error.name === 'AbortError') throw error;
+        throw error;
+    }
+};
+
+async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> {
+    const genAI = new GoogleGenerativeAI(userApiKey);
+    
+    // TÍNH TOÁN SỐ LƯỢNG RIÊNG CHO BATCH NÀY
+    const tn = config.distribution.TN;
+    const tln = config.distribution.TLN;
+    const ds = config.distribution.DS;
+    
+    const totalInBatch = (tn.BIET + tn.HIEU + tn.VANDUNG) + 
+                         (tln.BIET + tln.HIEU + tln.VANDUNG) + 
+                         (ds.BIET + ds.HIEU + ds.VANDUNG);
+
+    if (totalInBatch === 0) return [];
+
     const model = genAI.getGenerativeModel({
-      model: "gemini-3-flash-preview",
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
-        temperature: 0.3,
-        // TĂNG LÊN MỨC CAO ĐỂ TRÁNH BỊ CẮT CỤT JSON
-        maxOutputTokens: 20000,
-      }
+        model: "gemini-3-flash-preview", 
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
+            temperature: 0.4,
+        }
     });
 
     const prompt = `
-      Bạn là Chuyên Gia Giáo Dục. Tạo ${totalQuestions} câu hỏi:
-      1. CHỦ ĐỀ: "${config.topic}"
-      2. BỔ SUNG: "${config.additionalPrompt || "Không có"}"
+      Bạn là Chuyên Gia Giáo Dục. Tạo ${totalInBatch} câu hỏi cho chủ đề: "${config.topic}".
+      Yêu cầu bổ sung: "${config.additionalPrompt || "Không có"}"
       
-      3. PHÂN PHỐI CHI TIẾT (BẮT BUỘC TUÂN THỦ CẤP ĐỘ):
-         - Trắc nghiệm (${tnCount} câu):
-            + Mức Biết: ${config.distribution.TN.BIET || 0} câu
-            + Mức Hiểu: ${config.distribution.TN.HIEU || 0} câu
-            + Mức Vận dụng: ${config.distribution.TN.VANDUNG || 0} câu
-         
-         - Điền số (${tlnCount} câu):
-            + Mức Biết: ${config.distribution.TLN.BIET || 0} câu
-            + Mức Hiểu: ${config.distribution.TLN.HIEU || 0} câu
-            + Mức Vận dụng: ${config.distribution.TLN.VANDUNG || 0} câu
-            
-         - Đúng/Sai (${dsCount} câu):
-            + Mức Biết: ${config.distribution.DS.BIET || 0} câu
-            + Mức Hiểu: ${config.distribution.DS.HIEU || 0} câu
-            + Mức Vận dụng: ${config.distribution.DS.VANDUNG || 0} câu
-
+      PHÂN BỔ CẤP ĐỘ TRONG ĐỢT NÀY:
+      - Trắc nghiệm: ${tn.BIET} Biết, ${tn.HIEU} Hiểu, ${tn.VANDUNG} Vận dụng
+      - Điền số: ${tln.BIET} Biết, ${tln.HIEU} Hiểu, ${tln.VANDUNG} Vận dụng
+      - Đúng/Sai: ${ds.BIET} Biết, ${ds.HIEU} Hiểu, ${ds.VANDUNG} Vận dụng
       QUY TẮC HIỂN THỊ (TUYỆT ĐỐI TUÂN THỦ):
 
       RULE 1. NỘI DUNG CÂU HỎI (questionText):
@@ -315,69 +346,37 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
           - Nếu đáp án là tọa độ hoặc biểu thức, BẮT BUỘC phải dùng loại 'TN'.
           - Các phương án trắc nghiệm (options) chứa tọa độ phải đặt trong LaTeX: "$\vec{a} = (1; 2; 3)$" hoặc "$M(1; -2; 0)$".
 
-         Trả về JSON mảng ${totalQuestions} câu.
+          RULE 11. NGUYÊN TẮC "KHÔNG CẦN THÌ KHÔNG VẼ":
+          -  Tuyệt đối KHÔNG trả về graphFunction, variationTableData hay geometryGraph nếu đề bài không yêu cầu học sinh phải quan sát hình vẽ để giải bài.
+          -  Đặc biệt: Với các bài toán về Tập hợp, số học, đại số thuần túy, các trường dữ liệu hình ảnh BẮT BUỘC phải để giá trị null.
+          -  Tuyệt đối KHÔNG được vẽ khung tọa độ trống (Empty Grid).
+
+          RULE 12. TỐI ƯU HÓA DỮ LIỆU:
+          - Nếu một câu hỏi có thể giải bằng văn bản mà không cần hình minh họa, hãy ưu tiên chỉ dùng văn bản để tiết kiệm tài nguyên hệ thống.
+
+        Trả về đúng định dạng JSON mảng ${totalInBatch} câu hỏi.
     `;
 
-    const result = await retryOperation(async () => {
-      return await model.generateContent(prompt, { signal }); 
-    });
-
-    // Lấy text từ response
-    const responseText = result.response.text();
-    
-    // Parse JSON
-    let rawQuestions: Question[] = [];
     try {
-        // Loại bỏ các ký tự không phải JSON ở đầu/cuối (phòng trường hợp AI trả về text kèm markdown)
-        const jsonStart = responseText.indexOf('[');
-        const jsonEnd = responseText.lastIndexOf(']') + 1;
-        const cleanJson = responseText.substring(jsonStart, jsonEnd);
-        
-        rawQuestions = JSON.parse(cleanJson);
-      } catch (error: any) {
-        if (error.name === 'AbortError') throw error;
-      
-        // Phân tích mã lỗi từ Gemini API
-        const status = error.status || (error.message?.includes('429') ? 429 : 
-                                       error.message?.includes('400') ? 400 : 
-                                       error.message?.includes('503') ? 503 : 500);
-      
-        let msg = "Đã xảy ra lỗi không xác định.";
-        let detail = "Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau.";
-      
-        switch (status) {
-          case 429:
-            msg = "Hết lượt sử dụng (Rate Limit)";
-            detail = "Key API của bạn đã hết hạn mức miễn phí hoặc bạn đang yêu cầu quá nhanh. Hãy chờ 1 phút hoặc đổi Key khác.";
-            break;
-          case 400:
-            msg = "Yêu cầu quá tải (JSON/Tokens)";
-            detail = "Nội dung phản hồi có thể quá dài khiến cấu trúc dữ liệu bị lỗi. Hãy thử giảm số lượng câu hỏi xuống (dưới 10 câu).";
-            break;
-          case 503:
-          case 500:
-            msg = "Máy chủ AI đang bận";
-            detail = "Hệ thống Google Gemini đang quá tải. Bạn hãy nhấn 'Tạo lại' sau khoảng 10-30 giây.";
-            break;
-        }
-      
-        // Ném ra một object chứa cả tiêu đề và chi tiết
-        throw new Error(JSON.stringify({ title: msg, detail: detail }));
-      }
-    
-    // Trả về kết quả đã shuffle
-    return rawQuestions.map(q => shuffleQuestion(q));
+      const result = await retryOperation(async () => {
+          return await model.generateContent(prompt, { signal });
+      });
 
-  } catch (error: any) {
-    // Nếu lỗi do người dùng chủ động hủy (AbortError) thì không cần log error nghiêm trọng
-    if (error.name === 'AbortError') {
-      console.log("Request was cancelled by user");
-      throw error;
-    }
-    console.error("Gemini Error:", error);
-    throw error;
+      const responseText = result.response.text();
+      const jsonStart = responseText.indexOf('[');
+      const jsonEnd = responseText.lastIndexOf(']') + 1;
+      const cleanJson = responseText.substring(jsonStart, jsonEnd);
+      
+      const rawQuestions: Question[] = JSON.parse(cleanJson);
+      return rawQuestions.map(q => shuffleQuestion(q));
+  } catch (e: any) {
+      throw new Error(JSON.stringify({ 
+          title: "Lỗi tạo nội dung", 
+          detail: "Hệ thống không thể tạo các câu hỏi ở cấp độ yêu cầu. Thử lại sau 10s." 
+      }));
   }
-};
+}
+    
 
   // --- BỔ SUNG: HELPER CHUYỂN FILE ẢNH SANG BASE64 ---
   const fileToGenerativePart = async (file: File): Promise<{ inlineData: { data: string, mimeType: string } }> => {
