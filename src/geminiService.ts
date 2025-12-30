@@ -2,8 +2,41 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { QuizConfig, Question } from "./types";
 
 // const apiKey = import.meta.env.VITE_API_KEY as string;
-// const genAI = new GoogleGenerativeAI(apiKey || "");
-// Thêm đoạn này vào đầu file geminiService.ts, sau các dòng import
+const handleApiError = (error: any) => {
+  console.error("Gemini API Error Detail:", error);
+
+  let errorObj = {
+    title: "Lỗi không xác định",
+    detail: "Đã có sự cố xảy ra, vui lòng thử lại sau hoặc kiểm tra kết nối mạng."
+  };
+
+  const msg = error.message || "";
+
+  // 1. Lỗi nội dung quá lớn/Tràn JSON (Biện pháp: Bớt số câu)
+  if (msg.includes("400") || error instanceof SyntaxError || msg.includes("JSON")) {
+    errorObj = {
+      title: "Nội dung quá lớn",
+      detail: "Số lượng câu hỏi hoặc hình ảnh vượt quá khả năng xử lý. Bạn hãy giảm bớt số lượng câu hỏi cần tạo (thử tạo 3-5 câu)."
+    };
+  }
+  // 2. Lỗi API Key (Biện pháp: Thay key mới)
+  else if (msg.includes("API_KEY_INVALID") || msg.includes("403")) {
+    errorObj = {
+      title: "API Key không hợp lệ",
+      detail: "Mã Gemini Key của bạn đã hết hạn hoặc không chính xác. Vui lòng tạo Key mới tại AI Studio."
+    };
+  }
+  // 3. Lỗi quá tải (Biện pháp: Chờ 1-2 phút)
+  else if (msg.includes("429") || msg.includes("500") || msg.includes("503") || msg.includes("overloaded")) {
+    errorObj = {
+      title: "Máy chủ AI đang bận",
+      detail: "Hệ thống Google đang quá tải. Bạn vui lòng chờ khoảng 1-2 phút rồi nhấn 'Tạo lại'."
+    };
+  }
+
+  // BẮT BUỘC ném lỗi dưới dạng string JSON để App.tsx bắt được
+  throw new Error(JSON.stringify(errorObj));
+};
 
 // Hàm thử lại (Retry) khi gặp lỗi quá tải
 async function retryOperation<T>(
@@ -131,6 +164,7 @@ const questionSchema: any = {
 };
 
 
+
 // Thêm tham số userApiKey
 // export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
   // Sửa khai báo hàm để nhận signal
@@ -223,10 +257,11 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
         - Ký hiệu giới hạn thì viết: '\displaystyle\lim\limits', kí hiệu nguyên hàm/tích phân thì viết '\displaystyle\int'.
         - TUYỆT ĐỐI KHÔNG viết lời mô tả hình ảnh vào đây (Ví dụ SAI: "(Hình vẽ mô tả một đồ thị...)").
         - Nếu đề bài cần hình, hãy nói "Cho đồ thị như hình bên." và dùng các trường bên dưới để vẽ.
-        - 'explanation': Lời giải chi tiết. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
+        - 'explanation': Lời giải ngắn gọn. BẮT BUỘC dùng ký tự '\\n' để ngắt dòng giữa các bước tính toán/lập luận.
         - Trong lời giải có câu chốt cuối cùng: Vậy đáp án là ... (nội dung của đáp án - không viết tiền tố A/B/C/D).
         - TUYỆT ĐỐI KHÔNG được tự viết code bảng biến thiên (như \\begin{array} hay <table>) vào đây. 
          - Nếu đề có bảng biến thiên, chỉ cần ghi "Cho bảng biến thiên như hình bên:" rồi để code tự vẽ.
+         - Nếu có biểu đồ thì chuyển thành bảng.
 
       RULE 2: NGUYÊN TẮC ĐÁP ÁN TRẮC NGHIỆM (TN) - CỰC KỲ QUAN TRỌNG:
     - AI BẮT BUỘC phải đặt nội dung đáp án ĐÚNG vào phương án ĐẦU TIÊN (vị trí A) trong mảng 'options'.
@@ -253,7 +288,15 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
 
       RULE 4. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
 
-      RULE 5. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
+      RULE 5. NGUYÊN TẮC "KHÔNG CẦN THÌ KHÔNG VẼ":
+      -  Tuyệt đối KHÔNG trả về graphFunction, variationTableData hay geometryGraph nếu đề bài không yêu cầu học sinh phải quan sát hình vẽ để giải bài.
+      -  Đặc biệt: Với các bài toán về Tập hợp, số học, đại số thuần túy, các trường dữ liệu hình ảnh BẮT BUỘC phải để giá trị null.
+      -  Tuyệt đối KHÔNG được vẽ khung tọa độ trống (Empty Grid).
+
+      RULE 6. TỐI ƯU HÓA DỮ LIỆU:
+      - Nếu một câu hỏi có thể giải bằng văn bản mà không cần hình minh họa, hãy ưu tiên chỉ dùng văn bản để tiết kiệm tài nguyên hệ thống.
+      
+      RULE 7. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
          - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
             
         a. HÌNH CHÓP S.ABCD (Đáy là hình bình hành/chữ nhật):
@@ -277,7 +320,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
           - Cạnh khuất thường là cạnh đáy bên trong (ví dụ AC) hoặc cạnh bên khuất.
           - Hãy suy luận logic để set 'style': 'DASHED' cho đúng cạnh bị che.
 
-      RULE 6. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình thang...:
+      RULE 8. HÌNH PHẲNG (2D) - Tam giác, Hình bình hành, Hình thang...:
           - BẮT BUỘC Đặt tất cả tọa độ Z = 0.
           - SỬ DỤNG HỆ TRỤC TỌA ĐỘ OXY CHUẨN:
             + Trục hoành là x, Trục tung là y.
@@ -286,7 +329,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
             + Ví dụ Hình chữ nhật: (0,0,0), (4,0,0), (4,2,0), (0,2,0).
           - TẤT CẢ CÁC CẠNH PHẢI LÀ 'SOLID'.
           
-      RULE 7. QUY TẮC ĐỒ THỊ HÀM SỐ (QUAN TRỌNG):
+      RULE 9. QUY TẮC ĐỒ THỊ HÀM SỐ (QUAN TRỌNG):
               - Nếu câu hỏi yêu cầu nhìn đồ thị để tìm cực trị, đồng biến/nghịch biến...:
               - BẮT BUỘC trả về trường 'graphFunction'.
               - CÚ PHÁP PHẢI LÀ JAVASCRIPT THUẦN (Không dùng LaTeX):
@@ -306,7 +349,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
               }
 
 
-      RULE 8. QUY TẮC BẢNG BIẾN THIÊN (VariationTable):
+      RULE 10. QUY TẮC BẢNG BIẾN THIÊN (VariationTable):
         - Nếu câu hỏi là "Cho bảng biến thiên như hình bên", BẮT BUỘC phải sinh dữ liệu 'variationTableData'.
         - Cấu trúc CHUẨN KỸ THUẬT:
             + xNodes: ["$-\\infty$", "x1", "x2", "$+\\infty$"] (Luôn bắt đầu và kết thúc bằng vô cực nếu là hàm đa thức/phân thức)
@@ -318,7 +361,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
               * Nếu y' là "+" -> yNodes tăng. Nếu y' là "-" -> yNodes giảm.
         - MẸO: Hãy tự kiểm tra logic: "Dương đi lên, Âm đi xuống".
 
-      RULE 9. NGUYÊN TẮC PHÂN LOẠI DỮ LIỆU (QUAN TRỌNG - SỬA ĐỔI):
+      RULE 11. NGUYÊN TẮC PHÂN LOẠI DỮ LIỆU (QUAN TRỌNG - SỬA ĐỔI):
         
         A. NẾU LÀ CÂU HỎI HÌNH HỌC (Oxyz, Hình không gian, Hình phẳng):
            - BẮT BUỘC trả về 'geometryGraph' để vẽ hình.
@@ -341,18 +384,11 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
              - Để null các trường: 'graphFunction', 'geometryGraph'.
              - Trong 'questionText' phải ghi: "Cho bảng biến thiên như hình bên."
 
-        RULE 10. QUY TẮC ĐÁP ÁN TỌA ĐỘ/VECTƠ:
+        RULE 12. QUY TẮC ĐÁP ÁN TỌA ĐỘ/VECTƠ:
           - Tuyệt đối KHÔNG đưa tọa độ (x;y;z) hoặc biểu thức chứa biến vào trường 'correctAnswer' của loại 'TLN'.
           - Nếu đáp án là tọa độ hoặc biểu thức, BẮT BUỘC phải dùng loại 'TN'.
           - Các phương án trắc nghiệm (options) chứa tọa độ phải đặt trong LaTeX: "$\vec{a} = (1; 2; 3)$" hoặc "$M(1; -2; 0)$".
 
-          RULE 11. NGUYÊN TẮC "KHÔNG CẦN THÌ KHÔNG VẼ":
-          -  Tuyệt đối KHÔNG trả về graphFunction, variationTableData hay geometryGraph nếu đề bài không yêu cầu học sinh phải quan sát hình vẽ để giải bài.
-          -  Đặc biệt: Với các bài toán về Tập hợp, số học, đại số thuần túy, các trường dữ liệu hình ảnh BẮT BUỘC phải để giá trị null.
-          -  Tuyệt đối KHÔNG được vẽ khung tọa độ trống (Empty Grid).
-
-          RULE 12. TỐI ƯU HÓA DỮ LIỆU:
-          - Nếu một câu hỏi có thể giải bằng văn bản mà không cần hình minh họa, hãy ưu tiên chỉ dùng văn bản để tiết kiệm tài nguyên hệ thống.
 
         Trả về đúng định dạng JSON mảng ${totalInBatch} câu hỏi.
     `;
@@ -369,11 +405,10 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
       
       const rawQuestions: Question[] = JSON.parse(cleanJson);
       return rawQuestions.map(q => shuffleQuestion(q));
-  } catch (e: any) {
-      throw new Error(JSON.stringify({ 
-          title: "Lỗi tạo nội dung", 
-          detail: "Hệ thống không thể tạo các câu hỏi ở cấp độ yêu cầu. Thử lại sau 10s." 
-      }));
+    } catch (e: any) {
+      if (e.name === 'AbortError') throw e;
+      // GỌI HÀM NÀY ĐỂ XỬ LÝ VÀ HIỆN LỖI CHI TIẾT
+      return handleApiError(e); 
   }
 }
     
@@ -427,7 +462,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
           1. Đếm chính xác tổng số câu hỏi có trong các ảnh.
           2. Trích xuất và giải chi tiết TẤT CẢ các câu hỏi đó.
           3. Nếu ảnh là lý thuyết và không có câu hỏi, hãy tự tạo số lượng câu hỏi tương ứng theo yêu cầu của người dùng.
-          4. GIẢI TOÁN CHI TIẾT: Tự giải bài toán trước khi đưa ra đáp án. 
+          4. GIẢI TOÁN NGẮN GỌN: Tự giải bài toán trước khi đưa ra đáp án. 
           5. QUY ƯỚC ĐẦU RA: Đáp án ĐÚNG luôn ở vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
           6. CHUẨN LATEX ĐÁP ÁN: Tất cả các con số, tọa độ, vectơ, phân số trong phần 'options' BẮT BUỘC phải nằm trong dấu $. Ví dụ: "$I\left(-\frac{7}{2}; \frac{15}{2}; -34\right)$". Không được để text thuần nếu có ký hiệu toán.
         `;
@@ -437,8 +472,9 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
           1. Đếm chính xác tổng số câu hỏi có trong các ảnh. 
           2. Tạo câu hỏi MỚI tương tự về kiến thức và độ khó như trong ảnh.
           3. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số, tên, bối cảnh.
-          4. QUY ƯỚC ĐẦU RA: Luôn đặt đáp án ĐÚNG vào vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
-          5. CHUẨN LATEX ĐÁP ÁN: Mọi ký hiệu toán học và chữ số trong 'options' phải kẹp trong cặp dấu $.
+          4. GIẢI TOÁN NGẮN GỌN: Tự giải bài toán trước khi đưa ra đáp án. 
+          5. QUY ƯỚC ĐẦU RA: Luôn đặt đáp án ĐÚNG vào vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
+          6. CHUẨN LATEX ĐÁP ÁN: Tất cả các con số, tọa độ, vectơ, phân số trong phần 'options' BẮT BUỘC phải nằm trong dấu $. Ví dụ: "$I\left(-\frac{7}{2}; \frac{15}{2}; -34\right)$". Không được để text thuần nếu có ký hiệu toán.
         `;
       }
     
@@ -486,33 +522,8 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
         rawQuestions = JSON.parse(cleanJson);
       } catch (error: any) {
         if (error.name === 'AbortError') throw error;
-      
-        // Phân tích mã lỗi từ Gemini API
-        const status = error.status || (error.message?.includes('429') ? 429 : 
-                                       error.message?.includes('400') ? 400 : 
-                                       error.message?.includes('503') ? 503 : 500);
-      
-        let msg = "Đã xảy ra lỗi không xác định.";
-        let detail = "Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau.";
-      
-        switch (status) {
-          case 429:
-            msg = "Hết lượt sử dụng (Rate Limit)";
-            detail = "Key API của bạn đã hết hạn mức miễn phí hoặc bạn đang yêu cầu quá nhanh. Hãy chờ 1 phút hoặc đổi Key khác.";
-            break;
-          case 400:
-            msg = "Yêu cầu quá tải (JSON/Tokens)";
-            detail = "Nội dung phản hồi có thể quá dài khiến cấu trúc dữ liệu bị lỗi. Hãy thử giảm số lượng câu hỏi xuống (dưới 10 câu).";
-            break;
-          case 503:
-          case 500:
-            msg = "Máy chủ AI đang bận";
-            detail = "Hệ thống Google Gemini đang quá tải. Bạn hãy nhấn 'Tạo lại' sau khoảng 10-30 giây.";
-            break;
-        }
-      
-        // Ném ra một object chứa cả tiêu đề và chi tiết
-        throw new Error(JSON.stringify({ title: msg, detail: detail }));
+        // GỌI HÀM NÀY ĐỂ XÓA CẢNH BÁO VÀ BÁO LỖI CHUẨN
+        return handleApiError(error);
       }
     // Bước 2: Trộn đáp án và trả về
     return rawQuestions.map(q => shuffleQuestion(q));

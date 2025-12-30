@@ -29,9 +29,19 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
   const { daysLeft, isPremium } = useSubscription();
 
   useEffect(() => {
+    // 1. Khi component mount, lấy key đã lưu từ máy lên
     const saved = localStorage.getItem('user_gemini_key');
     if (saved) setApiKey(saved);
   }, []);
+  
+  // 2. [THÊM MỚI] Tự động lưu Key mỗi khi giá trị apiKey thay đổi và saveKey được bật
+  useEffect(() => {
+    if (saveKey && apiKey.trim()) {
+      localStorage.setItem('user_gemini_key', apiKey.trim());
+    } else if (!saveKey) {
+      localStorage.removeItem('user_gemini_key');
+    }
+  }, [apiKey, saveKey]);
 
   const [matrix, setMatrix] = useState({
     TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
@@ -131,6 +141,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
       <div className="mb-6">
         <div className="flex justify-between mb-2">
           <label className="text-sm font-medium">Cấu trúc đề</label>
+          <span className="text-xs text-red-500 italic mr-2">(Khuyên dùng: &lt; 10 câu để AI chạy tốt nhất)</span>
           <span className="text-sm font-bold text-primary bg-blue-50 px-2 py-1 rounded">Tổng: {totalQuestions} câu</span>
         </div>
         <div className="overflow-x-auto pb-2 border rounded-lg bg-gray-50 p-2">
@@ -151,7 +162,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
       {/* SỬ DỤNG 'prompt' TẠI ĐÂY (Xóa cảnh báo setPrompt) */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-1">Yêu cầu bổ sung (Optional)</label>
-        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} className="w-full p-3 border rounded-lg h-20 resize-none outline-none focus:ring-2 focus:ring-primary" placeholder="Ví dụ: Tạo 5 câu trắc nghiệm..." />
+        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} className="w-full p-3 border rounded-lg h-20 resize-none outline-none focus:ring-2 focus:ring-primary" placeholder="Ví dụ: Tạo 5 câu trắc nghiệm/Giải vắn tắt/Không vẽ hình" />
       </div>
 
       <div className="mb-8 border-t pt-6">

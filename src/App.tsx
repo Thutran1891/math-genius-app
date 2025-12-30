@@ -410,14 +410,21 @@ const getSavedSession = () => {
       setQuestions(result);
     } catch (error: any) {
       try {
-        // Thử parse lỗi từ JSON string chúng ta đã tạo ở Bước 1
+        // Giải mã JSON lỗi từ geminiService ném về
         const parsedError = JSON.parse(error.message);
-        setErrorInfo(parsedError);
+        setErrorInfo({
+          title: parsedError.title,
+          detail: parsedError.detail
+        });
       } catch {
-        setErrorInfo({ title: "Lỗi hệ thống", detail: error.message });
+        // Nếu lỗi không phải định dạng JSON (lỗi code thuần)
+        setErrorInfo({ 
+          title: "Lỗi hệ thống", 
+          detail: error.message || "Đã có lỗi xảy ra." 
+        });
       }
     } finally {
-      setLoading(false); // Đảm bảo luôn tắt Loading
+      setLoading(false);
     }
   };
 
@@ -447,6 +454,7 @@ const getSavedSession = () => {
   const handleGenerate = async (newConfig: QuizConfig, apiKey: string) => {
     setSourceType('TOPIC'); // Đánh dấu là tạo từ chủ đề
     setLoading(true);
+    setErrorInfo(null); // Xóa lỗi cũ trước khi bắt đầu
     setConfig(newConfig);
     setCurrentApiKey(apiKey);
     resetQuizState(); // Gọi hàm reset
@@ -454,15 +462,20 @@ const getSavedSession = () => {
       const result = await generateQuiz(newConfig, apiKey);
       setQuestions(result);
     } catch (error: any) {
+      console.error("Bắt được lỗi tại App:", error.message);
       try {
-        // Thử parse lỗi từ JSON string chúng ta đã tạo ở Bước 1
+        // Phải parse vì geminiService ném ra chuỗi JSON
         const parsedError = JSON.parse(error.message);
-        setErrorInfo(parsedError);
-      } catch {
-        setErrorInfo({ title: "Lỗi hệ thống", detail: error.message });
+        setErrorInfo(parsedError); 
+      } catch (e) {
+        // Nếu không parse được (lỗi lạ), hiện lỗi mặc định
+        setErrorInfo({ 
+          title: "Lỗi không xác định", 
+          detail: error.message || "Vui lòng kiểm tra console để biết thêm chi tiết." 
+        });
       }
     } finally {
-      setLoading(false); // Đảm bảo luôn tắt Loading
+      setLoading(false);
     }
   };
 
