@@ -179,7 +179,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
           acc + Object.values(type).reduce((sum, val) => sum + (val || 0), 0), 0);
 
   // 2. TỐI ƯU CHIA BATCH: 
-  // Nếu <= 10 câu: làm 1 lần duy nhất. Nếu > 10 câu: chia đợt mỗi đợt 8 câu.
+  // <= 10 câu: làm 1 lần. > 10 câu: chia đợt 8 câu để đảm bảo ổn định.
   const BATCH_SIZE = totalQuestions <= 10 ? 10 : 8;
   
   const taskBatches: QuizConfig[] = [];
@@ -199,7 +199,8 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
       };
       let countInBatch = 0;
 
-      for (const type of ['TN', 'TLN', 'DS'] as const) {
+      // Đưa các loại câu hỏi vào batch theo thứ tự ưu tiên
+      for (const type of ['TN', 'DS', 'TLN'] as const) { 
           for (const level of ['BIET', 'HIEU', 'VANDUNG'] as const) {
               while (remainingDist[type][level] > 0 && countInBatch < BATCH_SIZE) {
                   batchDist[type][level]++;
@@ -212,14 +213,37 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
   }
 
   try {
-      // GỌI SONG SONG NHƯNG VỚI SỐ LƯỢNG BATCH ÍT HƠN
+      // GỌI API SONG SONG
       const results = await Promise.all(
           taskBatches.map(batchConfig => callGeminiAPI(batchConfig, userApiKey, signal))
       );
-      return results.flat().sort(() => Math.random() - 0.5);
+      
+      const allQuestions = results.flat();
+
+      // 3. LOGIC SẮP XẾP CHUYÊN NGHIỆP (TẦNG 1: LOẠI, TẦNG 2: ĐỘ KHÓ)
+      const typePriority: Record<string, number> = {
+        'TN': 1, // Phần 1: Trắc nghiệm
+        'DS': 2, // Phần 2: Đúng/Sai
+        'TLN': 3 // Phần 3: Điền số
+      };
+
+      const difficultyPriority: Record<string, number> = {
+        'BIET': 1,    // Nhận biết
+        'HIEU': 2,    // Thông hiểu
+        'VANDUNG': 3  // Vận dụng
+      };
+
+      return allQuestions.sort((a, b) => {
+        // Nếu khác loại câu hỏi -> Sắp xếp theo loại (TN -> DS -> TLN)
+        if (typePriority[a.type] !== typePriority[b.type]) {
+          return typePriority[a.type] - typePriority[b.type];
+        }
+        // Nếu cùng loại câu hỏi -> Sắp xếp theo mức độ (Biết -> Hiểu -> VD)
+        return difficultyPriority[a.difficulty] - difficultyPriority[b.difficulty];
+      });
+
   } catch (error: any) {
       if (error.name === 'AbortError') throw error;
-      // Sử dụng hàm xử lý lỗi trung tâm để hiện Modal
       return handleApiError(error);
   }
 };
