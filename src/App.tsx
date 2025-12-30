@@ -108,6 +108,7 @@ const getSavedSession = () => {
 };
 
   // THANH TIẾN TRÌNH
+  const [isStreaming, setIsStreaming] = useState(false);
 
 useEffect(() => {
   let interval: NodeJS.Timeout;
@@ -487,49 +488,71 @@ useEffect(() => {
   };
 
   const handleGenerate = async (newConfig: QuizConfig, apiKey: string) => {
-    // 1. Nếu đang có một yêu cầu khác chạy, hãy hủy nó trước khi bắt đầu cái mới
+    // 1. Hủy yêu cầu cũ nếu đang chạy
     if (abortControllerRef.current) {
         abortControllerRef.current.abort();
     }
 
-    // 2. Tạo một bộ điều khiển mới cho yêu cầu hiện tại
+    // 2. Khởi tạo Controller mới
     const controller = new AbortController();
-    abortControllerRef.current = controller;    
-    setSourceType('TOPIC'); // Đánh dấu là tạo từ chủ đề
+    abortControllerRef.current = controller;
+
+    // --- CÁC TÍNH NĂNG CŨ (GIỮ NGUYÊN) ---
+    setSourceType('TOPIC'); 
     setLoading(true);
-    setErrorInfo(null); // Xóa lỗi cũ trước khi bắt đầu
+    setIsStreaming(false); 
+    setErrorInfo(null); 
     setConfig(newConfig);
     setCurrentApiKey(apiKey);
-    localStorage.setItem('user_gemini_key', apiKey); // Đảm bảo lưu key mới nhất
-    resetQuizState(); // Gọi hàm reset
+    localStorage.setItem('user_gemini_key', apiKey); 
+    resetQuizState(); 
+
+    // --- TỰ ĐỘNG NGẮT SAU 60 GIÂY ---
+    const timeoutId = setTimeout(() => {
+        if (loading && !isStreaming) {
+            controller.abort();
+            setErrorInfo({
+                title: "Hết thời gian chờ",
+                detail: "Kết nối mạng quá yếu hoặc AI phản hồi lâu. Vui lòng thử lại sau 1-2 phút."
+            });
+        }
+    }, 60000); // 60 giây
+
     try {
-      // 3. Truyền controller.signal vào hàm generateQuiz
-        // Lưu ý: Bạn cần cập nhật hàm generateQuiz trong geminiService.ts để nhận thêm tham số này
+        // 3. Gọi API với signal
         const result = await generateQuiz(newConfig, apiKey, controller.signal);
-      setQuestions(result);
-      setSavedTime(0);
+        
+        // --- NGAY KHI CÓ DỮ LIỆU ---
+        clearTimeout(timeoutId); // Hủy bộ đếm thời gian chờ
+        setIsStreaming(true);
+        setQuestions(result);
+        setSavedTime(0);
+        
+        // [QUAN TRỌNG]: Ẩn nút Hủy ngay lập tức khi đã có kết quả
+        abortControllerRef.current = null; 
+
     } catch (error: any) {
-      // 4. Kiểm tra nếu lỗi là do người dùng chủ động hủy
-      if (error.name === 'AbortError') {
-        console.log("Yêu cầu đã được hủy bởi người dùng.");
-        return; // Thoát ra, không hiện thông báo lỗi
-    }
-      try {
-        // Phải parse vì geminiService ném ra chuỗi JSON
-        const parsedError = JSON.parse(error.message);
-        setErrorInfo(parsedError); 
-      } catch (e) {
-        // Nếu không parse được (lỗi lạ), hiện lỗi mặc định
-        setErrorInfo({ 
-          title: "Lỗi không xác định", 
-          detail: error.message || "Vui lòng kiểm tra console để biết thêm chi tiết." 
-        });
-      }
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            console.log("Yêu cầu đã được hủy.");
+            return;
+        }
+
+        try {
+            const parsedError = JSON.parse(error.message);
+            setErrorInfo(parsedError); 
+        } catch (e) {
+            setErrorInfo({ 
+                title: "Lỗi không xác định", 
+                detail: error.message || "Kiểm tra console để biết thêm chi tiết." 
+            });
+        }
     } finally {
-      setLoading(false);
-      abortControllerRef.current = null; // Reset lại Ref khi xong
+        setLoading(false);
+        setIsStreaming(false);
+        abortControllerRef.current = null;
     }
-  };
+};
 
     // Thêm hàm này bên dưới handleGenerate
   const handleCancelRequest = () => {
@@ -640,33 +663,40 @@ const handleUpdateScore = (points: number) => {
       <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
         
               {/* Giao diện Thanh tiến trình */}
-      {loading && (
-        <div className="fixed top-0 left-0 w-full z-[200]">
-          {/* Background mờ cho toàn màn hình nếu muốn */}
-          <div className="fixed inset-0 bg-white/20 backdrop-blur-[2px] z-[-1]" />
-          
-          <div className="h-1.5 w-full bg-blue-100 overflow-hidden relative">
-            <div 
-              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-lg border border-blue-50 flex items-center gap-3 animate-bounce">
-            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            <span className="text-sm font-bold text-blue-700">
-              AI Đang soạn đề... {Math.round(progress)}%
-            </span>
-            {/* NÚT HỦY MỚI THÊM VÀO */}
-        <button 
-            onClick={handleCancelRequest}
-            className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg transition-all"
-        >
-            Hủy yêu cầu
-        </button>
-          </div>
-        </div>
-      )}
+          {loading && (
+            <div className="fixed top-0 left-0 w-full z-[200]">
+              {/* Background mờ cho toàn màn hình */}
+              <div className="fixed inset-0 bg-white/20 backdrop-blur-[2px] z-[-1]" />
+              
+              {/* Thanh Progress Bar chạy trên đỉnh */}
+              <div className="h-1.5 w-full bg-blue-100 overflow-hidden relative">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              
+              {/* Khung thông báo trung tâm */}
+              <div className="absolute top-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 w-full max-w-xs sm:max-w-md">
+                <div className="bg-white px-5 py-2.5 rounded-full shadow-xl border border-blue-50 flex items-center gap-3 animate-bounce">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm font-bold text-blue-700 whitespace-nowrap">
+                    AI Đang soạn đề... {Math.round(progress)}%
+                  </span>
+                </div>
+
+                {/* CHỈ HIỆN NÚT HỦY KHI CHƯA CÓ DỮ LIỆU ĐỔ VỀ VÀ REF CÒN TỒN TẠI */}
+                {!isStreaming && abortControllerRef.current && (
+                  <button 
+                      onClick={handleCancelRequest}
+                      className="px-4 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-full text-[11px] font-black uppercase tracking-wider hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-95"
+                  >
+                      Hủy yêu cầu (Dừng AI)
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
         {/* --- TOAST NOTIFICATION --- */}
         {showToast && (
