@@ -6,6 +6,16 @@ import { generateTheory } from '../geminiService';
 import { LatexText } from './LatexText'; 
 import { Sparkles, KeyRound, LogOut, Clock, BookOpen, X, Image, Upload, Copy, Wand2, Trash2, RefreshCcw, Camera } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import { FileText } from 'lucide-react'; 
+// Thêm các hàm mới vào dòng import từ pdfHelper
+import { 
+  getPdfPagesPreview, 
+  renderHighResPage, 
+  PdfPagePreview 
+} from '../utils/pdfHelper';
+
+// Import component Modal (Giả sử bạn để file này cùng thư mục components)
+  import { PdfSelectorModal } from './PdfSelectorModal';
 
 interface Props {
   onGenerate: (config: QuizConfig, apiKey: string) => void;
@@ -27,6 +37,40 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
   const pasteInputRef = useRef<HTMLInputElement>(null);
   
   const { daysLeft, isPremium } = useSubscription();
+
+  // Gọi file PDF
+  const [isProcessingPdf, setIsProcessingPdf] = useState(false);
+
+  const [pdfPreviews, setPdfPreviews] = useState<PdfPagePreview[] | null>(null);
+
+const handlePdfChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  setIsProcessingPdf(true);
+  try {
+    const previews = await getPdfPagesPreview(file);
+    setPdfPreviews(previews); // Mở Modal chọn trang
+  } catch (err) {
+    alert("Lỗi đọc PDF");
+  } finally {
+    setIsProcessingPdf(false);
+  }
+};
+
+const handleConfirmPdfPages = async (selectedOriginalPages: any[]) => {
+  setIsProcessingPdf(true);
+  setPdfPreviews(null); // Đóng modal
+  try {
+    const highResFiles = await Promise.all(
+      selectedOriginalPages.map(page => renderHighResPage(page))
+    );
+    await addImagesToState(highResFiles); // Thêm vào danh sách ảnh để AI xử lý
+  } catch (err) {
+    alert("Lỗi chuyển đổi trang");
+  } finally {
+    setIsProcessingPdf(false);
+  }
+};
 
   useEffect(() => {
     // 1. Khi component mount, lấy key đã lưu từ máy lên
@@ -181,7 +225,20 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
       <div className="mb-8 border-t pt-6">
         <h3 className="font-bold mb-3 flex items-center gap-2"><Image size={20} className="text-blue-600"/> Tạo đề từ ảnh</h3>
         <div className="flex gap-2 mb-4">
-          <label htmlFor="img-up" className="bg-gray-100 p-2 rounded border cursor-pointer flex items-center gap-1 text-xs"><Upload size={14}/> File</label>
+        <label htmlFor="pdf-up" className="bg-red-50 p-2 rounded border cursor-pointer flex items-center gap-1 text-xs text-red-700 border-red-200">
+            {isProcessingPdf ? <RefreshCcw size={14} className="animate-spin"/> : <FileText size={14}/>}
+            PDF
+          </label>
+          <input id="pdf-up" type="file" accept="application/pdf" className="hidden" onChange={handlePdfChange} disabled={isProcessingPdf} />
+          {pdfPreviews && (
+            <PdfSelectorModal 
+              previews={pdfPreviews}
+              onClose={() => setPdfPreviews(null)}
+              onConfirm={handleConfirmPdfPages}
+            />
+          )}
+
+          <label htmlFor="img-up" className="bg-gray-100 p-2 rounded border cursor-pointer flex items-center gap-1 text-xs"><Upload size={14}/> PNG</label>
           <input id="img-up" type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} />
           
           <label htmlFor="cam-up" className="bg-blue-50 p-2 rounded border cursor-pointer flex items-center gap-1 text-xs text-blue-700 border-blue-200"><Camera size={14}/> Camera</label>
