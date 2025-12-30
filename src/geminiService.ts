@@ -168,50 +168,60 @@ const questionSchema: any = {
 // Thêm tham số userApiKey
 // export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
   // Sửa khai báo hàm để nhận signal
-  export const generateQuiz = async (config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> => {
-    if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
+// geminiService.ts
 
-    // 1. CHIA BATCH: Mỗi đợt chỉ làm 3-4 câu để đảm bảo ổn định
-    const BATCH_SIZE = 4;
-    const taskBatches: QuizConfig[] = [];
-    const remainingDist = JSON.parse(JSON.stringify(config.distribution));
+export const generateQuiz = async (config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> => {
+  if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
 
-    const hasRemaining = () => {
-        return Object.values(remainingDist).some((type: any) => 
-            Object.values(type).some((val: any) => val > 0)
-        );
-    };
+  // 1. TÍNH TỔNG SỐ CÂU HỎI
+  const totalQuestions = 
+      Object.values(config.distribution).reduce((acc, type) => 
+          acc + Object.values(type).reduce((sum, val) => sum + (val || 0), 0), 0);
 
-    while (hasRemaining()) {
-        const batchDist = {
-            TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
-            TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
-            DS: { BIET: 0, HIEU: 0, VANDUNG: 0 },
-        };
-        let countInBatch = 0;
+  // 2. TỐI ƯU CHIA BATCH: 
+  // Nếu <= 10 câu: làm 1 lần duy nhất. Nếu > 10 câu: chia đợt mỗi đợt 8 câu.
+  const BATCH_SIZE = totalQuestions <= 10 ? 10 : 8;
+  
+  const taskBatches: QuizConfig[] = [];
+  const remainingDist = JSON.parse(JSON.stringify(config.distribution));
 
-        for (const type of ['TN', 'TLN', 'DS'] as const) {
-            for (const level of ['BIET', 'HIEU', 'VANDUNG'] as const) {
-                while (remainingDist[type][level] > 0 && countInBatch < BATCH_SIZE) {
-                    batchDist[type][level]++;
-                    remainingDist[type][level]--;
-                    countInBatch++;
-                }
-            }
-        }
-        taskBatches.push({ ...config, distribution: batchDist });
-    }
+  const hasRemaining = () => {
+      return Object.values(remainingDist).some((type: any) => 
+          Object.values(type).some((val: any) => val > 0)
+      );
+  };
 
-    // 2. GỌI API SONG SONG
-    try {
-        const results = await Promise.all(
-            taskBatches.map(batchConfig => callGeminiAPI(batchConfig, userApiKey, signal))
-        );
-        return results.flat().sort(() => Math.random() - 0.5);
-    } catch (error: any) {
-        if (error.name === 'AbortError') throw error;
-        throw error;
-    }
+  while (hasRemaining()) {
+      const batchDist = {
+          TN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+          TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+          DS: { BIET: 0, HIEU: 0, VANDUNG: 0 },
+      };
+      let countInBatch = 0;
+
+      for (const type of ['TN', 'TLN', 'DS'] as const) {
+          for (const level of ['BIET', 'HIEU', 'VANDUNG'] as const) {
+              while (remainingDist[type][level] > 0 && countInBatch < BATCH_SIZE) {
+                  batchDist[type][level]++;
+                  remainingDist[type][level]--;
+                  countInBatch++;
+              }
+          }
+      }
+      taskBatches.push({ ...config, distribution: batchDist });
+  }
+
+  try {
+      // GỌI SONG SONG NHƯNG VỚI SỐ LƯỢNG BATCH ÍT HƠN
+      const results = await Promise.all(
+          taskBatches.map(batchConfig => callGeminiAPI(batchConfig, userApiKey, signal))
+      );
+      return results.flat().sort(() => Math.random() - 0.5);
+  } catch (error: any) {
+      if (error.name === 'AbortError') throw error;
+      // Sử dụng hàm xử lý lỗi trung tâm để hiện Modal
+      return handleApiError(error);
+  }
 };
 
 async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> {

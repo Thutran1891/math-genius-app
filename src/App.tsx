@@ -43,6 +43,8 @@ function App() {
   const [loadingTheory, setLoadingTheory] = useState(false);
 
     // Thêm vào vùng khai báo useState
+    // Thanh tiến trình
+    const [progress, setProgress] = useState(0);
 // ... các state cũ ...
   const [sourceType, setSourceType] = useState<'TOPIC' | 'IMAGE'>('TOPIC');
   const [lastImages, setLastImages] = useState<File[]>([]); 
@@ -102,6 +104,31 @@ const getSavedSession = () => {
   const isExpired = Date.now() - parsed.timestamp > 24 * 60 * 60 * 1000;
   return isExpired ? null : parsed;
 };
+
+  // THANH TIẾN TRÌNH
+
+useEffect(() => {
+  let interval: NodeJS.Timeout;
+
+  if (loading) {
+    setProgress(0);
+    // Chạy nhanh lên 30% đầu
+    interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev < 30) return prev + 5; // Tăng nhanh
+        if (prev < 85) return prev + 2; // Tăng vừa
+        if (prev < 98) return prev + 0.5; // Tăng chậm dần (chờ AI)
+        return prev;
+      });
+    }, 400); // Mỗi 0.4 giây cập nhật một lần
+  } else {
+    // Khi AI trả kết quả xong, nhảy vọt lên 100% rồi biến mất
+    setProgress(100);
+    setTimeout(() => setProgress(0), 500);
+  }
+
+  return () => clearInterval(interval);
+}, [loading]);
 
   // --- ĐẶT Ở ĐÂY (Sau các khai báo useState) ---
   useEffect(() => {
@@ -382,6 +409,7 @@ const getSavedSession = () => {
     setLoading(true);
     setErrorInfo(null); // Reset lỗi cũ
     setCurrentApiKey(apiKey); // QUAN TRỌNG: Lưu Key ngay lập tức để nút Đổi đề có thể dùng
+    localStorage.setItem('user_gemini_key', apiKey); // Đảm bảo lưu key mới nhất
     resetQuizState(); 
   
     // Lưu thông tin để nút "Đổi đề" biết phải làm gì
@@ -431,6 +459,11 @@ const getSavedSession = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      // [THÊM DÒNG NÀY] Khôi phục API Key từ localStorage cho App
+    const savedKey = localStorage.getItem('user_gemini_key');
+    if (savedKey) {
+      setCurrentApiKey(savedKey);
+    }
     });
     return () => unsubscribe();
   }, []);
@@ -457,6 +490,7 @@ const getSavedSession = () => {
     setErrorInfo(null); // Xóa lỗi cũ trước khi bắt đầu
     setConfig(newConfig);
     setCurrentApiKey(apiKey);
+    localStorage.setItem('user_gemini_key', apiKey); // Đảm bảo lưu key mới nhất
     resetQuizState(); // Gọi hàm reset
     try {
       const result = await generateQuiz(newConfig, apiKey);
@@ -576,6 +610,28 @@ const handleUpdateScore = (points: number) => {
     <SubscriptionGuard>
       <div className="min-h-screen py-8 px-4 font-sans bg-slate-50">
         
+              {/* Giao diện Thanh tiến trình */}
+      {loading && (
+        <div className="fixed top-0 left-0 w-full z-[200]">
+          {/* Background mờ cho toàn màn hình nếu muốn */}
+          <div className="fixed inset-0 bg-white/20 backdrop-blur-[2px] z-[-1]" />
+          
+          <div className="h-1.5 w-full bg-blue-100 overflow-hidden relative">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-500 ease-out shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-lg border border-blue-50 flex items-center gap-3 animate-bounce">
+            <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm font-bold text-blue-700">
+              AI Đang soạn đề... {Math.round(progress)}%
+            </span>
+          </div>
+        </div>
+      )}
+
         {/* --- TOAST NOTIFICATION --- */}
         {showToast && (
             <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 z-[100] animate-in slide-in-from-top duration-100">
