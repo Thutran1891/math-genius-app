@@ -543,7 +543,7 @@ useEffect(() => {
                 detail: "Kết nối mạng quá yếu hoặc AI phản hồi lâu. Vui lòng kiểm tra lại Key hoặc thử lại sau."
             });
         }
-    }, 150000); // Tăng lên 150 giây để AI có đủ thời gian "suy nghĩ"
+    }, 90000); // Tăng lên 90 giây để AI có đủ thời gian "suy nghĩ"
 
     try {
         // 3. Gọi API với signal

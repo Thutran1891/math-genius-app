@@ -146,7 +146,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
         </div>
         <div className="overflow-x-auto pb-2 border rounded-lg bg-gray-50 p-2">
           {/* Thay đổi grid-cols-4 và gap để các cột sát nhau hơn */}
-        <div className="grid grid-cols-[80px_1fr_1fr_1fr] gap-2 text-center min-w-[300px]">
+        <div className="grid grid-cols-[70px_1fr_1fr_1fr] gap-2 text-center min-w-[200px]">
           <div className="text-gray-400 font-bold text-xs">Loại\Mức</div>
           <div className="text-green-600 font-bold text-xs uppercase">Biết</div>
           <div className="text-blue-600 font-bold text-xs uppercase">Hiểu</div>
@@ -160,10 +160,10 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
                   key={level} 
                   type="number" 
                   min="0" 
-                  // Điều chỉnh padding (p-1), chiều cao (h-8) và cỡ chữ (text-xs) để nhỏ lại 50%
-                  className="h-8 p-1 border rounded text-center text-xs outline-none focus:ring-1 focus:ring-primary focus:border-primary" 
+                  // Điều chỉnh padding (p-2), chiều cao (h-14) và cỡ chữ (text-xs) 
+                  className="h-14 p-2 border rounded text-center text-xs outline-none focus:ring-1 focus:ring-primary focus:border-primary" 
                   onChange={e => handleChange(type as any, level, e.target.value)} 
-                  placeholder="0"
+                  placeholder=" "
                 />
               ))}
             </React.Fragment>

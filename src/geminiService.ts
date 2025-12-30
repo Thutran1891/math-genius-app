@@ -163,33 +163,29 @@ const questionSchema: any = {
   required: ['id', 'type', 'questionText', 'explanation']
 };
 
-
-
-// Thêm tham số userApiKey
-// export const generateQuiz = async (config: QuizConfig, userApiKey: string): Promise<Question[]> => {
-  // Sửa khai báo hàm để nhận signal
-// geminiService.ts
-
-export const generateQuiz = async (config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> => {
-  if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
-
   // 1. TÍNH TỔNG SỐ CÂU HỎI
-  const totalQuestions = 
-      Object.values(config.distribution).reduce((acc, type) => 
-          acc + Object.values(type).reduce((sum, val) => sum + (val || 0), 0), 0);
-
-  // 2. TỐI ƯU CHIA BATCH: 
-  // <= 10 câu: làm 1 lần. > 10 câu: chia đợt 8 câu để đảm bảo ổn định.
-  const BATCH_SIZE = totalQuestions <= 10 ? 10 : 8;
+  export const generateQuiz = async (config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> => {
+    if (!userApiKey) throw new Error("Vui lòng nhập API Key!");
   
-  const taskBatches: QuizConfig[] = [];
-  const remainingDist = JSON.parse(JSON.stringify(config.distribution));
-
-  const hasRemaining = () => {
-      return Object.values(remainingDist).some((type: any) => 
-          Object.values(type).some((val: any) => val > 0)
-      );
-  };
+    // 1. TÍNH TỔNG SỐ CÂU HỎI
+    const totalQuestions = 
+        Object.values(config.distribution).reduce((acc, type) => 
+            acc + Object.values(type).reduce((sum, val) => sum + (val || 0), 0), 0);
+  
+    // 2. TỐI ƯU CHIA BATCH
+    // SỬ DỤNG BIẾN totalQuestions TẠI ĐÂY:
+    // Nếu tổng số câu ít (<= 20), gộp làm 1 batch duy nhất.
+    // Nếu nhiều hơn, chia mỗi đợt 20 câu để đảm bảo ổn định.
+    const BATCH_SIZE = totalQuestions <= 20 ? totalQuestions : 20; 
+    
+    const taskBatches: QuizConfig[] = [];
+    const remainingDist = JSON.parse(JSON.stringify(config.distribution));
+  
+    const hasRemaining = () => {
+        return Object.values(remainingDist).some((type: any) => 
+            Object.values(type).some((val: any) => val > 0)
+        );
+    };
 
   while (hasRemaining()) {
       const batchDist = {
@@ -199,7 +195,6 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
       };
       let countInBatch = 0;
 
-      // Đưa các loại câu hỏi vào batch theo thứ tự ưu tiên
       for (const type of ['TN', 'DS', 'TLN'] as const) { 
           for (const level of ['BIET', 'HIEU', 'VANDUNG'] as const) {
               while (remainingDist[type][level] > 0 && countInBatch < BATCH_SIZE) {
@@ -213,64 +208,57 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
   }
 
   try {
-      // GỌI API SONG SONG
-      const results = await Promise.all(
-          taskBatches.map(batchConfig => callGeminiAPI(batchConfig, userApiKey, signal))
-      );
-      
-      const allQuestions = results.flat();
+    // GỌI API SONG SONG (Giữ nguyên tính năng cũ)
+    const results = await Promise.all(
+        taskBatches.map(batchConfig => callGeminiAPI(batchConfig, userApiKey, signal))
+    );
+    
+    const allQuestions = results.flat();
 
-      // 3. LOGIC SẮP XẾP CHUYÊN NGHIỆP (TẦNG 1: LOẠI, TẦNG 2: ĐỘ KHÓ)
-      const typePriority: Record<string, number> = {
-        'TN': 1, // Phần 1: Trắc nghiệm
-        'DS': 2, // Phần 2: Đúng/Sai
-        'TLN': 3 // Phần 3: Điền số
-      };
+    // 3. LOGIC SẮP XẾP CHUYÊN NGHIỆP (Giữ nguyên tính năng cũ)
+    const typePriority: Record<string, number> = {
+      'TN': 1, 'DS': 2, 'TLN': 3
+    };
 
-      const difficultyPriority: Record<string, number> = {
-        'BIET': 1,    // Nhận biết
-        'HIEU': 2,    // Thông hiểu
-        'VANDUNG': 3  // Vận dụng
-      };
+    const difficultyPriority: Record<string, number> = {
+      'BIET': 1, 'HIEU': 2, 'VANDUNG': 3
+    };
 
-      return allQuestions.sort((a, b) => {
-        // Nếu khác loại câu hỏi -> Sắp xếp theo loại (TN -> DS -> TLN)
-        if (typePriority[a.type] !== typePriority[b.type]) {
-          return typePriority[a.type] - typePriority[b.type];
-        }
-        // Nếu cùng loại câu hỏi -> Sắp xếp theo mức độ (Biết -> Hiểu -> VD)
-        return difficultyPriority[a.difficulty] - difficultyPriority[b.difficulty];
-      });
+    return allQuestions.sort((a, b) => {
+      if (typePriority[a.type] !== typePriority[b.type]) {
+        return typePriority[a.type] - typePriority[b.type];
+      }
+      return difficultyPriority[a.difficulty] - difficultyPriority[b.difficulty];
+    });
 
-  } catch (error: any) {
-      if (error.name === 'AbortError') throw error;
-      return handleApiError(error);
-  }
+} catch (error: any) {
+    if (error.name === 'AbortError') throw error;
+    return handleApiError(error);
+}
 };
 
 async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> {
   const genAI = new GoogleGenerativeAI(userApiKey);
-    
-    // TÍNH TOÁN SỐ LƯỢNG RIÊNG CHO BATCH NÀY
-    const tn = config.distribution.TN;
-    const tln = config.distribution.TLN;
-    const ds = config.distribution.DS;
-    
-    const totalInBatch = (tn.BIET + tn.HIEU + tn.VANDUNG) + 
-                         (tln.BIET + tln.HIEU + tln.VANDUNG) + 
-                         (ds.BIET + ds.HIEU + ds.VANDUNG);
+  
+  const tn = config.distribution.TN;
+  const tln = config.distribution.TLN;
+  const ds = config.distribution.DS;
+  
+  const totalInBatch = (tn.BIET + tn.HIEU + tn.VANDUNG) + 
+                       (tln.BIET + tln.HIEU + tln.VANDUNG) + 
+                       (ds.BIET + ds.HIEU + ds.VANDUNG);
 
-    if (totalInBatch === 0) return [];
+  if (totalInBatch === 0) return [];
 
-    const model = genAI.getGenerativeModel({
-        model: "gemini-3-flash-preview", 
-        generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
-            temperature: 0.4,
-            maxOutputTokens: 64000,
-        } 
-    });
+  const model = genAI.getGenerativeModel({
+      model: "gemini-3-flash-preview", 
+      generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
+          temperature: 0.4,
+          maxOutputTokens: 64000, // Tận dụng tối đa khả năng phản hồi dài
+      } 
+  });
 
     const prompt = `
       Bạn là Chuyên Gia Giáo Dục. Tạo ${totalInBatch} câu hỏi cho chủ đề: "${config.topic}".
@@ -323,10 +311,9 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
 
       RULE 4. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
 
-      RULE 5. NGUYÊN TẮC "KHÔNG CẦN THÌ KHÔNG VẼ":
-      -  Tuyệt đối KHÔNG trả về graphFunction, variationTableData hay geometryGraph nếu đề bài không yêu cầu học sinh phải quan sát hình vẽ để giải bài.
-      -  Đặc biệt: Với các bài toán về Tập hợp, số học, đại số thuần túy, các trường dữ liệu hình ảnh BẮT BUỘC phải để giá trị null.
-      -  Tuyệt đối KHÔNG được vẽ khung tọa độ trống (Empty Grid).
+      RULE 5 (Bổ sung): > - TUYỆT ĐỐI KHÔNG được trả về trường graphFunction là chuỗi rỗng "" hay bất kỳ giá trị nào nếu không có công thức hàm số cụ thể.
+        - Nếu không cần vẽ đồ thị, trường graphFunction BẮT BUỘC phải là null.
+        - Bất kỳ sự xuất hiện của hệ trục tọa độ mà không có đường biểu diễn hàm số nào đều bị coi là lỗi nghiêm trọng.
 
       RULE 6. TỐI ƯU HÓA DỮ LIỆU:
       - Nếu một câu hỏi có thể giải bằng văn bản mà không cần hình minh họa, hãy ưu tiên chỉ dùng văn bản để tiết kiệm tài nguyên hệ thống.
@@ -439,15 +426,15 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
       const cleanJson = responseText.substring(jsonStart, jsonEnd);
       
       const rawQuestions: Question[] = JSON.parse(cleanJson);
-      return rawQuestions.map(q => shuffleQuestion(q));
+      // Giữ nguyên tính năng trộn đáp án
+      return rawQuestions.map(q => shuffleQuestion(q)); 
     } catch (e: any) {
       if (e.name === 'AbortError') {
         console.warn("Yêu cầu đã bị hủy bởi người dùng hoặc hệ thống.");
         throw e; 
-    }
-      // GỌI HÀM NÀY ĐỂ XỬ LÝ VÀ HIỆN LỖI CHI TIẾT
+      }
       return handleApiError(e); 
-  }
+    }
 }
     
 
