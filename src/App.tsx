@@ -43,8 +43,10 @@ function App() {
   const [loadingTheory, setLoadingTheory] = useState(false);
 
     // Thêm vào vùng khai báo useState
+  // THÊM DÒNG NÀY: Dùng để lưu trữ trạng thái của yêu cầu đang chạy
+  const abortControllerRef = useRef<AbortController | null>(null);
     // Thanh tiến trình
-    const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
 // ... các state cũ ...
   const [sourceType, setSourceType] = useState<'TOPIC' | 'IMAGE'>('TOPIC');
   const [lastImages, setLastImages] = useState<File[]>([]); 
@@ -485,6 +487,14 @@ useEffect(() => {
   };
 
   const handleGenerate = async (newConfig: QuizConfig, apiKey: string) => {
+    // 1. Nếu đang có một yêu cầu khác chạy, hãy hủy nó trước khi bắt đầu cái mới
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+    }
+
+    // 2. Tạo một bộ điều khiển mới cho yêu cầu hiện tại
+    const controller = new AbortController();
+    abortControllerRef.current = controller;    
     setSourceType('TOPIC'); // Đánh dấu là tạo từ chủ đề
     setLoading(true);
     setErrorInfo(null); // Xóa lỗi cũ trước khi bắt đầu
@@ -493,10 +503,17 @@ useEffect(() => {
     localStorage.setItem('user_gemini_key', apiKey); // Đảm bảo lưu key mới nhất
     resetQuizState(); // Gọi hàm reset
     try {
-      const result = await generateQuiz(newConfig, apiKey);
+      // 3. Truyền controller.signal vào hàm generateQuiz
+        // Lưu ý: Bạn cần cập nhật hàm generateQuiz trong geminiService.ts để nhận thêm tham số này
+        const result = await generateQuiz(newConfig, apiKey, controller.signal);
       setQuestions(result);
+      setSavedTime(0);
     } catch (error: any) {
-      console.error("Bắt được lỗi tại App:", error.message);
+      // 4. Kiểm tra nếu lỗi là do người dùng chủ động hủy
+      if (error.name === 'AbortError') {
+        console.log("Yêu cầu đã được hủy bởi người dùng.");
+        return; // Thoát ra, không hiện thông báo lỗi
+    }
       try {
         // Phải parse vì geminiService ném ra chuỗi JSON
         const parsedError = JSON.parse(error.message);
@@ -510,6 +527,16 @@ useEffect(() => {
       }
     } finally {
       setLoading(false);
+      abortControllerRef.current = null; // Reset lại Ref khi xong
+    }
+  };
+
+    // Thêm hàm này bên dưới handleGenerate
+  const handleCancelRequest = () => {
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        setLoading(false);
+        // Có thể reset thêm progress bar nếu bạn có dùng
     }
   };
 
@@ -551,6 +578,8 @@ useEffect(() => {
       setLoading(false);
     }
   };
+
+  
 
   const handleLoadExamFromHistory = (oldQuestions: Question[], topic: string, savedTimeLimit: number) => {
     resetQuizState();
@@ -628,6 +657,13 @@ const handleUpdateScore = (points: number) => {
             <span className="text-sm font-bold text-blue-700">
               AI Đang soạn đề... {Math.round(progress)}%
             </span>
+            {/* NÚT HỦY MỚI THÊM VÀO */}
+        <button 
+            onClick={handleCancelRequest}
+            className="bg-red-500 hover:bg-red-600 text-white px-4 py-1 rounded-full text-xs font-bold shadow-lg transition-all"
+        >
+            Hủy yêu cầu
+        </button>
           </div>
         </div>
       )}

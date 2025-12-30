@@ -249,7 +249,7 @@ export const generateQuiz = async (config: QuizConfig, userApiKey: string, signa
 };
 
 async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: AbortSignal): Promise<Question[]> {
-    const genAI = new GoogleGenerativeAI(userApiKey);
+  const genAI = new GoogleGenerativeAI(userApiKey);
     
     // TÍNH TOÁN SỐ LƯỢNG RIÊNG CHO BATCH NÀY
     const tn = config.distribution.TN;
@@ -440,7 +440,10 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
       const rawQuestions: Question[] = JSON.parse(cleanJson);
       return rawQuestions.map(q => shuffleQuestion(q));
     } catch (e: any) {
-      if (e.name === 'AbortError') throw e;
+      if (e.name === 'AbortError') {
+        console.warn("Yêu cầu đã bị hủy bởi người dùng hoặc hệ thống.");
+        throw e; 
+    }
       // GỌI HÀM NÀY ĐỂ XỬ LÝ VÀ HIỆN LỖI CHI TIẾT
       return handleApiError(e); 
   }

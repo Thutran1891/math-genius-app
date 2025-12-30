@@ -162,7 +162,7 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
       {/* SỬ DỤNG 'prompt' TẠI ĐÂY (Xóa cảnh báo setPrompt) */}
       <div className="mb-6">
         <label className="block text-sm font-medium mb-1">Yêu cầu bổ sung (Optional)</label>
-        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} className="w-full p-3 border rounded-lg h-20 resize-none outline-none focus:ring-2 focus:ring-primary" placeholder="Ví dụ: Tạo 5 câu trắc nghiệm/Giải vắn tắt/Không vẽ hình" />
+        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} className="w-full p-3 border rounded-lg h-20 resize-none outline-none focus:ring-2 focus:ring-primary" placeholder="Ví dụ: Tạo 5 câu trắc nghiệm/Lời giải vắn tắt/Không vẽ hình" />
       </div>
 
       <div className="mb-8 border-t pt-6">
