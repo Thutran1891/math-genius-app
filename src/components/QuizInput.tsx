@@ -145,18 +145,31 @@ export const QuizInput: React.FC<Props> = ({ onGenerate, onGenerateFromImage, is
           <span className="text-sm font-bold text-primary bg-blue-50 px-2 py-1 rounded">Tổng: {totalQuestions} câu</span>
         </div>
         <div className="overflow-x-auto pb-2 border rounded-lg bg-gray-50 p-2">
-          <div className="grid grid-cols-4 gap-4 text-center min-w-[500px]">
-            <div className="text-gray-400 font-bold">Loại\Mức</div><div className="text-green-600 font-bold">Biết</div><div className="text-blue-600 font-bold">Hiểu</div><div className="text-purple-600 font-bold">VD</div>
-            {['TN', 'TLN', 'DS'].map(type => (
-              <React.Fragment key={type}>
-                <div className="font-bold self-center">{type}</div>
-                {(['BIET', 'HIEU', 'VANDUNG'] as const).map(level => (
-                  <input key={level} type="number" min="0" className="p-2 border rounded text-center" onChange={e => handleChange(type as any, level, e.target.value)} />
-                ))}
-              </React.Fragment>
-            ))}
-          </div>
+          {/* Thay đổi grid-cols-4 và gap để các cột sát nhau hơn */}
+        <div className="grid grid-cols-[80px_1fr_1fr_1fr] gap-2 text-center min-w-[300px]">
+          <div className="text-gray-400 font-bold text-xs">Loại\Mức</div>
+          <div className="text-green-600 font-bold text-xs uppercase">Biết</div>
+          <div className="text-blue-600 font-bold text-xs uppercase">Hiểu</div>
+          <div className="text-purple-600 font-bold text-xs uppercase">VD</div>
+          
+          {['TN', 'TLN', 'DS'].map(type => (
+            <React.Fragment key={type}>
+              <div className="font-bold self-center text-xs">{type}</div>
+              {(['BIET', 'HIEU', 'VANDUNG'] as const).map(level => (
+                <input 
+                  key={level} 
+                  type="number" 
+                  min="0" 
+                  // Điều chỉnh padding (p-1), chiều cao (h-8) và cỡ chữ (text-xs) để nhỏ lại 50%
+                  className="h-8 p-1 border rounded text-center text-xs outline-none focus:ring-1 focus:ring-primary focus:border-primary" 
+                  onChange={e => handleChange(type as any, level, e.target.value)} 
+                  placeholder="0"
+                />
+              ))}
+            </React.Fragment>
+          ))}
         </div>
+      </div>
       </div>
 
       {/* SỬ DỤNG 'prompt' TẠI ĐÂY (Xóa cảnh báo setPrompt) */}
