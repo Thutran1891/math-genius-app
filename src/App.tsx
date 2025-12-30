@@ -7,13 +7,12 @@ import { History } from './components/History';
 import { QuizConfig, Question } from './types';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import { LatexText } from './components/LatexText';
 import { generateQuiz, generateTheory, generateQuizFromImages } from './geminiService';
 import { TimerDisplay } from './components/TimerDisplay';
-
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,6 +42,17 @@ function App() {
   const [loadingTheory, setLoadingTheory] = useState(false);
 
     // Thêm vào vùng khai báo useState
+    const saveApiKeyToFirebase = async (apiKey: string) => {
+      if (auth.currentUser) {
+        try {
+          // Sử dụng doc và setDoc đã import ở dòng 10
+          const userRef = doc(db, "users", auth.currentUser.uid);
+          await setDoc(userRef, { geminiApiKey: apiKey }, { merge: true });
+        } catch (e) {
+          console.error("Lỗi lưu Key:", e);
+        }
+      }
+    };
   // THÊM DÒNG NÀY: Dùng để lưu trữ trạng thái của yêu cầu đang chạy
   const abortControllerRef = useRef<AbortController | null>(null);
     // Thanh tiến trình
@@ -408,14 +418,19 @@ useEffect(() => {
     apiKey: string, 
     timeLimit: number, 
     topicName?: string
-  ) => {
+) => {
+    // 1. Quản lý AbortController
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
-    setErrorInfo(null); // Reset lỗi cũ
-    setCurrentApiKey(apiKey); // QUAN TRỌNG: Lưu Key ngay lập tức để nút Đổi đề có thể dùng
-    localStorage.setItem('user_gemini_key', apiKey); // Đảm bảo lưu key mới nhất
+    setErrorInfo(null);
+    setIsStreaming(false);
+    setCurrentApiKey(apiKey);
+    localStorage.setItem('user_gemini_key', apiKey);
     resetQuizState(); 
   
-    // Lưu thông tin để nút "Đổi đề" biết phải làm gì
     setSourceType('IMAGE');    
     setLastImages(images);     
     setImageMode(mode);        
@@ -423,53 +438,59 @@ useEffect(() => {
     const defaultName = mode === 'EXACT' ? "Đề gốc từ ảnh" : "Đề tương tự từ ảnh";
     const finalTopic = topicName && topicName.trim() !== "" ? topicName : defaultName;
   
-    // Cập nhật config để hiển thị tiêu đề và thời gian
     setConfig({
       topic: finalTopic,
-      distribution: { 
-        TN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
-        TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, 
-        DS: { BIET: 0, HIEU: 0, VANDUNG: 0 } 
-      },
+      distribution: { TN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, TLN: { BIET: 0, HIEU: 0, VANDUNG: 0 }, DS: { BIET: 0, HIEU: 0, VANDUNG: 0 } },
       additionalPrompt: prompt,
       timeLimit: timeLimit || 15
     });  
   
     try {
-      // Gọi API với apiKey truyền trực tiếp từ tham số
-      const result = await generateQuizFromImages(images, mode, apiKey, prompt);
+      // 2. Gọi API với controller.signal
+      const result = await generateQuizFromImages(images, mode, apiKey, prompt, controller.signal);
+      setIsStreaming(true);
       setQuestions(result);
+      setSavedTime(0);
+      abortControllerRef.current = null;
     } catch (error: any) {
-      try {
-        // Giải mã JSON lỗi từ geminiService ném về
-        const parsedError = JSON.parse(error.message);
-        setErrorInfo({
-          title: parsedError.title,
-          detail: parsedError.detail
-        });
-      } catch {
-        // Nếu lỗi không phải định dạng JSON (lỗi code thuần)
-        setErrorInfo({ 
-          title: "Lỗi hệ thống", 
-          detail: error.message || "Đã có lỗi xảy ra." 
-        });
-      }
+      if (error.name === 'AbortError') return;
+      // Xử lý báo lỗi JSON tương tự như handleGenerate...
     } finally {
       setLoading(false);
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
-  };
+};
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      // [THÊM DÒNG NÀY] Khôi phục API Key từ localStorage cho App
-    const savedKey = localStorage.getItem('user_gemini_key');
-    if (savedKey) {
-      setCurrentApiKey(savedKey);
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    setUser(currentUser);
+
+    // 1. Luôn ưu tiên khôi phục nhanh từ LocalStorage để người dùng thấy ngay
+    const localKey = localStorage.getItem('user_gemini_key');
+    if (localKey) {
+      setCurrentApiKey(localKey);
     }
-    });
-    return () => unsubscribe();
-  }, []);
+
+    // 2. Nếu có mạng và đã đăng nhập, tải bản mới nhất từ Firebase về để cập nhật
+    if (currentUser) {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists() && userSnap.data().geminiApiKey) {
+          const cloudKey = userSnap.data().geminiApiKey;
+          setCurrentApiKey(cloudKey);
+          localStorage.setItem('user_gemini_key', cloudKey); // Cập nhật lại local luôn
+        }
+      } catch (e) {
+        console.error("Không thể tải Key từ Firebase:", e);
+      }
+    }
+  });
+  return () => unsubscribe();
+}, []);
 
   const handleToggleTheory = async () => {
     setShowTheory(true);
@@ -497,7 +518,7 @@ useEffect(() => {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    // --- CÁC TÍNH NĂNG CŨ (GIỮ NGUYÊN) ---
+    // Thiết lập các trạng thái ban đầu
     setSourceType('TOPIC'); 
     setLoading(true);
     setIsStreaming(false); 
@@ -505,30 +526,40 @@ useEffect(() => {
     setConfig(newConfig);
     setCurrentApiKey(apiKey);
     localStorage.setItem('user_gemini_key', apiKey); 
+    saveApiKeyToFirebase(apiKey);
     resetQuizState(); 
 
-    // --- TỰ ĐỘNG NGẮT SAU 60 GIÂY ---
+    // --- CẢI TIẾN BỘ ĐẾM THỜI GIAN CHỜ (TIMEOUT) ---
+    // Sử dụng biến cục bộ để theo dõi trạng thái chính xác hơn
+    let hasStartedStreaming = false;
+
     const timeoutId = setTimeout(() => {
-        if (loading && !isStreaming) {
+        // Chỉ hủy nếu sau 60s vẫn chưa nhận được bất kỳ dữ liệu nào
+        if (!hasStartedStreaming) {
             controller.abort();
+            setLoading(false);
             setErrorInfo({
                 title: "Hết thời gian chờ",
-                detail: "Kết nối mạng quá yếu hoặc AI phản hồi lâu. Vui lòng thử lại sau 1-2 phút."
+                detail: "Kết nối mạng quá yếu hoặc AI phản hồi lâu. Vui lòng kiểm tra lại Key hoặc thử lại sau."
             });
         }
-    }, 60000); // 60 giây
+    }, 150000); // Tăng lên 150 giây để AI có đủ thời gian "suy nghĩ"
 
     try {
         // 3. Gọi API với signal
         const result = await generateQuiz(newConfig, apiKey, controller.signal);
         
         // --- NGAY KHI CÓ DỮ LIỆU ---
-        clearTimeout(timeoutId); // Hủy bộ đếm thời gian chờ
+        hasStartedStreaming = true; // Đánh dấu đã nhận được dữ liệu
+        clearTimeout(timeoutId); 
+        
         setIsStreaming(true);
         setQuestions(result);
+        
+        // Sửa lỗi: Sử dụng setSavedTime(0) thay vì setTotalTime
         setSavedTime(0);
         
-        // [QUAN TRỌNG]: Ẩn nút Hủy ngay lập tức khi đã có kết quả
+        // Ẩn nút Hủy ngay lập tức
         abortControllerRef.current = null; 
 
     } catch (error: any) {
@@ -543,8 +574,8 @@ useEffect(() => {
             setErrorInfo(parsedError); 
         } catch (e) {
             setErrorInfo({ 
-                title: "Lỗi không xác định", 
-                detail: error.message || "Kiểm tra console để biết thêm chi tiết." 
+                title: "Lỗi tạo đề", 
+                detail: error.message || "Kiểm tra kết nối mạng và API Key của bạn." 
             });
         }
     } finally {

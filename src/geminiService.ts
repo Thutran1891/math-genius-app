@@ -269,8 +269,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
             responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
             temperature: 0.4,
             maxOutputTokens: 64000,
-            thinking_level: "medium",
-        } as any
+        } 
     });
 
     const prompt = `
@@ -487,9 +486,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
         responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
         temperature: mode === 'EXACT' ? 0.1 : 0.4,
         maxOutputTokens: 64000,
-        thinking_level: "medium",
-        media_resolution: "high"
-      } as any
+      } 
     });
   
     // 1. Chuẩn bị dữ liệu hình ảnh
