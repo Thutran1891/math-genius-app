@@ -81,15 +81,20 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                 {data.xNodes.map((x, i) => {
                     const cx = startX + 40 + i * colWidth;
                     
+                    // 1. CHUẨN HÓA BIẾN
                     const xValClean = (x || "").toLowerCase().replace(/\$|\\/g, '').trim();
                     const isInfinity = xValClean.includes('inf') || xValClean.includes('\u221e');
+                    const rawY = data.yNodes[i] || "";
+                    const rawYPrime = data.yPrimeVals?.[i] || "";
 
-                    // --- CHỈNH SỬA 1: LOGIC TIỆM CẬN (Sử dụng data.yPrimeVals trực tiếp) ---
-                    const isAsymptote = !isInfinity && (
-                        data.yPrimeVals?.[i] === '||' || 
-                        (data.yNodes[i] && data.yNodes[i].includes('||'))
-                    );
+                    // --- 2. LOGIC TIỆM CẬN ĐỨNG (QUAN TRỌNG NHẤT) ---
+                    // Điều kiện vẽ 2 vạch sọc:
+                    // - KHÔNG phải vô cực.
+                    // - Dòng Y BẮT BUỘC phải chứa '||' (thể hiện sự gián đoạn của hàm số).
+                    // - Dòng Y' cũng phải chứa '||' HOẶC AI bỏ trống (không xác định).
+                    const isAsymptote = !isInfinity && rawY.includes('||');
 
+                    // 3. Render X Nodes
                     const xDisplay = (
                         <foreignObject x={cx - 40} y={15} width={80} height={rowHeight - 15}>
                             <div className="flex justify-center w-full h-full font-bold text-sm items-center">
@@ -98,6 +103,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         </foreignObject>
                     );
 
+                    // --- 4. Render Y' Values (Số 0 hoặc ||) ---
                     let yPrimeValDisplay = null;
                     if (isAsymptote) {
                         yPrimeValDisplay = (
@@ -108,9 +114,10 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     } 
                     else if (!isInfinity) {
-                        // --- CHỈNH SỬA 2: TỰ ĐỘNG BÙ SỐ 0 (Dựa trên mảng data) ---
-                        const valToDraw = (data.yPrimeVals && data.yPrimeVals[i] !== undefined && data.yPrimeVals[i].trim() !== "" && data.yPrimeVals[i] !== "||") 
-                                        ? data.yPrimeVals[i] 
+                        // TỰ ĐỘNG BÙ SỐ 0: 
+                        // Nếu không phải tiệm cận và không phải vô cực, ta luôn ưu tiên số 0 tại cực trị.
+                        const valToDraw = (rawYPrime && rawYPrime.trim() !== "" && rawYPrime !== "||") 
+                                        ? rawYPrime 
                                         : "0"; 
 
                         yPrimeValDisplay = (
@@ -122,6 +129,7 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
+                    // 5. Render Dấu Y' (+/-)
                     let signDisplay = null;
                     if (i < data.xNodes.length - 1 && data.yPrimeSigns?.[i]) {
                         const signCx = cx + colWidth / 2;
@@ -134,31 +142,31 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
-                    let yDisplay = null;
-                    const rawY = data.yNodes[i] || "";
+                    // 6. Render Y Nodes
+                    let yNodeContent = null;
                     if (isAsymptote) {
                         const parts = rawY.split('||');
-                        const leftVal = (parts[0] || "").trim();
-                        const rightVal = (parts[1] || "").trim();
-                        const leftY = getYPos(leftVal, i, true, false);
-                        const rightY = getYPos(rightVal, i, false, true);
-                        yDisplay = (
+                        const lVal = (parts[0] || "").trim();
+                        const rVal = (parts[1] || "").trim();
+                        const lY = getYPos(lVal, i, true, false);
+                        const rY = getYPos(rVal, i, false, true);
+                        yNodeContent = (
                             <g>
-                                <foreignObject x={cx - 52} y={leftY - 15} width={50} height={30}>
+                                <foreignObject x={cx - 52} y={lY - 15} width={50} height={30}>
                                     <div className="flex justify-end w-full h-full font-bold text-sm items-center pr-1">
-                                        <LatexText text={cleanMath(leftVal)} />
+                                        <LatexText text={cleanMath(lVal)} />
                                     </div>
                                 </foreignObject>
-                                <foreignObject x={cx + 2} y={rightY - 15} width={50} height={30}>
+                                <foreignObject x={cx + 2} y={rY - 15} width={50} height={30}>
                                     <div className="flex justify-start w-full h-full font-bold text-sm items-center pl-0">
-                                        <LatexText text={cleanMath(rightVal)} />
+                                        <LatexText text={cleanMath(rVal)} />
                                     </div>
                                 </foreignObject>
                             </g>
                         );
                     } else {
                         const yPos = getYPos(rawY, i);
-                        yDisplay = (
+                        yNodeContent = (
                             <foreignObject x={cx - 40} y={yPos - 15} width={80} height={30}>
                                 <div className="flex justify-center w-full h-full font-bold text-sm items-center bg-transparent">
                                     <LatexText text={cleanMath(rawY)} />
@@ -167,18 +175,18 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                         );
                     }
 
+                    // 7. Mũi tên
                     let arrowLine = null;
                     if (i < data.xNodes.length - 1) {
-                        const currentYRaw = data.yNodes[i] || "";
                         const nextYRaw = data.yNodes[i+1] || "";
                         const nextCx = startX + 40 + (i+1) * colWidth;
                         let x1, y1, x2, y2;
 
-                        if (currentYRaw.includes('||')) {
-                            y1 = getYPos(currentYRaw.split('||')[1] || "", i, false, true);
+                        if (rawY.includes('||')) {
+                            y1 = getYPos(rawY.split('||')[1] || "", i, false, true);
                             x1 = cx + 8;
                         } else {
-                            y1 = getYPos(currentYRaw, i);
+                            y1 = getYPos(rawY, i);
                             x1 = cx + 22;
                         }
 
@@ -200,11 +208,12 @@ export const VariationTable: React.FC<Props> = ({ data }) => {
                             {xDisplay}
                             {yPrimeValDisplay}
                             {signDisplay}
+                            {yNodeContent}
                             {arrowLine}
-                            {yDisplay}
                         </g>
                     );
                 })}
+
             </svg>
         </div>
     );

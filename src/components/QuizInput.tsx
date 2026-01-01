@@ -192,7 +192,7 @@ const handleConfirmPdfPages = async (selectedOriginalPages: any[]) => {
         <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50"></div>
           <div className="min-w-[300px] p-2">
             <div className="grid grid-cols-4 gap-1.5 text-center mb-2">
-              <div className="text-[10px] font-black text-gray-400 uppercase">Loại</div>
+              <div className="text-[10px] font-black text-red-500 uppercase">Loại \ mức</div>
               <div className="text-[10px] font-black text-green-600 uppercase">Biết</div>
               <div className="text-[10px] font-black text-blue-600 uppercase">Hiểu</div>
               <div className="text-[10px] font-black text-purple-600 uppercase">VD</div>
@@ -206,8 +206,8 @@ const handleConfirmPdfPages = async (selectedOriginalPages: any[]) => {
                   key={level} 
                   type="number" 
                   min="0" 
-                  // Điều chỉnh padding (p-2), chiều cao (h-14) và cỡ chữ (text-xs) 
-                  className="h-14 p-2 border rounded text-center text-xs outline-none focus:ring-1 focus:ring-primary focus:border-primary" 
+                  // Điều chỉnh padding (p-2), chiều cao (h-10) và cỡ chữ (text-xs) 
+                  className="h-10 p-2 border rounded text-center text-xs outline-none focus:ring-1 focus:ring-primary focus:border-primary" 
                   onChange={e => handleChange(type as any, level, e.target.value)} 
                   placeholder=" "
                 />
