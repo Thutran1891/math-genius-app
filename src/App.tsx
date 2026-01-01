@@ -604,19 +604,32 @@ useEffect(() => {
   
     setAttemptCount(prev => prev + 1); // Tăng số lần (Lần 2 trở đi sẽ hiện chú thích)
     setLoading(true);
+    // Bước chèn mới: Lấy danh sách văn bản câu hỏi hiện tại để yêu cầu AI né tránh
+    // Chúng ta chỉ lấy tối đa 10 câu gần nhất để tránh làm Prompt quá dài gây tốn token
+    const currentQuestionsContent = questions.map(q => q.questionText).slice(-10);
+    
+    // Tạo bản sao config có kèm danh sách loại trừ
+    const configWithExclusion: QuizConfig = {
+        ...config,
+        excludeQuestions: currentQuestionsContent
+    };
   
     try {
       if (sourceType === 'TOPIC') {
-        const result = await generateQuiz(config, currentApiKey);
+        // Sử dụng configWithExclusion thay vì config cũ
+        const result = await generateQuiz(configWithExclusion, currentApiKey);
         setQuestions(result);
       } else {
         // Dùng các biến đã lưu: lastImages và imageMode
         if (lastImages.length > 0) {
+          // Đối với tạo từ ảnh, chúng ta gửi danh sách né vào tham số additionalPrompt
+          const exclusionText = `\nKHÔNG tạo lại các câu hỏi có nội dung sau: ${currentQuestionsContent.join(" | ")}`;
+          
           const result = await generateQuizFromImages(
-            lastImages, 
-            imageMode, // Đã sử dụng biến này, sẽ hết báo lỗi vàng
-            currentApiKey,
-            config.additionalPrompt
+              lastImages,
+              imageMode,
+              currentApiKey,
+              (config.additionalPrompt || "") + exclusionText
           );
           setQuestions(result);
         }
@@ -626,6 +639,7 @@ useEffect(() => {
       setScore(0);
       setSavedTime(0);
       setIsSaved(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' }); // Cuộn lên đầu cho trải nghiệm tốt hơn
     } catch (error: any) {
       alert("Lỗi khi đổi đề: " + error.message);
     } finally {

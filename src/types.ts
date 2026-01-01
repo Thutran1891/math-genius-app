@@ -31,6 +31,7 @@ export interface QuizConfig {
     DS: { BIET: number; HIEU: number; VANDUNG: number };
   };
   additionalPrompt: string;
+  excludeQuestions?: string[]; // Thêm dòng này để lưu mảng các câu hỏi cũ
 }
 
 export interface Question {

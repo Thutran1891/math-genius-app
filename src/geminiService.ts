@@ -144,23 +144,28 @@ const questionSchema: any = {
           isCorrect: { type: SchemaType.BOOLEAN }
         },
         required: ["id", "content", "isCorrect"]
-      }
+      },
+      nullable: true
   },
   // ----------------------------------------------------
     
     variationTableData: { ...variationTableSchema, nullable: true },
-    graphFunction: { type: SchemaType.STRING },
+    graphFunction: { 
+      type: SchemaType.STRING, 
+      nullable: true, 
+      description: "BẮT BUỘC là null nếu câu hỏi không cần đồ thị. Tuyệt đối không để chuỗi rỗng." 
+  },
     // --- THÊM DÒNG NÀY ---
     asymptotes: { 
       type: SchemaType.ARRAY, 
       items: { type: SchemaType.STRING }, 
-      description: "Mảng chứa các đường tiệm cận. Ví dụ: ['x=2', 'y=1', 'y = 2*x + 1]" 
+      description: "BẮT BUỘC là null nếu không có đồ thị." 
   },
   // ---------------------
     geometryGraph: { ...geometryGraphSchema, nullable: true },
     plotlyData: { ...plotlyDataSchema, nullable: true }
   },
-  required: ['id', 'type', 'questionText', 'explanation']
+  required: ['id', 'type', 'questionText', 'explanation', 'correctAnswer', 'difficulty']
 };
 
   // 1. TÍNH TỔNG SỐ CÂU HỎI
@@ -255,14 +260,23 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
       generationConfig: {
           responseMimeType: "application/json",
           responseSchema: { type: SchemaType.ARRAY, items: questionSchema },
-          temperature: 0.4,
+          temperature: 0.9,  // Sự sáng tạo khác biệt thuộc [0, 1]
           maxOutputTokens: 64000, // Tận dụng tối đa khả năng phản hồi dài
       } 
   });
+  // 2. TẠO SALT (Hạt giống ngẫu nhiên):
+  const salt = Math.random().toString(36).substring(7);
+  // Tạo đoạn nhắc nhở né tránh câu cũ nếu có
+  const exclusionInstruction = config.excludeQuestions && config.excludeQuestions.length > 0
+  ? `\nTUYỆT ĐỐI KHÔNG lặp lại hoặc tạo câu hỏi tương tự các nội dung sau:\n${config.excludeQuestions.join('\n')}`
+  : "";
+  // const timestamp = Date.now();
 
     const prompt = `
-      Bạn là Chuyên Gia Giáo Dục. Tạo ${totalInBatch} câu hỏi cho chủ đề: "${config.topic}".
-      Yêu cầu bổ sung: "${config.additionalPrompt || "Không có"}"
+Bạn là Chuyên Gia Giáo Dục. [Mã phiên bản ngẫu nhiên: ${salt}]
+      Tạo ${totalInBatch} câu hỏi cho chủ đề: "${config.topic}".
+      ${exclusionInstruction}
+Yêu cầu bổ sung: "${config.additionalPrompt || "Không có"}"
       
       PHÂN BỔ CẤP ĐỘ TRONG ĐỢT NÀY:
       - Trắc nghiệm: ${tn.BIET} Biết, ${tn.HIEU} Hiểu, ${tn.VANDUNG} Vận dụng
@@ -376,7 +390,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
         - Cấu trúc CHUẨN KỸ THUẬT:
             + xNodes: ["$-\\infty$", "x1", "x2", "$+\\infty$"] (Luôn bắt đầu và kết thúc bằng vô cực nếu là hàm đa thức/phân thức)
             + yPrimeSigns: ["+", "-", "+"] (Số lượng ít hơn xNodes 1 đơn vị)
-            + yPrimeVals: Tại vị trí nghiệm ghi "0", tại vị trí không xác định ghi "||".
+            + yPrimeVals: Tại các điểm cực trị (nghiệm của y'), trường yPrimeVals BẮT BUỘC phải là '0'. Tại các điểm hàm số không xác định, yPrimeVals BẮT BUỘC là '||'.
             + yNodes: Phải khớp logic với dấu của y'.
               * QUAN TRỌNG VỚI TIỆM CẬN ĐỨNG: Tại vị trí x mà hàm số không xác định (có dấu || ở y' và y), giá trị yNodes BẮT BUỘC phải viết cả giới hạn trái và phải ngăn cách bởi '||'.
               * VÍ DỤ ĐÚNG: "$+\\infty$||$-\\infty$" (Tuyệt đối KHÔNG được viết thiếu như "$+\\infty$||" hay chỉ "$+\\infty$").
@@ -496,7 +510,7 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
           NHIỆM VỤ: 
           1. Đếm chính xác tổng số câu hỏi có trong các ảnh. 
           2. Tạo câu hỏi MỚI tương tự về kiến thức và độ khó như trong ảnh.
-          3. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số, tên, bối cảnh.
+          3. THAY ĐỔI SỐ LIỆU: Giữ nguyên dạng bài nhưng thay đổi con số, tên gọi và bối cảnh.
           4. GIẢI TOÁN NGẮN GỌN: Tự giải bài toán trước khi đưa ra đáp án. 
           5. QUY ƯỚC ĐẦU RA: Luôn đặt đáp án ĐÚNG vào vị trí đầu tiên (A). 'correctAnswer' luôn là "A".
           6. CHUẨN LATEX ĐÁP ÁN: Tất cả các con số, tọa độ, vectơ, phân số trong phần 'options' BẮT BUỘC phải nằm trong dấu $. Ví dụ: "$I\left(-\frac{7}{2}; \frac{15}{2}; -34\right)$". Không được để text thuần nếu có ký hiệu toán.
@@ -524,7 +538,8 @@ async function callGeminiAPI(config: QuizConfig, userApiKey: string, signal?: Ab
       - TỌA ĐỘ: Dùng dấu chấm phẩy ";" để ngăn cách (ví dụ: $(1; 2; 3)$).
       - LOẠI CÂU HỎI: Tự động phân loại 'type' là 'TN' (Trắc nghiệm), 'TLN' (Điền số) hoặc 'DS' (Đúng/Sai) dựa trên nội dung ảnh. 
       - LƯU Ý: Nếu câu hỏi là câu tự luận thì chỉ viết 'type' 'TLN' khi đáp số là một số (số thực hoặc số nguyên) đơn lẻ duy nhất, ngược lại thì chuyển về 'type' 'TN' (trắc nghiệm) và tự bổ sung thêm 3 phương án nhiễu hợp lý.
-    
+      - Trường 'graphFunction' PHẢI là cú pháp Javascript (Dùng *, /, Math.pow). TUYỆT ĐỐI KHÔNG DÙNG LaTeX trong trường này.
+
       TRẢ VỀ JSON ARRAY CHỨA ĐỦ SỐ LƯỢNG CÂU HỎI.
     `;      
       // 3. Gửi yêu cầu (Bọc trong try-catch và dùng retryOperation)

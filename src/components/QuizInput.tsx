@@ -188,14 +188,16 @@ const handleConfirmPdfPages = async (selectedOriginalPages: any[]) => {
           <span className="text-xs text-red-500 italic mr-2">(Tổng trọng số nên: {'<='} 20 (TN = 1, TLN = 2, ĐS = 4))</span>
           <span className="text-sm font-bold text-primary bg-blue-50 px-2 py-1 rounded">Tổng: {totalQuestions} câu</span>
         </div>
-        <div className="overflow-x-auto pb-2 border rounded-lg bg-gray-50 p-2">
-          {/* Thay đổi grid-cols-4 và gap để các cột sát nhau hơn */}
-        <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr] gap-2 text-center w-full min-w-[280px]">
-          <div className="text-gray-400 font-bold text-xs">Loại\Mức</div>
-          <div className="text-green-600 font-bold text-xs uppercase">Biết</div>
-          <div className="text-blue-600 font-bold text-xs uppercase">Hiểu</div>
-          <div className="text-purple-600 font-bold text-xs uppercase">VD</div>
-          
+
+        <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50"></div>
+          <div className="min-w-[300px] p-2">
+            <div className="grid grid-cols-4 gap-1.5 text-center mb-2">
+              <div className="text-[10px] font-black text-gray-400 uppercase">Loại</div>
+              <div className="text-[10px] font-black text-green-600 uppercase">Biết</div>
+              <div className="text-[10px] font-black text-blue-600 uppercase">Hiểu</div>
+              <div className="text-[10px] font-black text-purple-600 uppercase">VD</div>
+            
+
           {['TN', 'TLN', 'DS'].map(type => (
             <React.Fragment key={type}>
               <div className="font-bold self-center text-xs">{type}</div>
