@@ -7,7 +7,8 @@ import { History } from './components/History';
 import { QuizConfig, Question } from './types';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { addDoc, collection, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, setDoc } from 'firebase/firestore'; // Dành cho Firestore
+import { getDatabase, ref, onDisconnect, set } from 'firebase/database'; // Dành cho Realtime Database (Online status)
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { RefreshCcw, Trophy, ArrowLeft, History as HistoryIcon, Save, BookOpen, X, AlertTriangle, CheckCircle } from 'lucide-react';
 import { LatexText } from './components/LatexText';
@@ -462,49 +463,60 @@ useEffect(() => {
     }
 };
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    setUser(currentUser);
 
-      // 1. Luôn ưu tiên khôi phục nhanh từ LocalStorage để người dùng thấy ngay (Giữ nguyên)
-      const localKey = localStorage.getItem('user_gemini_key');
-      if (localKey) {
-        setCurrentApiKey(localKey);
+    // 1. Luôn ưu tiên khôi phục nhanh từ LocalStorage để người dùng thấy ngay
+    const localKey = localStorage.getItem('user_gemini_key');
+    if (localKey) {
+      setCurrentApiKey(localKey);
+    }
+
+    // 2. Nếu có mạng và đã đăng nhập -> Thực hiện các tác vụ
+    if (currentUser) {
+      
+      // --- [MỚI] A. Cập nhật trạng thái Online (Dùng Realtime Database) ---
+      // Giúp tự động xóa tên khi người dùng tắt Tab/Trình duyệt
+      try {
+        const rtdb = getDatabase();
+        const presenceRef = ref(rtdb, `online_users/${currentUser.uid}`);
+
+        // Cài đặt: Nếu mất kết nối -> Xóa node này ngay lập tức
+        onDisconnect(presenceRef).remove();
+
+        // Ghi nhận trạng thái đang online
+        set(presenceRef, {
+          displayName: currentUser.displayName || "User không tên",
+          email: currentUser.email,
+          lastSeen: Date.now(),
+          state: 'online'
+        });
+      } catch (e) {
+        console.error("Lỗi Realtime Database:", e);
       }
 
-      // 2. Nếu có mạng và đã đăng nhập -> Thực hiện các tác vụ với Firestore
-      if (currentUser) {
-        try {
-          // [QUAN TRỌNG] Import thêm setDoc và serverTimestamp vào dòng này
-          const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+      // --- [CŨ] B. Tải API Key từ Firestore ---
+      try {
+        // Import dynamic Firestore để lấy key (giữ nguyên logic cũ của bạn)
+        const { doc, getDoc } = await import('firebase/firestore');
 
-          // --- [MỚI] A. Cập nhật trạng thái Online ---
-          // Ghi nhận người dùng đang online vào collection "online_status"
-          const userStatusRef = doc(db, "online_status", currentUser.uid);
-          await setDoc(userStatusRef, {
-            displayName: currentUser.displayName || "User không tên",
-            email: currentUser.email,
-            lastSeen: serverTimestamp(), // Lưu thời gian thực
-            isOnline: true
-          }, { merge: true });
-
-          // --- [CŨ] B. Tải API Key từ Firebase ---
-          const userRef = doc(db, "users", currentUser.uid);
-          const userSnap = await getDoc(userRef);
-          
-          if (userSnap.exists() && userSnap.data().geminiApiKey) {
-            const cloudKey = userSnap.data().geminiApiKey;
-            setCurrentApiKey(cloudKey);
-            localStorage.setItem('user_gemini_key', cloudKey); // Cập nhật lại local luôn
-          }
-
-        } catch (e) {
-          console.error("Lỗi cập nhật dữ liệu người dùng (Online status/API Key):", e);
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (userSnap.exists() && userSnap.data().geminiApiKey) {
+          const cloudKey = userSnap.data().geminiApiKey;
+          setCurrentApiKey(cloudKey);
+          localStorage.setItem('user_gemini_key', cloudKey); // Đồng bộ lại local
         }
+      } catch (e) {
+        console.error("Lỗi tải API Key từ Firestore:", e);
       }
-    });
-    return () => unsubscribe();
-  }, []);
+    }
+  });
+
+  return () => unsubscribe();
+}, []);
 
   const handleToggleTheory = async () => {
     setShowTheory(true);
