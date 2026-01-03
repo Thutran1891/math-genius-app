@@ -462,35 +462,49 @@ useEffect(() => {
     }
 };
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-    setUser(currentUser);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
 
-    // 1. Luôn ưu tiên khôi phục nhanh từ LocalStorage để người dùng thấy ngay
-    const localKey = localStorage.getItem('user_gemini_key');
-    if (localKey) {
-      setCurrentApiKey(localKey);
-    }
-
-    // 2. Nếu có mạng và đã đăng nhập, tải bản mới nhất từ Firebase về để cập nhật
-    if (currentUser) {
-      try {
-        const { doc, getDoc } = await import('firebase/firestore');
-        const userRef = doc(db, "users", currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists() && userSnap.data().geminiApiKey) {
-          const cloudKey = userSnap.data().geminiApiKey;
-          setCurrentApiKey(cloudKey);
-          localStorage.setItem('user_gemini_key', cloudKey); // Cập nhật lại local luôn
-        }
-      } catch (e) {
-        console.error("Không thể tải Key từ Firebase:", e);
+      // 1. Luôn ưu tiên khôi phục nhanh từ LocalStorage để người dùng thấy ngay (Giữ nguyên)
+      const localKey = localStorage.getItem('user_gemini_key');
+      if (localKey) {
+        setCurrentApiKey(localKey);
       }
-    }
-  });
-  return () => unsubscribe();
-}, []);
+
+      // 2. Nếu có mạng và đã đăng nhập -> Thực hiện các tác vụ với Firestore
+      if (currentUser) {
+        try {
+          // [QUAN TRỌNG] Import thêm setDoc và serverTimestamp vào dòng này
+          const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+
+          // --- [MỚI] A. Cập nhật trạng thái Online ---
+          // Ghi nhận người dùng đang online vào collection "online_status"
+          const userStatusRef = doc(db, "online_status", currentUser.uid);
+          await setDoc(userStatusRef, {
+            displayName: currentUser.displayName || "User không tên",
+            email: currentUser.email,
+            lastSeen: serverTimestamp(), // Lưu thời gian thực
+            isOnline: true
+          }, { merge: true });
+
+          // --- [CŨ] B. Tải API Key từ Firebase ---
+          const userRef = doc(db, "users", currentUser.uid);
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists() && userSnap.data().geminiApiKey) {
+            const cloudKey = userSnap.data().geminiApiKey;
+            setCurrentApiKey(cloudKey);
+            localStorage.setItem('user_gemini_key', cloudKey); // Cập nhật lại local luôn
+          }
+
+        } catch (e) {
+          console.error("Lỗi cập nhật dữ liệu người dùng (Online status/API Key):", e);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleToggleTheory = async () => {
     setShowTheory(true);
