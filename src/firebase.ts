@@ -8,6 +8,7 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 const firebaseConfig = {
   apiKey: "AIzaSyBB8qyd_u7Yd1Nql3u-3tJ02Ohm1bbtT6Y",
   authDomain: "mathgenius-thu18.firebaseapp.com",
+  databaseURL: "https://mathgenius-thu18-default-rtdb.firebaseio.com",
   projectId: "mathgenius-thu18",
   storageBucket: "mathgenius-thu18.firebasestorage.app",
   messagingSenderId: "96381399270",
