@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Question } from '../types';
-import { CheckCircle, XCircle, Eye, EyeOff, Send } from 'lucide-react';
+import { CheckCircle, XCircle, Eye, EyeOff, Send , AlertCircle} from 'lucide-react';
 import { LatexText } from './LatexText';
 import { VariationTable } from './VariationTable';
 import { DynamicGeometry } from './DynamicGeometry';
@@ -239,11 +239,34 @@ const handleCheckResult = () => {
                 {question.type} - {question.difficulty === 'BIET' ? 'Biết' : question.difficulty === 'HIEU' ? 'Hiểu' : 'Vận dụng'}
             </span>
         </div>
+        {/* BADGE TRẠNG THÁI */}
         {isChecked && (
-             <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold animate-pulse ${isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {isCorrect ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                {question.type === 'DS' ? (isCorrect ? 'Hoàn thành' : 'Chưa đúng') : (isCorrect ? 'Chính xác!' : 'Sai rồi!')}
-             </div>
+            <div className={`flex items-center gap-1 px-3 py-1 rounded-full text-sm font-bold animate-pulse 
+                ${question.isSkipped 
+                    ? 'bg-gray-200 text-yellow-600 border border-gray-300' // Style cho "Chưa làm"
+                    : isCorrect 
+                        ? 'bg-green-100 text-green-700' 
+                        : 'bg-red-100 text-red-700'
+                }`
+            }>
+                {/* Render Icon & Text */}
+                {question.isSkipped ? (
+                    <>
+                        <AlertCircle className="w-4 h-4" />
+                        <span>Chưa làm</span>
+                    </>
+                ) : isCorrect ? (
+                    <>
+                        <CheckCircle className="w-4 h-4" />
+                        <span>{question.type === 'DS' ? 'Hoàn thành' : 'Chính xác!'}</span>
+                    </>
+                ) : (
+                    <>
+                        <XCircle className="w-4 h-4" />
+                        <span>{question.type === 'DS' ? 'Chưa đúng' : 'Sai rồi!'}</span>
+                    </>
+                )}
+            </div>
         )}
       </div>
 
@@ -253,12 +276,20 @@ const handleCheckResult = () => {
 
     {/* --- SỬA LẠI KHU VỰC NÀY ĐỂ TRÁNH TRÙNG LẶP --- */}
     {/* KHU VỰC VẼ HÌNH ẢNH MINH HỌA */}
-    {/* Chỉ hiển thị div bao ngoài nếu có ít nhất 1 loại dữ liệu hình ảnh để tránh khoảng trắng thừa */}
-    {(question.geometryGraph || (question.variationTableData && question.variationTableData.xNodes.length > 0) || question.graphFunction) && (
+    {/* Chỉ hiển thị div bao ngoài nếu có ít nhất 1 loại dữ liệu hình ảnh HỢP LỆ */}
+    {(
+        // 1. Check Hình học: Phải tồn tại object VÀ có ít nhất 1 cạnh (edges)
+        (question.geometryGraph && question.geometryGraph.edges && question.geometryGraph.edges.length > 0) || 
+        // 2. Check BBT: Phải có dữ liệu cột x
+        (question.variationTableData && question.variationTableData.xNodes.length > 0) || 
+        // 3. Check Đồ thị: Phải có chuỗi hàm số
+        question.graphFunction
+    ) && (
         <div className="space-y-6 flex justify-center mb-6">
             {(() => {
                 // CASE 1: HÌNH HỌC (Ưu tiên cao nhất)
-                if (question.geometryGraph) {
+                // Cập nhật điều kiện: Chỉ render nếu mảng edges không rỗng
+                if (question.geometryGraph && question.geometryGraph.edges && question.geometryGraph.edges.length > 0) {
                     return (
                         <div className="border rounded-lg p-4 bg-gray-50 shadow-inner w-full max-w-md">
                             <DynamicGeometry graph={question.geometryGraph} />
@@ -278,7 +309,7 @@ const handleCheckResult = () => {
                     );
                 }
 
-                // KHÔNG CÓ DỮ LIỆU -> KHÔNG RENDER GÌ CẢ (Clean UI)
+                // KHÔNG CÓ DỮ LIỆU HỢP LỆ -> KHÔNG RENDER GÌ CẢ
                 return null;
             })()}
         </div>

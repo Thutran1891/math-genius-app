@@ -195,27 +195,45 @@ useEffect(() => {
   const currentQuestions = questionsRef.current;
 
   const finalizedQuestions = currentQuestions.map(q => {
-    // Nếu đã bấm "Kiểm tra" (isCorrect đã có true/false) thì giữ nguyên
+    // Nếu câu hỏi này đã được chấm trước đó (người dùng bấm "Kiểm tra" thủ công), giữ nguyên
     if (q.isCorrect !== undefined) return q;
 
-    // Nếu chưa bấm "Kiểm tra", tiến hành chấm điểm dựa trên userAnswer đã lưu
-    let isCorrect = false;
-    const userAns = q.userAnswer;
-    if (!userAns) return { ...q, isCorrect: false };
+    // 1. KIỂM TRA XEM CÓ LÀM BÀI KHÔNG
+    let isSkipped = false;
+    const uAns = q.userAnswer;
 
+    if (q.type === 'DS') {
+        // Với câu Đúng/Sai, nếu object rỗng hoặc null -> Chưa làm
+        if (!uAns || Object.keys(uAns).length === 0) isSkipped = true;
+    } else {
+        // Với TN và TLN, nếu null, undefined hoặc chuỗi rỗng -> Chưa làm
+        // Lưu ý: TLN nhập số 0 vẫn tính là đã làm (check String().trim())
+        if (uAns === null || uAns === undefined || String(uAns).trim() === '') {
+            isSkipped = true;
+        }
+    }
+
+    // Nếu chưa làm -> Đánh dấu Skipped, Tính là sai (isCorrect = false) để không cộng điểm
+    if (isSkipped) {
+        return { ...q, isCorrect: false, isSkipped: true };
+    }
+
+    // 2. NẾU ĐÃ LÀM -> TIẾN HÀNH CHẤM ĐIỂM (Logic cũ)
+    let isCorrect = false;
     if (q.type === 'TN') {
-      isCorrect = userAns === q.correctAnswer;
+        isCorrect = uAns === q.correctAnswer;
     } else if (q.type === 'TLN') {
-      const uVal = parseFloat(userAns.toString().replace(',', '.'));
-      const cVal = parseFloat(q.correctAnswer?.toString().replace(',', '.') || '');
-      isCorrect = !isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01;
+        const uVal = parseFloat(uAns.toString().replace(',', '.'));
+        const cVal = parseFloat(q.correctAnswer?.toString().replace(',', '.') || '');
+        isCorrect = !isNaN(uVal) && !isNaN(cVal) && Math.abs(uVal - cVal) <= 0.01;
     } else if (q.type === 'DS') {
-      const ansObj = (userAns as unknown || {}) as Record<string, boolean>; // Thêm || {}
-      const correctCount = q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0;
-      isCorrect = (correctCount === (q.statements?.length || 4));
-  }
-    return { ...q, isCorrect };
-  });
+        const ansObj = (uAns as unknown || {}) as Record<string, boolean>;
+        const correctCount = q.statements?.filter(s => ansObj[s.id] === s.isCorrect).length || 0;
+        isCorrect = (correctCount === (q.statements?.length || 4));
+    }
+
+    return { ...q, isCorrect, isSkipped: false };
+});
 
   // Tính tổng điểm
   const currentScore = finalizedQuestions.reduce((sum, q) => {

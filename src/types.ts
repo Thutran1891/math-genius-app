@@ -58,8 +58,11 @@ export interface Question {
   geometryGraph?: GeometryGraph; 
   variationTableData?: VariationTableData; 
   
-  userAnswer?: string;
+  userAnswer?: string | any; // Sửa nhẹ type này để linh hoạt
   isCorrect?: boolean;
+  // --- THÊM DÒNG NÀY ---
+  isSkipped?: boolean; // Đánh dấu câu chưa làm
+  // --------------------
   showSolution?: boolean;
 }
 

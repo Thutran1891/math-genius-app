@@ -325,12 +325,18 @@ Yêu cầu bổ sung: "${config.additionalPrompt || "Không có"}"
 
       RULE 4. QUY TẮC CÂU ĐIỀN ĐÁP SỐ (TLN): Câu hỏi phải có câu trả lời là 1 số nguyên hoặc số thập phân, nếu là số thập phân vô hạn thì thêm chú thích yêu cầu làm tròn đến chữ số thập phân thứ hai.
 
-      RULE 5 (Bổ sung): > - TUYỆT ĐỐI KHÔNG được trả về trường graphFunction là chuỗi rỗng "" hay bất kỳ giá trị nào nếu không có công thức hàm số cụ thể.
-        - Nếu không cần vẽ đồ thị, trường graphFunction BẮT BUỘC phải là null.
-        - Bất kỳ sự xuất hiện của hệ trục tọa độ mà không có đường biểu diễn hàm số nào đều bị coi là lỗi nghiêm trọng.
-
-      RULE 6. TỐI ƯU HÓA DỮ LIỆU:
-      - Nếu một câu hỏi có thể giải bằng văn bản mà không cần hình minh họa, hãy ưu tiên chỉ dùng văn bản để tiết kiệm tài nguyên hệ thống.
+      RULE 5 & 6 (QUAN TRỌNG - CHỐNG LỖI TRẮNG TRANG): TỐI ƯU HÓA HÌNH ẢNH
+        - NGUYÊN TẮC VÀNG: "KHÔNG CÓ TỪ KHÓA -> KHÔNG VẼ HÌNH".
+        - Chỉ sinh dữ liệu hình ảnh (graphFunction, geometryGraph, variationTableData) KHI VÀ CHỈ KHI trong 'questionText' có chứa các cụm từ tham chiếu:
+             + "hình bên", "hình vẽ bên", "đồ thị bên", "bảng biến thiên bên".
+             + "Cho đồ thị...", "Cho bảng biến thiên...".
+        
+        - TRƯỜNG HỢP CẤM VẼ (BẮT BUỘC set null):
+             + Nếu đề bài đã cho công thức tường minh (VD: "Cho hàm số $y=x^3-3x$...", "Cho mặt phẳng $(P): 3x-y+2z-5=0$").
+             + Nếu đề bài chỉ yêu cầu tính toán đại số (VD: Tìm vectơ pháp tuyến, tính đạo hàm, tính tích phân).
+             + TUYỆT ĐỐI KHÔNG vẽ một hệ trục tọa độ Oxyz trống trơn vô nghĩa.
+        
+        - Nếu vi phạm (cố tình vẽ khi không cần thiết), hệ thống sẽ bị lỗi JSON -> BẠN SẼ BỊ PHẠT.
       
       RULE 7. HÌNH HỌC KHÔNG GIAN (Oxyz) (BẮT BUỘC TUÂN THỦ ĐỂ CÓ NÉT ĐỨT)::
          - BẮT BUỘC dùng trường 'geometryGraph' (Nodes & Edges).  
@@ -400,26 +406,34 @@ Yêu cầu bổ sung: "${config.additionalPrompt || "Không có"}"
       RULE 11. NGUYÊN TẮC PHÂN LOẠI DỮ LIỆU (QUAN TRỌNG - SỬA ĐỔI):
         
         A. NẾU LÀ CÂU HỎI HÌNH HỌC (Oxyz, Hình không gian, Hình phẳng):
-           - BẮT BUỘC trả về 'geometryGraph' để vẽ hình.
-           - KHÔNG trả về 'variationTableData' hay 'graphFunction'.
+           - QUY TẮC "TRIGGER TỪ KHÓA": 
+             + MẶC ĐỊNH trường 'geometryGraph' phải là null.
+             + CHỈ sinh dữ liệu 'geometryGraph' (để vẽ hình) KHI VÀ CHỈ KHI trong 'questionText' có chứa các từ khóa tham chiếu cụ thể: "hình bên", "hình vẽ bên", "như hình vẽ", "cho khối chóp bên".
+           
+           - TRƯỜNG HỢP CẤM VẼ (geometryGraph = null):
+             + Nếu đề bài chỉ cho dữ kiện bằng lời hoặc công thức (Ví dụ: "Trong không gian Oxyz, cho mặt cầu (S):...", "Tính thể tích khối chóp S.ABCD biết...").
+             + TUYỆT ĐỐI KHÔNG vẽ một hệ trục Oxyz trống trơn nếu không có hình khối cụ thể đi kèm.
+
+           - Các trường 'variationTableData' và 'graphFunction' LUÔN LUÔN là null.
 
         B. NẾU LÀ CÂU HỎI GIẢI TÍCH / HÀM SỐ:
-           - Bắt buộc chọn DUY NHẤT 1 trong 3 hình thức hiển thị sau (Không được trộn lẫn):
+           - Bắt buộc chọn DUY NHẤT 1 trong 3 hình thức hiển thị sau dựa trên từ khóa trong đề bài:
            
-           Option 1: CHO BẰNG CÔNG THỨC (Đại số)
-             - Chỉ cung cấp text và công thức trong 'questionText'.
-             - Để null các trường: 'graphFunction', 'variationTableData', 'geometryGraph'.
+           Option 1: CHO BẰNG CÔNG THỨC (Đại số - Phổ biến nhất)
+             - Dấu hiệu: Đề bài cho công thức hàm số cụ thể hoặc chỉ hỏi tính chất. KHÔNG có từ "đồ thị bên", "bảng biến thiên bên".
+             - Hành động: Chỉ cung cấp text trong 'questionText'.
+             - BẮT BUỘC: 'graphFunction', 'variationTableData', 'geometryGraph' đều phải là null.
              
            Option 2: CHO BẰNG ĐỒ THỊ
-             - Trả về 'graphFunction' (và 'asymptotes' nếu có).
-             - Để null các trường: 'variationTableData', 'geometryGraph'.
-             - Trong 'questionText' phải ghi: "Cho đồ thị hàm số y=f(x) như hình bên."
+             - Dấu hiệu: Trong 'questionText' có cụm từ "đồ thị bên", "đồ thị như hình vẽ".
+             - Hành động: Trả về 'graphFunction' (và 'asymptotes' nếu có).
+             - BẮT BUỘC: 'variationTableData', 'geometryGraph' là null.
              
            Option 3: CHO BẰNG BẢNG BIẾN THIÊN
-             - Trả về 'variationTableData'.
-             - Để null các trường: 'graphFunction', 'geometryGraph'.
-             - Trong 'questionText' phải ghi: "Cho bảng biến thiên như hình bên."
-
+             - Dấu hiệu: Trong 'questionText' có cụm từ "bảng biến thiên bên", "bảng biến thiên như hình vẽ".
+             - Hành động: Trả về 'variationTableData'.
+             - BẮT BUỘC: 'graphFunction', 'geometryGraph' là null.
+             
         RULE 12. QUY TẮC ĐÁP ÁN TỌA ĐỘ/VECTƠ:
           - Tuyệt đối KHÔNG đưa tọa độ (x;y;z) hoặc biểu thức chứa biến vào trường 'correctAnswer' của loại 'TLN'.
           - Nếu đáp án là tọa độ hoặc biểu thức, BẮT BUỘC phải dùng loại 'TN'.
